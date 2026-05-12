@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Providers } from "./providers";
 
 export const metadata: Metadata = {
   title: "中医病案分析工作台",
@@ -15,7 +14,7 @@ export default function RootLayout({
   return (
     <html lang="zh-Hans">
       <body>
-        <Providers>{children}</Providers>
+        {children}
       </body>
     </html>
   );
