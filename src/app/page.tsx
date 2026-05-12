@@ -201,7 +201,6 @@ export default function Home() {
   return (
     <main className="app-shell">
       <section className="hero-panel">
-        <p className="eyebrow">医生端临床辅助</p>
         <h1>病案研判工作台</h1>
         <p className="hero-copy">
           从病案记录中提炼关键信息，标出影响判断的资料缺口，并输出可复核的中医临床参考。
@@ -216,7 +215,6 @@ export default function Home() {
       <section className="panel flow-panel">
         <div className="section-heading compact-heading">
           <div>
-            <p className="eyebrow">病案输入</p>
             <h2>病案记录</h2>
           </div>
           <button type="button" className="secondary-button compact-button" onClick={resetSession}>
@@ -243,7 +241,6 @@ export default function Home() {
 
         <div className="draft-panel compact-draft">
           <label className="field-block">
-            <span>病案记录</span>
             <textarea
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
