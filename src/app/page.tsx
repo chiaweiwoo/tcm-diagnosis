@@ -3,13 +3,6 @@
 import {
   Activity,
   AlertTriangle,
-  CheckCircle2,
-  ClipboardCheck,
-  FileText,
-  History,
-  Lock,
-  MessageSquareText,
-  ShieldCheck,
   Sparkles,
 } from "lucide-react";
 import { ChangeEvent, FormEvent, useState } from "react";
@@ -60,15 +53,6 @@ const historyRows = [
   { title: "PCOS经后调理", meta: "方药分析 · 已生成 · 医生反馈：有帮助" },
   { title: "右拇指弹响指", meta: "针灸方案 · 已生成 · 等待复核" },
   { title: "膝痛术后恢复", meta: "综合调理 · 被拦截：资料不足" },
-];
-
-const storageItems = [
-  "病案输入",
-  "校验结果",
-  "拦截原因",
-  "AI输出",
-  "模型与提示词版本",
-  "医生反馈",
 ];
 
 function buildMockResult(form: CaseForm): MockResult {
@@ -152,8 +136,7 @@ export default function Home() {
   const [errors, setErrors] = useState<Partial<Record<keyof CaseForm, string>>>({});
   const [blockedReasons, setBlockedReasons] = useState<string[]>([]);
   const [missingContext, setMissingContext] = useState<string[]>([]);
-  const [result, setResult] = useState<MockResult>(() => buildMockResult(samples.pcos));
-  const [feedback, setFeedback] = useState("尚未选择");
+  const [result, setResult] = useState<MockResult | null>(null);
 
   const modelLabel = form.modelMode === "快速模式" ? "deepseek-v4-flash" : "deepseek-v4-pro";
   const requiredCount = [
@@ -202,7 +185,6 @@ export default function Home() {
     }
 
     setResult(buildMockResult(form));
-    setFeedback("尚未选择");
   }
 
   function loadSample(sample: "pcos" | "trigger") {
@@ -210,8 +192,7 @@ export default function Home() {
     setErrors({});
     setBlockedReasons([]);
     setMissingContext([]);
-    setResult(buildMockResult(samples[sample]));
-    setFeedback("尚未选择");
+    setResult(null);
   }
 
   return (
@@ -219,15 +200,10 @@ export default function Home() {
       <section className="hero-panel">
         <div>
           <p className="eyebrow">医生端 · 中医病案分析</p>
-          <h1>临床决策辅助工作台</h1>
+          <h1>输入病案，生成分析</h1>
           <p className="hero-copy">
-            用结构化输入、提交前校验与医生反馈，测试DeepSeek在方药与针灸方案改良中的可靠性。
+            先用模拟结果测试流程；真实DeepSeek调用稍后接入。
           </p>
-        </div>
-        <div className="hero-status" aria-label="系统状态">
-          <span><ShieldCheck size={16} />仅限医生</span>
-          <span><Lock size={16} />密钥仅在服务端</span>
-          <span><ClipboardCheck size={16} />交互留存</span>
         </div>
       </section>
 
@@ -237,41 +213,6 @@ export default function Home() {
       </section>
 
       <div className="dashboard-grid">
-        <aside className="side-panel">
-          <div className="brand-card">
-            <div className="brand-mark">岐</div>
-            <div>
-              <h2>病案工作流</h2>
-              <p>采集 · 校验 · 分析 · 反馈</p>
-            </div>
-          </div>
-
-          <nav className="nav-list" aria-label="工作台导航">
-            <a href="#input"><FileText size={18} />病案输入</a>
-            <a href="#result"><Sparkles size={18} />AI分析预览</a>
-            <a href="#history"><History size={18} />历史记录</a>
-            <a href="#feedback"><MessageSquareText size={18} />医生反馈</a>
-          </nav>
-
-          <div className="metric-card">
-            <span>资料完整度</span>
-            <strong>{requiredCount}/7</strong>
-            <div className="progress-track">
-              <div style={{ width: `${(requiredCount / 7) * 100}%` }} />
-            </div>
-            <small>完整资料有助于提高稳定性，但隐私或资料不足时也可先分析。</small>
-          </div>
-
-          <div className="storage-card">
-            <h3>后续将保存</h3>
-            <div>
-              {storageItems.map((item) => (
-                <span key={item}>{item}</span>
-              ))}
-            </div>
-          </div>
-        </aside>
-
         <section className="main-panel" id="input">
           <div className="section-heading">
             <div>
@@ -282,6 +223,11 @@ export default function Home() {
               <button type="button" onClick={() => loadSample("pcos")}>载入PCOS样本</button>
               <button type="button" onClick={() => loadSample("trigger")}>载入弹响指样本</button>
             </div>
+          </div>
+
+          <div className="compact-status">
+            <span>资料完整度 {requiredCount}/7</span>
+            <small>缺少资料会提示，不会随意硬挡。</small>
           </div>
 
           <form className="case-form" onSubmit={submitCase}>
@@ -423,37 +369,45 @@ export default function Home() {
           </form>
         </section>
 
-        <section className="result-panel" id="result">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">AI输出</p>
-              <h2>{result.title}</h2>
+        {result ? (
+          <section className="result-panel" id="result">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">AI输出</p>
+                <h2>{result.title}</h2>
+              </div>
+              <span className="pill">{form.caseType}</span>
             </div>
-            <span className="pill">{form.caseType}</span>
-          </div>
 
-          <p className="result-summary">{result.summary}</p>
+            <p className="result-summary">{result.summary}</p>
 
-          <div className="result-sections">
-            {result.sections.map((section) => (
-              <article className="result-card" key={section.title}>
-                <h3>{section.title}</h3>
-                <ul>
-                  {section.items.map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
-              </article>
-            ))}
-          </div>
+            <div className="result-sections">
+              {result.sections.map((section) => (
+                <article className="result-card" key={section.title}>
+                  <h3>{section.title}</h3>
+                  <ul>
+                    {section.items.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </article>
+              ))}
+            </div>
 
-          <article className="caution-card">
-            <h3><AlertTriangle size={18} />风险提示</h3>
-            {result.cautions.map((item) => (
-              <p key={item}>{item}</p>
-            ))}
-          </article>
-        </section>
+            <article className="caution-card">
+              <h3><AlertTriangle size={18} />风险提示</h3>
+              {result.cautions.map((item) => (
+                <p key={item}>{item}</p>
+              ))}
+            </article>
+          </section>
+        ) : (
+          <section className="empty-panel">
+            <Sparkles size={28} />
+            <h2>提交后显示分析结果</h2>
+            <p>可先载入样本快速测试，也可以直接输入新病案。</p>
+          </section>
+        )}
 
         <section className="history-panel" id="history">
           <div className="section-heading">
@@ -471,33 +425,6 @@ export default function Home() {
               </button>
             ))}
           </div>
-        </section>
-
-        <section className="feedback-panel" id="feedback">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">医生反馈</p>
-              <h2>结果复核</h2>
-            </div>
-            <CheckCircle2 size={20} />
-          </div>
-          <div className="feedback-options" role="group" aria-label="医生反馈">
-            {["有帮助", "部分有帮助", "需要修改", "不适用"].map((item) => (
-              <button
-                key={item}
-                type="button"
-                className={feedback === item ? "selected" : ""}
-                onClick={() => setFeedback(item)}
-              >
-                {item}
-              </button>
-            ))}
-          </div>
-          <label className="field-block">
-            <span>反馈备注</span>
-            <textarea rows={4} placeholder="记录医生认为可采纳、需删除或需补充证据的地方" />
-          </label>
-          <p className="feedback-state">当前反馈：{feedback}</p>
         </section>
       </div>
     </main>
