@@ -18,6 +18,10 @@ export default function LoginPage() {
   useEffect(() => {
     const reason = new URLSearchParams(window.location.search).get("reason");
     setReasonMessage(reason ? reasonMessages[reason] ?? "" : "");
+
+    if (reason === "unauthorized") {
+      void createBrowserSupabaseClient().auth.signOut();
+    }
   }, []);
 
   async function handleGoogleSignIn() {
