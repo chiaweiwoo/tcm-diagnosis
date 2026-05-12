@@ -23,11 +23,11 @@ drafts, and save interactions for later review and prompt/model improvement.
 ## Stack Decisions
 
 - Frontend/deployment: Next.js + TypeScript, deployable to Vercel.
-- UI system: Chakra UI is installed and should be preferred for reusable components; custom CSS is acceptable for product-specific layout and branding.
+- UI system: keep the current Next.js + focused CSS approach unless a library clearly reduces complexity.
 - Icons: lucide-react.
-- Form and validation: react-hook-form + zod. Do not scatter medical guardrails across ad hoc conditionals when a schema/refinement can express the rule.
-- Auth/data: Supabase in a later phase.
-- AI: DeepSeek in a later phase through server-side API routes only.
+- Form and validation: zod plus focused validation helpers. Keep guardrails centralized and testable.
+- Auth/data: Supabase for future auth/storage and current server-side logging.
+- AI: DeepSeek through server-side API routes only.
 
 ## Hard Invariants
 
@@ -42,7 +42,7 @@ drafts, and save interactions for later review and prompt/model improvement.
    - prompt version
    - doctor feedback
    - timestamp and doctor email
-4. V0 is a mock dashboard, but it must reflect the real workflow: input, validation, analysis preview, history, feedback.
+4. The current workflow is draft organization, doctor review, then analysis result. Avoid showing analysis before submission.
 5. AI output must avoid guaranteed cure claims and must expose uncertainty.
 6. Requests that look patient-facing, vague, or promising guaranteed efficacy should be blocked before model submission.
 7. Citation/research retrieval is important for medical credibility, but it is phase 2. Until then, do not fabricate citations.
@@ -102,6 +102,8 @@ The app must reduce this variance.
 Implementation direction:
 
 - Store `prompt_version`, `model`, provider, temperature/reasoning settings, input JSON, output JSON, validation result, and doctor feedback for every run.
+- Store API-call performance for every model call: route, provider, model, latency, success/failure, token usage, estimated cost, prompt version, and useful metadata.
+- API logging should not slow down doctor-facing responses. Use background logging where possible; the UI should wait for DeepSeek, not for Supabase inserts.
 - Use strict schemas and stable output sections rather than free-form prose.
 - Use low temperature for clinical analysis.
 - Keep a regression set of representative doctor cases and compare outputs when prompt/model changes.
@@ -125,14 +127,22 @@ The tool should gently improve doctor data collection habits over time:
 - Treat validation as clinical coaching, not form punishment.
 - Primary workflow should be 草稿整理 → 结构复核 → 生成分析.
 - In V0, draft organization may be local/mock, but the future product should use one LLM call for draft organization and another LLM call for analysis.
+- The product now uses two LLM calls: one faster organization call and one analysis call. Keep both steps visible so doctors can correct structured data before analysis.
+
+## Latency And Cost
+
+- Do not assume slow calls are caused only by the model tier. Check logged latency, output token count, JSON parse failures, and prompt size.
+- Prefer concise structured outputs over long prose. Long completion length is a common cause of slow responses.
+- Keep `max_tokens` conservative for the analysis route unless the UI needs more detail.
+- Use API call logs before changing default models. Compare similar saved cases across model, latency, cost, and doctor feedback.
+- Keep verification pragmatic for this small project. Build before push when routes/UI changed, run unit tests when validation or JSON handling changed, and avoid style-only or heavyweight checks unless they prevent a likely broken deployment.
 
 ## Next Planned Phases
 
-1. Finish mock dashboard and verify desktop/mobile rendering.
+1. Improve analysis result readability and clinical grouping.
 2. Add Supabase auth with Google OAuth and email allowlist.
-3. Add `/api/analyze` server route with DeepSeek.
-4. Save cases, AI runs, blocked validations, and feedback.
-5. Add citation retrieval layer for PubMed/TCM sources.
+3. Save cases, AI runs, blocked validations, and feedback.
+4. Add citation retrieval layer for PubMed/TCM sources.
 
 ## Prompt Architecture Direction
 

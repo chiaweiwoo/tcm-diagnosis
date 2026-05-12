@@ -1,7 +1,19 @@
 "use client";
 
-import { AlertTriangle, Sparkles } from "lucide-react";
-import { ChangeEvent, FormEvent, useState } from "react";
+import {
+  Activity,
+  AlertTriangle,
+  Brain,
+  ClipboardCheck,
+  FileText,
+  ListChecks,
+  MessageSquareText,
+  Pill,
+  RotateCcw,
+  Sparkles,
+  UserRound,
+} from "lucide-react";
+import { ChangeEvent, FormEvent, ReactNode, useState } from "react";
 import { CaseForm, validateCaseForm } from "@/lib/caseValidation";
 import "./workbench.css";
 
@@ -46,6 +58,12 @@ const estimatedTrialCost = {
   usd: 0.0031,
 };
 
+const resultGroups = [
+  { title: "临床判断", sectionTitles: ["辨证假设", "当前方案评估"] },
+  { title: "建议方案", sectionTitles: ["修改建议", "备选思路"] },
+  { title: "复核与随访", sectionTitles: ["检查与监测", "证据缺口", "需要复核"] },
+];
+
 async function readApiError(response: Response) {
   try {
     const body = (await response.json()) as { error?: string };
@@ -79,6 +97,20 @@ export default function Home() {
     form.currentPlan,
     form.doctorQuestion,
   ].filter(Boolean).length;
+
+  function resetSession() {
+    setForm(initialForm);
+    setDraft("");
+    setActiveStep("draft");
+    setErrors({});
+    setBlockedReasons([]);
+    setMissingContext([]);
+    setOrganizeNotes([]);
+    setOrganizeSuggestions([]);
+    setResult(null);
+    setMeta(null);
+    setApiError("");
+  }
 
   function updateField(
     event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
@@ -193,8 +225,10 @@ export default function Home() {
     <main className="app-shell">
       <section className="hero-panel">
         <p className="eyebrow">医生端测试版</p>
-        <h1>输入病案，生成分析</h1>
-        <p className="hero-copy">草稿整理与分析现在会通过服务端调用DeepSeek。</p>
+        <h1>整理病案，辅助复核</h1>
+        <p className="hero-copy">
+          将医生草稿整理成可复核资料，提醒缺失信息，并生成务实、可追踪的中医临床参考建议。
+        </p>
       </section>
 
       <section className="notice-bar">
@@ -203,13 +237,19 @@ export default function Home() {
       </section>
 
       <div className="work-grid">
-        <section className="panel">
+        <section className={`panel ${activeStep === "result" ? "flow-panel" : ""}`}>
           <div className="section-heading compact-heading">
             <div>
               <p className="eyebrow">流程</p>
               <h2>草稿整理 → 结构复核 → 生成分析</h2>
             </div>
-            <span className="quiet-label">资料 {filledCount}/7</span>
+            <div className="heading-actions">
+              <span className="quiet-label">资料 {filledCount}/7</span>
+              <button type="button" className="secondary-button compact-button" onClick={resetSession}>
+                <RotateCcw size={15} />
+                重新开始
+              </button>
+            </div>
           </div>
 
           <div className="steps" aria-label="流程步骤">
@@ -273,70 +313,82 @@ export default function Home() {
                 </div>
               )}
 
-              <div className="form-row four">
-                <Field label="病案类型" badge="必填" error={errors.caseType}>
-                  <select name="caseType" value={form.caseType} onChange={updateField}>
-                    <option>方药分析</option>
-                    <option>针灸方案</option>
-                    <option>综合调理</option>
-                  </select>
+              <div className="form-section">
+                <SectionTitle icon={<UserRound size={18} />}>患者与病案</SectionTitle>
+                <div className="form-row four">
+                  <Field label="病案类型" badge="必填" error={errors.caseType}>
+                    <select name="caseType" value={form.caseType} onChange={updateField}>
+                      <option>方药分析</option>
+                      <option>针灸方案</option>
+                      <option>综合调理</option>
+                    </select>
+                  </Field>
+
+                  <Field label="年龄" badge="建议补充" error={errors.age}>
+                    <input name="age" value={form.age} onChange={updateField} inputMode="numeric" />
+                  </Field>
+
+                  <Field label="性别" badge="建议补充" error={errors.sex}>
+                    <select name="sex" value={form.sex} onChange={updateField}>
+                      <option value="">未填写</option>
+                      <option>女</option>
+                      <option>男</option>
+                      <option>其他</option>
+                    </select>
+                  </Field>
+
+                  <Field label="病程" badge="建议补充" error={errors.duration}>
+                    <input name="duration" value={form.duration} onChange={updateField} />
+                  </Field>
+                </div>
+              </div>
+
+              <div className="form-section">
+                <SectionTitle icon={<FileText size={18} />}>临床背景</SectionTitle>
+                <Field label="主诉" badge="必填" error={errors.chiefComplaint}>
+                  <textarea name="chiefComplaint" value={form.chiefComplaint} onChange={updateField} rows={3} />
                 </Field>
 
-                <Field label="年龄" badge="建议补充" error={errors.age}>
-                  <input name="age" value={form.age} onChange={updateField} inputMode="numeric" />
+                <Field label="体质与生活背景" badge="建议补充">
+                  <input name="constitution" value={form.constitution} onChange={updateField} />
                 </Field>
 
-                <Field label="性别" badge="建议补充" error={errors.sex}>
-                  <select name="sex" value={form.sex} onChange={updateField}>
-                    <option value="">未填写</option>
-                    <option>女</option>
-                    <option>男</option>
-                    <option>其他</option>
-                  </select>
-                </Field>
-
-                <Field label="病程" badge="建议补充" error={errors.duration}>
-                  <input name="duration" value={form.duration} onChange={updateField} />
+                <Field label="病史与治疗反应" badge="建议补充">
+                  <textarea name="history" value={form.history} onChange={updateField} rows={4} />
                 </Field>
               </div>
 
-              <Field label="主诉" badge="必填" error={errors.chiefComplaint}>
-                <textarea name="chiefComplaint" value={form.chiefComplaint} onChange={updateField} rows={3} />
-              </Field>
-
-              <Field label="体质与生活背景" badge="建议补充">
-                <input name="constitution" value={form.constitution} onChange={updateField} />
-              </Field>
-
-              <Field label="病史与治疗反应" badge="建议补充">
-                <textarea name="history" value={form.history} onChange={updateField} rows={4} />
-              </Field>
-
-              <Field label="当前方案" badge="必填" error={errors.currentPlan}>
-                <textarea name="currentPlan" value={form.currentPlan} onChange={updateField} rows={4} />
-              </Field>
-
-              <div className="form-row two">
-                <Field
-                  label="方药内容"
-                  badge={form.caseType === "方药分析" ? "必填" : "可选"}
-                  error={errors.herbs}
-                >
-                  <textarea name="herbs" value={form.herbs} onChange={updateField} rows={4} />
+              <div className="form-section">
+                <SectionTitle icon={<Pill size={18} />}>当前治疗</SectionTitle>
+                <Field label="当前方案" badge="必填" error={errors.currentPlan}>
+                  <textarea name="currentPlan" value={form.currentPlan} onChange={updateField} rows={4} />
                 </Field>
 
-                <Field
-                  label="穴位与操作"
-                  badge={form.caseType === "针灸方案" ? "必填" : "可选"}
-                  error={errors.acupoints}
-                >
-                  <textarea name="acupoints" value={form.acupoints} onChange={updateField} rows={4} />
-                </Field>
+                <div className="form-row two">
+                  <Field
+                    label="方药内容"
+                    badge={form.caseType === "方药分析" ? "必填" : "可选"}
+                    error={errors.herbs}
+                  >
+                    <textarea name="herbs" value={form.herbs} onChange={updateField} rows={4} />
+                  </Field>
+
+                  <Field
+                    label="穴位与操作"
+                    badge={form.caseType === "针灸方案" ? "必填" : "可选"}
+                    error={errors.acupoints}
+                  >
+                    <textarea name="acupoints" value={form.acupoints} onChange={updateField} rows={4} />
+                  </Field>
+                </div>
               </div>
 
-              <Field label="医生问题" badge="必填" error={errors.doctorQuestion}>
-                <textarea name="doctorQuestion" value={form.doctorQuestion} onChange={updateField} rows={3} />
-              </Field>
+              <div className="form-section">
+                <SectionTitle icon={<MessageSquareText size={18} />}>医生目标</SectionTitle>
+                <Field label="医生问题" badge="必填" error={errors.doctorQuestion}>
+                  <textarea name="doctorQuestion" value={form.doctorQuestion} onChange={updateField} rows={3} />
+                </Field>
+              </div>
 
               {Object.keys(errors).length > 0 || blockedReasons.length > 0 ? (
                 <div className="blocked-box">
@@ -373,7 +425,8 @@ export default function Home() {
           ) : null}
         </section>
 
-        <section className="panel result-column">
+        {activeStep === "result" && result ? (
+        <section className="panel result-panel-full">
           {result ? (
             <>
               <div className="section-heading">
@@ -384,20 +437,12 @@ export default function Home() {
                 <span className="pill">{form.caseType}</span>
               </div>
 
-              <p className="result-summary">{result.summary}</p>
+              <section className="result-group">
+                <h3>摘要</h3>
+                <p className="result-summary">{result.summary}</p>
+              </section>
 
-              <div className="result-sections">
-                {result.sections.map((section) => (
-                  <article className="result-card" key={section.title}>
-                    <h3>{section.title}</h3>
-                    <ul>
-                      {section.items.map((item) => (
-                        <li key={item}>{item}</li>
-                      ))}
-                    </ul>
-                  </article>
-                ))}
-              </div>
+              <GroupedResults sections={result.sections} />
 
               <article className="caution-card">
                 <h3>风险提示</h3>
@@ -411,6 +456,15 @@ export default function Home() {
                   本次调用约 {meta.usage?.total_tokens ?? 0} tokens，费用约 US${(meta.costUsd ?? 0).toFixed(6)}。
                 </p>
               ) : null}
+
+              <div className="result-actions">
+                <button type="button" className="secondary-button" onClick={() => setActiveStep("review")}>
+                  返回复核
+                </button>
+                <button type="button" className="secondary-button" onClick={() => setActiveStep("draft")}>
+                  返回草稿
+                </button>
+              </div>
             </>
           ) : (
             <div className="empty-result">
@@ -420,6 +474,7 @@ export default function Home() {
             </div>
           )}
         </section>
+        ) : null}
       </div>
     </main>
   );
@@ -434,7 +489,7 @@ function Field({
   label: string;
   badge?: "必填" | "建议补充" | "可选";
   error?: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <label className={`field-block ${error ? "has-error" : ""}`}>
@@ -446,4 +501,66 @@ function Field({
       {error ? <small className="field-error">{error}</small> : null}
     </label>
   );
+}
+
+function SectionTitle({ icon, children }: { icon: ReactNode; children: ReactNode }) {
+  return (
+    <h3 className="section-title">
+      <span>{icon}</span>
+      {children}
+    </h3>
+  );
+}
+
+function GroupedResults({ sections }: { sections: AnalysisResult["sections"] }) {
+  const groupedTitles = new Set(resultGroups.flatMap((group) => group.sectionTitles));
+  const otherSections = sections.filter((section) => !groupedTitles.has(section.title));
+
+  return (
+    <>
+      {resultGroups.map((group) => (
+        <ResultGroup
+          key={group.title}
+          title={group.title}
+          sections={sections.filter((section) => group.sectionTitles.includes(section.title))}
+        />
+      ))}
+      {otherSections.length ? <ResultGroup title="其他信息" sections={otherSections} /> : null}
+    </>
+  );
+}
+
+function ResultGroup({
+  title,
+  sections,
+}: {
+  title: string;
+  sections: AnalysisResult["sections"];
+}) {
+  if (!sections.length) return null;
+
+  return (
+    <section className="result-group">
+      <SectionTitle icon={getResultIcon(title)}>{title}</SectionTitle>
+      <div className="result-sections">
+        {sections.map((section) => (
+          <article className="result-card" key={section.title}>
+            <h4>{section.title}</h4>
+            <ul>
+              {section.items.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function getResultIcon(title: string) {
+  if (title === "临床判断") return <Brain size={18} />;
+  if (title === "建议方案") return <ListChecks size={18} />;
+  if (title === "复核与随访") return <ClipboardCheck size={18} />;
+  return <Activity size={18} />;
 }

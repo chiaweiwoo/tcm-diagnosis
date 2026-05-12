@@ -1,12 +1,15 @@
 :root {
-  --background: #f5f7f3;
-  --foreground: #18332d;
+  --background: #f8f6f1;
+  --foreground: #26322f;
   --muted: #66736e;
   --paper: #fffdf8;
   --paper-strong: #ffffff;
   --line: #dbe5df;
-  --teal: #0f766e;
-  --teal-strong: #0a5f59;
+  --teal: #2f736b;
+  --teal-strong: #235f58;
+  --clinic-red: #9f2f28;
+  --clinic-red-strong: #7f211c;
+  --clinic-red-soft: #f7e7e3;
   --mint: #dcefe8;
   --sage: #edf4ef;
   --gold: #c68a2e;
@@ -57,7 +60,7 @@ button {
 }
 
 ::selection {
-  background: var(--mint);
+  background: var(--clinic-red-soft);
 }
 
 @media (max-width: 720px) {

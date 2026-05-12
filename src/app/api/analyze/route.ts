@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import { callDeepSeekJson, DeepSeekError } from "@/lib/ai/deepseek";
 import {
   buildTcmAnalysisUserPrompt,
@@ -55,10 +56,10 @@ export async function POST(request: NextRequest) {
         { role: "system", content: TCM_ANALYSIS_SYSTEM_PROMPT },
         { role: "user", content: buildTcmAnalysisUserPrompt(parsed.data) },
       ],
-      maxTokens: 4000,
+      maxTokens: 2400,
     });
 
-    await logApiCall({
+    after(() => logApiCall({
       route: "api/analyze",
       success: true,
       model: result.model,
@@ -67,7 +68,7 @@ export async function POST(request: NextRequest) {
       costUsd: result.costUsd,
       promptVersion: TCM_ANALYSIS_PROMPT_VERSION,
       metadata: { caseType: parsed.data.caseType },
-    });
+    }));
 
     const data = result.data;
     const output = {
@@ -96,33 +97,33 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     if (error instanceof DeepSeekError) {
-      await logApiCall({
+      after(() => logApiCall({
         route: "api/analyze",
         success: false,
         latencyMs: Date.now() - startedAt,
         errorMessage: error.message,
         promptVersion: TCM_ANALYSIS_PROMPT_VERSION,
-      });
-      await logServerEvent({
+      }));
+      after(() => logServerEvent({
         source: "api/analyze",
         message: error.message,
         details: { status: error.status },
-      });
+      }));
       return NextResponse.json({ error: error.message }, { status: error.status });
     }
 
-    await logApiCall({
+    after(() => logApiCall({
       route: "api/analyze",
       success: false,
       latencyMs: Date.now() - startedAt,
       errorMessage: error instanceof Error ? error.message : String(error),
       promptVersion: TCM_ANALYSIS_PROMPT_VERSION,
-    });
-    await logServerEvent({
+    }));
+    after(() => logServerEvent({
       source: "api/analyze",
       message: "生成分析失败，请稍后重试。",
       details: { error: error instanceof Error ? error.message : String(error) },
-    });
+    }));
     return NextResponse.json({ error: "生成分析失败，请稍后重试。" }, { status: 500 });
   }
 }

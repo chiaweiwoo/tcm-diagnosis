@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import { callDeepSeekJson, DeepSeekError, getDeepSeekFastModel } from "@/lib/ai/deepseek";
 import {
   buildTcmOrganizeUserPrompt,
@@ -55,7 +56,7 @@ export async function POST(request: NextRequest) {
       timeoutMs: 30_000,
     });
 
-    await logApiCall({
+    after(() => logApiCall({
       route: "api/organize",
       success: true,
       model: result.model,
@@ -64,7 +65,7 @@ export async function POST(request: NextRequest) {
       costUsd: result.costUsd,
       promptVersion: TCM_ORGANIZE_PROMPT_VERSION,
       metadata: { draftLength: draft.length },
-    });
+    }));
 
     const data = result.data;
     const form: CaseForm = {
@@ -93,33 +94,33 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     if (error instanceof DeepSeekError) {
-      await logApiCall({
+      after(() => logApiCall({
         route: "api/organize",
         success: false,
         latencyMs: Date.now() - startedAt,
         errorMessage: error.message,
         promptVersion: TCM_ORGANIZE_PROMPT_VERSION,
-      });
-      await logServerEvent({
+      }));
+      after(() => logServerEvent({
         source: "api/organize",
         message: error.message,
         details: { status: error.status },
-      });
+      }));
       return NextResponse.json({ error: error.message }, { status: error.status });
     }
 
-    await logApiCall({
+    after(() => logApiCall({
       route: "api/organize",
       success: false,
       latencyMs: Date.now() - startedAt,
       errorMessage: error instanceof Error ? error.message : String(error),
       promptVersion: TCM_ORGANIZE_PROMPT_VERSION,
-    });
-    await logServerEvent({
+    }));
+    after(() => logServerEvent({
       source: "api/organize",
       message: "整理病案失败，请稍后重试。",
       details: { error: error instanceof Error ? error.message : String(error) },
-    });
+    }));
     return NextResponse.json({ error: "整理病案失败，请稍后重试。" }, { status: 500 });
   }
 }
