@@ -4,6 +4,34 @@
   padding: 14px 24px 24px;
 }
 
+.toast-message {
+  position: fixed;
+  top: 16px;
+  right: 24px;
+  z-index: 20;
+  max-width: min(420px, calc(100vw - 32px));
+  padding: 11px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffdf8;
+  color: #3e302d;
+  box-shadow: 0 14px 34px rgba(31, 55, 48, 0.16);
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.toast-message.success {
+  border-color: #dfc6be;
+  color: var(--clinic-red-strong);
+}
+
+.toast-message.error {
+  border-color: #f1b8ad;
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
 .hero-panel {
   position: relative;
   overflow: hidden;
@@ -73,6 +101,24 @@
 .hero-action:hover {
   border-color: rgba(255, 255, 255, 0.58);
   background: rgba(255, 255, 255, 0.18);
+}
+
+.project-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.project-meta a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--clinic-red-strong);
+  font-weight: 800;
 }
 
 .notice-bar {
@@ -581,6 +627,10 @@
     padding: 14px;
   }
 
+  .toast-message {
+    right: 14px;
+  }
+
   .panel,
   .result-panel-full {
     width: 100%;
@@ -629,6 +679,11 @@
 
   .hero-action {
     max-width: 100%;
+  }
+
+  .project-meta {
+    justify-content: flex-start;
+    flex-wrap: wrap;
   }
 
   .result-timeline {

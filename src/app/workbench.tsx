@@ -6,6 +6,7 @@ import {
   Brain,
   ClipboardCheck,
   FileText,
+  GitBranch,
   ListChecks,
   LogOut,
   Pencil,
@@ -54,6 +55,11 @@ type ConsultationRecord = ConsultationSummary & {
   model_meta: ApiMeta | null;
 };
 
+type ToastState = {
+  message: string;
+  tone: "success" | "error" | "info";
+};
+
 const initialForm: CaseForm = {
   caseType: "方药分析",
   age: "",
@@ -95,11 +101,12 @@ async function readApiError(response: Response) {
 
 function formatRecordLabel(record: ConsultationSummary) {
   const timestamp = new Intl.DateTimeFormat("zh-SG", {
+    year: "numeric",
     month: "2-digit",
     day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
-    hour12: false,
+    hour12: true,
   }).format(new Date(record.updated_at));
 
   return record.consultation_name ? `${timestamp} · ${record.consultation_name}` : timestamp;
@@ -129,6 +136,7 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
   const [isEditing, setIsEditing] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [runStartedAt, setRunStartedAt] = useState<number | null>(null);
+  const [toast, setToast] = useState<ToastState | null>(null);
 
   const isBusy = isOrganizing || isAnalyzing || isSaving;
   const isLocked = isBusy || (Boolean(result) && !isEditing);
@@ -138,6 +146,13 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
   useEffect(() => {
     void loadConsultations();
   }, []);
+
+  useEffect(() => {
+    if (!toast) return;
+
+    const timer = window.setTimeout(() => setToast(null), 3200);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
 
   useEffect(() => {
     if (!isBusy || !runStartedAt) return;
@@ -165,6 +180,10 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
     }
   }
 
+  function showToast(message: string, tone: ToastState["tone"] = "info") {
+    setToast({ message, tone });
+  }
+
   function resetSession() {
     setConsultationName("");
     setActiveConsultationId("");
@@ -183,6 +202,7 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
     setIsAnalyzing(false);
     setIsSaving(false);
     setIsEditing(false);
+    showToast("已建立新的病案记录。", "info");
   }
 
   function clearAnalysisForEdit(nextDraft?: string) {
@@ -230,9 +250,12 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
       const body = (await response.json()) as { record: ConsultationRecord };
       setActiveConsultationId(body.record.id);
       await loadConsultations();
+      showToast("病案记录已保存。", "success");
       return body.record.id;
     } catch (error) {
-      setApiError(error instanceof Error ? error.message : "保存病案记录失败。");
+      const message = error instanceof Error ? error.message : "保存病案记录失败。";
+      setApiError(message);
+      showToast(message, "error");
       return "";
     } finally {
       setIsSaving(false);
@@ -279,6 +302,7 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
     }
 
     await loadConsultations();
+    showToast("临床研判已保存到历史记录。", "success");
   }
 
   async function loadConsultation(id: string) {
@@ -311,8 +335,11 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
       setElapsedSeconds(0);
       setRunStartedAt(null);
       setIsEditing(false);
+      showToast("已载入历史病案。", "success");
     } catch (error) {
-      setApiError(error instanceof Error ? error.message : "读取病案记录失败。");
+      const message = error instanceof Error ? error.message : "读取病案记录失败。";
+      setApiError(message);
+      showToast(message, "error");
     } finally {
       setIsLoadingHistory(false);
     }
@@ -333,8 +360,11 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
       }
       resetSession();
       await loadConsultations();
+      showToast("病案记录已删除。", "success");
     } catch (error) {
-      setApiError(error instanceof Error ? error.message : "删除病案记录失败。");
+      const message = error instanceof Error ? error.message : "删除病案记录失败。";
+      setApiError(message);
+      showToast(message, "error");
     } finally {
       setIsSaving(false);
     }
@@ -424,8 +454,11 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
       });
       setMissingContext(analyzed.validation?.missingContext ?? validation.missingContext);
       setIsEditing(false);
+      showToast("临床研判已完成。", "success");
     } catch (error) {
-      setApiError(error instanceof Error ? error.message : "生成分析失败，请稍后重试。");
+      const message = error instanceof Error ? error.message : "生成分析失败，请稍后重试。";
+      setApiError(message);
+      showToast(message, "error");
     } finally {
       setIsOrganizing(false);
       setIsAnalyzing(false);
@@ -441,6 +474,8 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
 
   return (
     <main className="app-shell">
+      {toast ? <div className={`toast-message ${toast.tone}`}>{toast.message}</div> : null}
+
       <section className="hero-panel">
         <div className="hero-head">
           <div>
@@ -455,6 +490,14 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
             {userEmail}
           </a>
         </div>
+      </section>
+
+      <section className="project-meta">
+        <span>作者：Woo Chia Wei</span>
+        <a href="https://github.com/chiaweiwoo/tcm-diagnosis" target="_blank" rel="noreferrer">
+          <GitBranch size={15} />
+          GitHub 仓库
+        </a>
       </section>
 
       <section className="notice-bar">

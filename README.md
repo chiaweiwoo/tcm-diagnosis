@@ -1,5 +1,8 @@
 # TCM Diagnosis
 
+Author: Woo Chia Wei  
+Repository: [github.com/chiaweiwoo/tcm-diagnosis](https://github.com/chiaweiwoo/tcm-diagnosis)
+
 > Doctor-facing TCM case review workbench · DeepSeek prototype
 
 This project tests whether an AI workflow can help TCM doctors review real clinic notes more consistently. The app is intentionally small: paste a case record, run clinical review, then compare the original note with structured AI output in simplified Chinese.
@@ -113,6 +116,26 @@ flowchart LR
     AN --> LOG
     FE --> CASES[("Supabase\nconsultations JSONB")]
 ```
+
+---
+
+## Backend API Routes
+
+Vercel hosts the backend API routes from the Next.js App Router. Each `src/app/api/**/route.ts` file is deployed as a server route, so DeepSeek and Supabase service-role credentials stay server-side.
+
+| Route | Purpose |
+|---|---|
+| `POST /api/organize` | Organizes a doctor draft into structured case data with DeepSeek. |
+| `POST /api/analyze` | Generates the clinical reference output with DeepSeek. |
+| `GET /api/consultations` | Lists consultation history for the logged-in doctor email. |
+| `POST /api/consultations` | Creates a consultation record. |
+| `GET /api/consultations/[id]` | Reads one consultation record owned by the logged-in doctor. |
+| `PATCH /api/consultations/[id]` | Renames, edits, marks stale/ready, and stores JSON analysis data. |
+| `DELETE /api/consultations/[id]` | Deletes one consultation record owned by the logged-in doctor. |
+| `GET /auth/callback` | Handles Supabase Google OAuth callback and allowlist check. |
+| `GET /auth/signout` | Signs out and returns to login. |
+
+Frontend pages/components live under `src/app`, while server-only business routes live under `src/app/api` and `src/app/auth`.
 
 ---
 
