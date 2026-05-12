@@ -204,7 +204,7 @@ export default function Home() {
 
       <div className="work-grid">
         <section className="panel">
-          <div className="section-heading">
+          <div className="section-heading compact-heading">
             <div>
               <p className="eyebrow">流程</p>
               <h2>草稿整理 → 结构复核 → 生成分析</h2>
@@ -273,7 +273,7 @@ export default function Home() {
                 </div>
               )}
 
-              <div className="form-row three">
+              <div className="form-row four">
                 <Field label="病案类型" badge="必填" error={errors.caseType}>
                   <select name="caseType" value={form.caseType} onChange={updateField}>
                     <option>方药分析</option>
@@ -294,14 +294,14 @@ export default function Home() {
                     <option>其他</option>
                   </select>
                 </Field>
+
+                <Field label="病程" badge="建议补充" error={errors.duration}>
+                  <input name="duration" value={form.duration} onChange={updateField} />
+                </Field>
               </div>
 
               <Field label="主诉" badge="必填" error={errors.chiefComplaint}>
                 <textarea name="chiefComplaint" value={form.chiefComplaint} onChange={updateField} rows={3} />
-              </Field>
-
-              <Field label="病程" badge="建议补充" error={errors.duration}>
-                <input name="duration" value={form.duration} onChange={updateField} />
               </Field>
 
               <Field label="体质与生活背景" badge="建议补充">
@@ -359,16 +359,16 @@ export default function Home() {
                 </div>
               ) : null}
 
-              <button className="primary-button" type="submit" disabled={isAnalyzing}>
-                <Sparkles size={18} />
-                {isAnalyzing ? "分析中..." : "生成分析"}
-              </button>
+              <div className="action-bar">
+                <button className="primary-button" type="submit" disabled={isAnalyzing}>
+                  <Sparkles size={18} />
+                  {isAnalyzing ? "分析中..." : "生成分析"}
+                </button>
 
-              <p className="cost-note">
-                预计单次分析约 {estimatedTrialCost.inputTokens.toLocaleString()} 输入tokens、
-                {estimatedTrialCost.outputTokens.toLocaleString()} 输出tokens，约
-                US${estimatedTrialCost.usd.toFixed(4)}。实际费用会按病案长度变化。
-              </p>
+                <p className="cost-note">
+                  预计约US${estimatedTrialCost.usd.toFixed(4)}，实际按病案长度变化。
+                </p>
+              </div>
             </form>
           ) : null}
         </section>
