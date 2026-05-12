@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { callDeepSeekJson, DeepSeekError } from "@/lib/ai/deepseek";
+import { callDeepSeekJson, DeepSeekError, getDeepSeekFastModel } from "@/lib/ai/deepseek";
 import {
   buildTcmOrganizeUserPrompt,
   TCM_ORGANIZE_PROMPT_VERSION,
   TCM_ORGANIZE_SYSTEM_PROMPT,
 } from "@/lib/ai/prompts";
 import { CaseForm } from "@/lib/caseValidation";
+import { logServerEvent } from "@/lib/logging";
 
 type OrganizedCase = {
   病案类型?: string;
@@ -48,6 +49,8 @@ export async function POST(request: NextRequest) {
         { role: "user", content: buildTcmOrganizeUserPrompt(draft) },
       ],
       maxTokens: 1800,
+      model: getDeepSeekFastModel(),
+      timeoutMs: 30_000,
     });
 
     const data = result.data;
@@ -77,9 +80,19 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     if (error instanceof DeepSeekError) {
+      await logServerEvent({
+        source: "api/organize",
+        message: error.message,
+        details: { status: error.status },
+      });
       return NextResponse.json({ error: error.message }, { status: error.status });
     }
 
+    await logServerEvent({
+      source: "api/organize",
+      message: "整理病案失败，请稍后重试。",
+      details: { error: error instanceof Error ? error.message : String(error) },
+    });
     return NextResponse.json({ error: "整理病案失败，请稍后重试。" }, { status: 500 });
   }
 }
