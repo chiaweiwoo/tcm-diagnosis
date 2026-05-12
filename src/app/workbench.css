@@ -204,11 +204,6 @@
   font-size: 13px;
 }
 
-.field-hint {
-  color: var(--muted);
-  font-size: 13px;
-}
-
 .blocked-box,
 .reminder-box {
   display: grid;
@@ -247,6 +242,13 @@
 .primary-button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
+}
+
+.cost-note {
+  margin: -2px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .primary-button:hover {

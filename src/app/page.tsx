@@ -24,7 +24,13 @@ const initialForm: CaseForm = {
   herbs: "",
   acupoints: "",
   doctorQuestion: "",
-  modelMode: "快速模式",
+  modelMode: "深度模式",
+};
+
+const estimatedTrialCost = {
+  inputTokens: 3500,
+  outputTokens: 1800,
+  usd: 0.0031,
 };
 
 function buildMockResult(form: CaseForm): MockResult {
@@ -86,7 +92,6 @@ export default function Home() {
   const [missingContext, setMissingContext] = useState<string[]>([]);
   const [result, setResult] = useState<MockResult | null>(null);
 
-  const modelLabel = form.modelMode === "快速模式" ? "deepseek-v4-flash" : "deepseek-v4-pro";
   const filledCount = [
     form.caseType,
     form.age,
@@ -231,19 +236,9 @@ export default function Home() {
               />
             </Field>
 
-            <div className="form-row two">
-              <Field label="病程" badge="建议补充" error={errors.duration}>
+            <Field label="病程" badge="建议补充" error={errors.duration}>
                 <input name="duration" value={form.duration} onChange={updateField} placeholder="例如：半年余" />
-              </Field>
-
-              <Field label="模型模式" badge="可选">
-                <select name="modelMode" value={form.modelMode} onChange={updateField}>
-                  <option>快速模式</option>
-                  <option>深度模式</option>
-                </select>
-                <small className="field-hint">{modelLabel}</small>
-              </Field>
-            </div>
+            </Field>
 
             <Field label="体质与生活背景" badge="建议补充">
               <input
@@ -339,6 +334,12 @@ export default function Home() {
               <Sparkles size={18} />
               生成分析预览
             </button>
+
+            <p className="cost-note">
+              预计单次真实调用约 {estimatedTrialCost.inputTokens.toLocaleString()} 输入tokens、
+              {estimatedTrialCost.outputTokens.toLocaleString()} 输出tokens，约
+              US${estimatedTrialCost.usd.toFixed(4)}。实际费用会按病案长度变化。
+            </p>
           </form>
           )}
         </section>
