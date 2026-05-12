@@ -138,6 +138,7 @@ The tool should gently improve doctor data collection habits over time:
 - Keep verification pragmatic for this small project. Build before push when routes/UI changed, run unit tests when validation or JSON handling changed, and avoid style-only or heavyweight checks unless they prevent a likely broken deployment.
 - Show elapsed time during model calls so latency is visible to the project owner and future clinicians.
 - Future prompt improvement should support clinic-specific distilled rules and doctor style preferences, stored separately from the base prompt so the system can improve over time without rewriting core safety rules.
+- Product wording should feel like a modern clinical tool, not an IT demo. Prefer terms such as 病案记录, 临床研判, 资料完整性, 病案摘要, 临床风险, 新建病案. Avoid over-explaining internal mechanics in visible UI copy.
 
 ## Next Planned Phases
 

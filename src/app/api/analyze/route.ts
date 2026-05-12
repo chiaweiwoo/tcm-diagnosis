@@ -65,8 +65,9 @@ export async function POST(request: NextRequest) {
     }));
 
     const data = result.data;
+    const resultType = data.病案类型 ?? parsed.data.caseType;
     const output = {
-      title: `${data.病案类型 ?? parsed.data.caseType}分析`,
+      title: `${resultType}研判`,
       summary: data.病例摘要 ?? "DeepSeek已生成分析结果。",
       sections: [
         section("辨证假设", data.中医辨证假设),

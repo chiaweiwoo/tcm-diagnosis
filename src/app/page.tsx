@@ -74,21 +74,21 @@ export default function Home() {
   const [isOrganizing, setIsOrganizing] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [runStartedAt, setRunStartedAt] = useState<number | null>(null);
 
   const isBusy = isOrganizing || isAnalyzing;
+  const isLocked = Boolean(result) || isBusy;
   const qualityWarnings = [...missingContext, ...organizeNotes, ...organizeSuggestions].filter(Boolean);
 
   useEffect(() => {
-    if (!isBusy) return;
+    if (!isBusy || !runStartedAt) return;
 
-    const startedAt = Date.now();
-    setElapsedSeconds(0);
     const timer = window.setInterval(() => {
-      setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
+      setElapsedSeconds(Math.floor((Date.now() - runStartedAt) / 1000));
     }, 1000);
 
     return () => window.clearInterval(timer);
-  }, [isBusy]);
+  }, [isBusy, runStartedAt]);
 
   function resetSession() {
     setDraft("");
@@ -101,6 +101,7 @@ export default function Home() {
     setMeta(null);
     setApiError("");
     setElapsedSeconds(0);
+    setRunStartedAt(null);
     setIsOrganizing(false);
     setIsAnalyzing(false);
   }
@@ -108,6 +109,7 @@ export default function Home() {
   async function analyzeDraft() {
     const text = draft.trim();
     if (!text) return;
+    const startedAt = Date.now();
 
     setApiError("");
     setBlockedReasons([]);
@@ -116,6 +118,8 @@ export default function Home() {
     setOrganizeSuggestions([]);
     setResult(null);
     setMeta(null);
+    setElapsedSeconds(0);
+    setRunStartedAt(startedAt);
     setIsOrganizing(true);
     setIsAnalyzing(false);
 
@@ -171,6 +175,7 @@ export default function Home() {
       };
 
       setResult(analyzed.result);
+      setElapsedSeconds(Math.max(1, Math.floor((Date.now() - startedAt) / 1000)));
       setMeta({
         usage: analyzed.usage,
         costUsd: analyzed.costUsd,
@@ -189,40 +194,40 @@ export default function Home() {
   return (
     <main className="app-shell">
       <section className="hero-panel">
-        <p className="eyebrow">医生端测试版</p>
-        <h1>输入草稿，生成临床参考</h1>
+        <p className="eyebrow">医生端临床辅助</p>
+        <h1>病案研判工作台</h1>
         <p className="hero-copy">
-          系统先整理病案，再标出资料缺口，最后生成务实、可追踪的中医临床建议。
+          从病案记录中提炼关键信息，标出影响判断的资料缺口，并输出可复核的中医临床参考。
         </p>
       </section>
 
       <section className="notice-bar">
         <AlertTriangle size={18} />
-        <span>本工具仅供注册中医师临床参考，不替代医生判断。</span>
+        <span>仅供注册中医师临床参考，最终判断以医生面诊与专业评估为准。</span>
       </section>
 
       <section className="panel flow-panel">
         <div className="section-heading compact-heading">
           <div>
-            <p className="eyebrow">工作台</p>
-            <h2>草稿与分析</h2>
+            <p className="eyebrow">病案输入</p>
+            <h2>病案记录</h2>
           </div>
           <button type="button" className="secondary-button compact-button" onClick={resetSession}>
             <RotateCcw size={15} />
-            重新开始
+            新建病案
           </button>
         </div>
 
         {apiError ? (
           <div className="blocked-box">
-            <strong>请求失败</strong>
+            <strong>生成失败</strong>
             <span>{apiError}</span>
           </div>
         ) : null}
 
         {blockedReasons.length ? (
           <div className="blocked-box">
-            <strong>暂不能生成</strong>
+            <strong>暂无法研判</strong>
             {blockedReasons.map((reason) => (
               <span key={reason}>{reason}</span>
             ))}
@@ -231,12 +236,13 @@ export default function Home() {
 
         <div className="draft-panel compact-draft">
           <label className="field-block">
-            <span>医生草稿</span>
+            <span>病案记录</span>
             <textarea
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
+              disabled={isLocked}
               rows={8}
-              placeholder="直接粘贴病案、当前治疗方案和医生问题。系统会自动整理资料并提示可能影响判断的缺口。"
+              placeholder="粘贴病案、处方或针灸方案、复诊目标，以及需要复核的临床问题。"
             />
           </label>
 
@@ -245,14 +251,14 @@ export default function Home() {
               className="primary-button"
               type="button"
               onClick={analyzeDraft}
-              disabled={!draft.trim() || isBusy}
+              disabled={!draft.trim() || isLocked}
             >
               <Sparkles size={18} />
-              {isOrganizing ? "整理资料中..." : isAnalyzing ? "生成分析中..." : "生成分析"}
+              {isOrganizing ? "整理资料中..." : isAnalyzing ? "临床研判中..." : "开始研判"}
             </button>
             <p className="cost-note">
-              {isBusy ? `已用 ${elapsedSeconds} 秒 · ` : ""}
-              先整理资料，再调用DeepSeek生成分析；若资料不足会先提示。
+              {elapsedSeconds > 0 ? `用时 ${elapsedSeconds} 秒 · ` : ""}
+              资料将先结构化，再进入临床研判；结果需由医生复核。
             </p>
           </div>
         </div>
@@ -262,7 +268,7 @@ export default function Home() {
         <section className="panel result-panel-full">
           <div className="section-heading">
             <div>
-              <p className="eyebrow">分析结果</p>
+              <p className="eyebrow">临床参考</p>
               <h2>{result.title}</h2>
             </div>
             <span className="pill">{form.caseType}</span>
@@ -270,7 +276,7 @@ export default function Home() {
 
           {qualityWarnings.length ? (
             <article className="warning-card">
-              <SectionTitle icon={<AlertTriangle size={18} />}>资料缺口与准确性提醒</SectionTitle>
+              <SectionTitle icon={<AlertTriangle size={18} />}>资料完整性</SectionTitle>
               <ul>
                 {qualityWarnings.map((item) => (
                   <li key={item}>{item}</li>
@@ -280,14 +286,14 @@ export default function Home() {
           ) : null}
 
           <section className="result-group">
-            <SectionTitle icon={<Sparkles size={18} />}>摘要</SectionTitle>
+            <SectionTitle icon={<Sparkles size={18} />}>病案摘要</SectionTitle>
             <p className="result-summary">{result.summary}</p>
           </section>
 
           <GroupedResults sections={result.sections} />
 
           <article className="caution-card">
-            <SectionTitle icon={<AlertTriangle size={18} />}>风险提示</SectionTitle>
+            <SectionTitle icon={<AlertTriangle size={18} />}>临床风险</SectionTitle>
             {result.cautions.map((item) => (
               <p key={item}>{item}</p>
             ))}
@@ -295,7 +301,7 @@ export default function Home() {
 
           {meta ? (
             <p className="cost-note">
-              本次分析约 {meta.usage?.total_tokens ?? 0} tokens，费用约 US${(meta.costUsd ?? 0).toFixed(6)}。
+              本次研判约 {meta.usage?.total_tokens ?? 0} tokens，费用约 US${(meta.costUsd ?? 0).toFixed(6)}。
             </p>
           ) : null}
 
