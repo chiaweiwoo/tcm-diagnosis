@@ -5,10 +5,14 @@ import {
   AlertTriangle,
   Brain,
   ClipboardCheck,
+  FileText,
   ListChecks,
   LogOut,
+  Pencil,
   RotateCcw,
+  Save,
   Sparkles,
+  Trash2,
 } from "lucide-react";
 import { KeyboardEvent, ReactNode, useEffect, useState } from "react";
 import { CaseForm, validateCaseForm } from "@/lib/caseValidation";
@@ -30,6 +34,24 @@ type ApiMeta = {
   costUsd?: number;
   model?: string;
   promptVersion?: string;
+};
+
+type ConsultationSummary = {
+  id: string;
+  consultation_name: string | null;
+  draft: string;
+  analysis_status: "draft" | "ready" | "stale";
+  created_at: string;
+  updated_at: string;
+  analyzed_at: string | null;
+};
+
+type ConsultationRecord = ConsultationSummary & {
+  organized_case: unknown | null;
+  analysis_result: AnalysisResult | null;
+  analysis_raw: unknown | null;
+  validation_result: ReturnType<typeof validateCaseForm> | null;
+  model_meta: ApiMeta | null;
 };
 
 const initialForm: CaseForm = {
@@ -71,7 +93,26 @@ async function readApiError(response: Response) {
   }
 }
 
+function formatRecordLabel(record: ConsultationSummary) {
+  const timestamp = new Intl.DateTimeFormat("zh-SG", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(record.updated_at));
+
+  return record.consultation_name ? `${timestamp} · ${record.consultation_name}` : timestamp;
+}
+
+function normalizeName(value: string) {
+  return value.trim() || null;
+}
+
 export default function Workbench({ userEmail }: { userEmail: string }) {
+  const [consultationName, setConsultationName] = useState("");
+  const [activeConsultationId, setActiveConsultationId] = useState("");
+  const [consultations, setConsultations] = useState<ConsultationSummary[]>([]);
   const [draft, setDraft] = useState("");
   const [form, setForm] = useState<CaseForm>(initialForm);
   const [blockedReasons, setBlockedReasons] = useState<string[]>([]);
@@ -83,12 +124,20 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
   const [apiError, setApiError] = useState("");
   const [isOrganizing, setIsOrganizing] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [runStartedAt, setRunStartedAt] = useState<number | null>(null);
 
-  const isBusy = isOrganizing || isAnalyzing;
-  const isLocked = Boolean(result) || isBusy;
+  const isBusy = isOrganizing || isAnalyzing || isSaving;
+  const isLocked = isBusy || (Boolean(result) && !isEditing);
+  const hasSavedRecord = Boolean(activeConsultationId);
   const qualityWarnings = [...missingContext, ...organizeNotes, ...organizeSuggestions].filter(Boolean);
+
+  useEffect(() => {
+    void loadConsultations();
+  }, []);
 
   useEffect(() => {
     if (!isBusy || !runStartedAt) return;
@@ -100,7 +149,25 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
     return () => window.clearInterval(timer);
   }, [isBusy, runStartedAt]);
 
+  async function loadConsultations() {
+    setIsLoadingHistory(true);
+    try {
+      const response = await fetch("/api/consultations", { cache: "no-store" });
+      if (!response.ok) {
+        throw new Error(await readApiError(response));
+      }
+      const body = (await response.json()) as { records: ConsultationSummary[] };
+      setConsultations(body.records);
+    } catch (error) {
+      setApiError(error instanceof Error ? error.message : "读取病案历史失败。");
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  }
+
   function resetSession() {
+    setConsultationName("");
+    setActiveConsultationId("");
     setDraft("");
     setForm(initialForm);
     setBlockedReasons([]);
@@ -114,6 +181,163 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
     setRunStartedAt(null);
     setIsOrganizing(false);
     setIsAnalyzing(false);
+    setIsSaving(false);
+    setIsEditing(false);
+  }
+
+  function clearAnalysisForEdit(nextDraft?: string) {
+    if (!result) return;
+    setResult(null);
+    setMeta(null);
+    setMissingContext([]);
+    setOrganizeNotes([]);
+    setOrganizeSuggestions([]);
+    if (activeConsultationId && nextDraft !== undefined) {
+      void saveDraftOnly(nextDraft, consultationName, activeConsultationId);
+    }
+  }
+
+  function handleDraftChange(value: string) {
+    setDraft(value);
+    clearAnalysisForEdit(value);
+  }
+
+  function handleNameChange(value: string) {
+    setConsultationName(value);
+  }
+
+  async function saveDraftOnly(nextDraft = draft, nextName = consultationName, recordId = activeConsultationId) {
+    const text = nextDraft.trim();
+    if (!text) return "";
+
+    setIsSaving(true);
+    setApiError("");
+
+    try {
+      const response = await fetch(recordId ? `/api/consultations/${recordId}` : "/api/consultations", {
+        method: recordId ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          consultationName: normalizeName(nextName),
+          draft: text,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(await readApiError(response));
+      }
+
+      const body = (await response.json()) as { record: ConsultationRecord };
+      setActiveConsultationId(body.record.id);
+      await loadConsultations();
+      return body.record.id;
+    } catch (error) {
+      setApiError(error instanceof Error ? error.message : "保存病案记录失败。");
+      return "";
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function saveAnalysisResult(input: {
+    recordId: string;
+    organized: unknown;
+    analyzed: {
+      result: AnalysisResult;
+      raw?: unknown;
+      usage?: ApiMeta["usage"];
+      costUsd?: number;
+      model?: string;
+      promptVersion?: string;
+      validation?: ReturnType<typeof validateCaseForm>;
+    };
+  }) {
+    const modelMeta = {
+      usage: input.analyzed.usage,
+      costUsd: input.analyzed.costUsd,
+      model: input.analyzed.model,
+      promptVersion: input.analyzed.promptVersion,
+    };
+
+    const response = await fetch(`/api/consultations/${input.recordId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        consultationName: normalizeName(consultationName),
+        draft: draft.trim(),
+        organizedCase: input.organized,
+        analysisResult: input.analyzed.result,
+        analysisRaw: input.analyzed.raw ?? null,
+        validationResult: input.analyzed.validation ?? null,
+        modelMeta,
+        analysisStatus: "ready",
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(await readApiError(response));
+    }
+
+    await loadConsultations();
+  }
+
+  async function loadConsultation(id: string) {
+    if (!id) {
+      resetSession();
+      return;
+    }
+
+    setApiError("");
+    setIsLoadingHistory(true);
+
+    try {
+      const response = await fetch(`/api/consultations/${id}`, { cache: "no-store" });
+      if (!response.ok) {
+        throw new Error(await readApiError(response));
+      }
+
+      const body = (await response.json()) as { record: ConsultationRecord };
+      const record = body.record;
+      setActiveConsultationId(record.id);
+      setConsultationName(record.consultation_name ?? "");
+      setDraft(record.draft ?? "");
+      setResult(record.analysis_result ?? null);
+      setMeta(record.model_meta ?? null);
+      setMissingContext(record.validation_result?.missingContext ?? []);
+      setOrganizeNotes([]);
+      setOrganizeSuggestions([]);
+      setBlockedReasons([]);
+      setApiError("");
+      setElapsedSeconds(0);
+      setRunStartedAt(null);
+      setIsEditing(false);
+    } catch (error) {
+      setApiError(error instanceof Error ? error.message : "读取病案记录失败。");
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  }
+
+  async function deleteActiveConsultation() {
+    if (!activeConsultationId) return;
+    const confirmed = window.confirm("确定删除这份病案记录？此操作无法复原。");
+    if (!confirmed) return;
+
+    setIsSaving(true);
+    setApiError("");
+
+    try {
+      const response = await fetch(`/api/consultations/${activeConsultationId}`, { method: "DELETE" });
+      if (!response.ok) {
+        throw new Error(await readApiError(response));
+      }
+      resetSession();
+      await loadConsultations();
+    } catch (error) {
+      setApiError(error instanceof Error ? error.message : "删除病案记录失败。");
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   async function analyzeDraft() {
@@ -177,12 +401,18 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
 
       const analyzed = (await analyzeResponse.json()) as {
         result: AnalysisResult;
+        raw?: unknown;
         usage?: ApiMeta["usage"];
         costUsd?: number;
         model?: string;
         promptVersion?: string;
         validation?: ReturnType<typeof validateCaseForm>;
       };
+
+      const recordId = activeConsultationId || (await saveDraftOnly(text, consultationName));
+      if (recordId) {
+        await saveAnalysisResult({ recordId, organized, analyzed });
+      }
 
       setResult(analyzed.result);
       setElapsedSeconds(Math.max(1, Math.floor((Date.now() - startedAt) / 1000)));
@@ -193,6 +423,7 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
         promptVersion: analyzed.promptVersion,
       });
       setMissingContext(analyzed.validation?.missingContext ?? validation.missingContext);
+      setIsEditing(false);
     } catch (error) {
       setApiError(error instanceof Error ? error.message : "生成分析失败，请稍后重试。");
     } finally {
@@ -236,10 +467,27 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
           <div>
             <h2>病案记录</h2>
           </div>
-          <button type="button" className="secondary-button compact-button" onClick={resetSession}>
-            <RotateCcw size={15} />
-            新建病案
-          </button>
+          <div className="heading-actions">
+            <button
+              type="button"
+              className="secondary-button compact-button"
+              onClick={() => void saveDraftOnly()}
+              disabled={!draft.trim() || isBusy}
+            >
+              <Save size={15} />
+              保存
+            </button>
+            {result && !isEditing ? (
+              <button type="button" className="secondary-button compact-button" onClick={() => setIsEditing(true)}>
+                <Pencil size={15} />
+                编辑病案
+              </button>
+            ) : null}
+            <button type="button" className="secondary-button compact-button" onClick={resetSession}>
+              <RotateCcw size={15} />
+              新建病案
+            </button>
+          </div>
         </div>
 
         {apiError ? (
@@ -259,10 +507,55 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
         ) : null}
 
         <div className="draft-panel compact-draft">
+          <div className="history-row">
+            <label className="field-block name-field">
+              <span>
+                病案名称 <em className="field-badge">可选</em>
+              </span>
+              <input
+                value={consultationName}
+                onChange={(event) => handleNameChange(event.target.value)}
+                disabled={isLocked}
+                placeholder="例如：PCOS复诊、拇指弹响指"
+              />
+            </label>
+            <label className="field-block history-field">
+              <span>历史记录</span>
+              <select
+                value={activeConsultationId}
+                onChange={(event) => void loadConsultation(event.target.value)}
+                disabled={isBusy || isLoadingHistory}
+              >
+                <option value="">{isLoadingHistory ? "读取中..." : "选择历史病案"}</option>
+                {consultations.map((record) => (
+                  <option key={record.id} value={record.id}>
+                    {formatRecordLabel(record)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              className="secondary-button compact-button delete-button"
+              onClick={deleteActiveConsultation}
+              disabled={!hasSavedRecord || isBusy}
+            >
+              <Trash2 size={15} />
+              删除
+            </button>
+          </div>
+
+          {activeConsultationId && result === null && draft.trim() ? (
+            <div className="reminder-box compact-reminder">
+              <FileText size={16} />
+              <span>病案可继续修改；修改后需重新研判，历史分析会以最新结果为准。</span>
+            </div>
+          ) : null}
+
           <label className="field-block">
             <textarea
               value={draft}
-              onChange={(event) => setDraft(event.target.value)}
+              onChange={(event) => handleDraftChange(event.target.value)}
               onKeyDown={handleDraftKeyDown}
               disabled={isLocked}
               rows={8}

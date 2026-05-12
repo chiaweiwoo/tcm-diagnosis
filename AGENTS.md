@@ -26,7 +26,7 @@ drafts, and save interactions for later review and prompt/model improvement.
 - UI system: keep the current Next.js + focused CSS approach unless a library clearly reduces complexity.
 - Icons: lucide-react.
 - Form and validation: zod plus focused validation helpers. Keep guardrails centralized and testable.
-- Auth/data: Supabase for Google OAuth allowlist, future clinical storage, and current server-side logging.
+- Auth/data: Supabase for Google OAuth allowlist, consultation history, future feedback storage, and current server-side logging.
 - AI: DeepSeek through server-side API routes only.
 
 ## Hard Invariants
@@ -34,7 +34,7 @@ drafts, and save interactions for later review and prompt/model improvement.
 1. DeepSeek and Supabase service-role credentials must never be exposed to frontend code.
 2. No `NEXT_PUBLIC_DEEPSEEK_*` environment variables.
 3. Google OAuth is required before entering the workbench. Allowed emails are configured through `ALLOWED_DOCTOR_EMAILS`.
-4. Current Supabase storage only saves server/API logs. Full patient/case interaction storage is still planned.
+4. Supabase stores consultation history by logged-in doctor email. Flexible clinical payloads must stay in JSONB while the expected diagnosis schema is still evolving with doctor feedback.
 5. All patient/case interaction records should be designed for future saving:
    - case input
    - validation result
@@ -105,7 +105,7 @@ Implementation direction:
 
 - Store `prompt_version`, `model`, provider, temperature/reasoning settings, input JSON, output JSON, validation result, and doctor feedback for every run.
 - Store API-call performance for every model call: route, provider, model, latency, success/failure, token usage, estimated cost, prompt version, and useful metadata.
-- Today only API-call performance and server errors are saved. Full clinical history requires future `clinical_cases` and `analysis_runs` tables.
+- Consultation history now saves doctor email, optional consultation name, draft, structured case JSON, analysis JSON, raw model JSON, validation JSON, model metadata JSON, and timestamps.
 - API logging should not slow down doctor-facing responses. Use background logging where possible; the UI should wait for DeepSeek, not for Supabase inserts.
 - Use strict schemas and stable output sections rather than free-form prose.
 - If a provider returns malformed JSON, use a small cleanup call that only repairs syntax and does not add clinical content.
@@ -151,15 +151,21 @@ The tool should gently improve doctor data collection habits over time:
 - Current allowed emails: `chiaweiwoo123@gmail.com`, `ardytcm@gmail.com`.
 - Visiting `/` without a valid session must redirect to `/login`.
 - A signed-in but non-allowlisted Google account must be signed out and shown a Chinese authorization message.
-- Keep OAuth and clinical history separate for now. Do not implement case CRUD until auth is stable.
+- Keep future patient-facing access separate from this doctor-facing OAuth flow.
+
+## Consultation History Requirements
+
+- History records are scoped by logged-in doctor email.
+- `consultations` uses JSONB for `organized_case`, `analysis_result`, `analysis_raw`, `validation_result`, and `model_meta`; avoid fixed clinical columns until real doctor review clarifies the durable schema.
+- Optional `consultation_name` should display as timestamp + name; unnamed records display timestamp only.
+- Doctors can save, reopen, rename, edit, regenerate, and delete records.
+- Editing a draft clears the current analysis state and requires regeneration.
 
 ## Next Planned Phases
 
-1. Add Supabase tables for `clinical_cases` and `analysis_runs`.
-2. Save full doctor draft, structured case, final analysis JSON, validation/missing-context state, and model metadata.
-3. Add doctor feedback and accepted/rejected suggestion capture.
-4. Add full consultation history CRUD after OAuth is verified.
-5. Add citation retrieval layer for PubMed/TCM sources.
+1. Add doctor feedback and accepted/rejected suggestion capture.
+2. Add citation retrieval layer for PubMed/TCM sources.
+3. Add regression-set comparisons for saved cases across prompt/model changes.
 
 ## Prompt Architecture Direction
 

@@ -13,3 +13,7 @@ export function isAllowedDoctorEmail(email?: string | null) {
   if (!email) return false;
   return parseAllowedEmails().includes(email.trim().toLowerCase());
 }
+
+export function normalizeDoctorEmail(email?: string | null) {
+  return email?.trim().toLowerCase() ?? "";
+}

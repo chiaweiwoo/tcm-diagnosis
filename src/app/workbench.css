@@ -223,6 +223,33 @@
   min-height: 320px;
 }
 
+.history-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.55fr) minmax(260px, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.history-row .field-block span {
+  font-size: 13px;
+}
+
+.name-field input,
+.history-field select {
+  min-height: 38px;
+}
+
+.delete-button {
+  min-height: 38px;
+  color: var(--danger);
+}
+
+.compact-reminder {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  padding: 9px 11px;
+}
+
 .form-row {
   display: grid;
   gap: 12px;
@@ -564,6 +591,10 @@
   }
 
   .result-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .history-row {
     grid-template-columns: 1fr;
   }
 

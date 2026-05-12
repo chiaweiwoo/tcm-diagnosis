@@ -17,6 +17,7 @@ Current flow:
 3. DeepSeek organizes the note internally.
 4. DeepSeek generates a clinical reference.
 5. The page keeps the original note on top and shows the analysis below for comparison.
+6. The record can be saved, renamed, reopened, edited, regenerated, or deleted.
 
 ```mermaid
 flowchart LR
@@ -57,6 +58,15 @@ The output is grouped for clinical review:
 
 Currently saved:
 
+- doctor email
+- optional consultation name
+- full doctor draft
+- structured extracted case JSON
+- final analysis JSON
+- raw model analysis JSON
+- validation/missing-context JSON
+- model metadata JSON
+- created/updated/analyzed timestamps
 - API route
 - provider
 - model
@@ -70,14 +80,10 @@ Currently saved:
 
 Not yet saved:
 
-- full doctor draft
-- structured extracted case
-- final analysis JSON
 - doctor feedback
 - accepted/rejected suggestions
-- doctor email
 
-Next database step: add `clinical_cases` and `analysis_runs`, then link feedback to each run.
+Next database step: add doctor feedback and accepted/rejected suggestion tracking.
 
 ---
 
@@ -105,7 +111,7 @@ flowchart LR
     AN --> FE
     ORG --> LOG[("Supabase\nAPI call logs")]
     AN --> LOG
-    FE -. "planned" .-> CASES[("Supabase\ncases + analysis runs")]
+    FE --> CASES[("Supabase\nconsultations JSONB")]
 ```
 
 ---
