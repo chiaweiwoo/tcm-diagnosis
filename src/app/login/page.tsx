@@ -17,7 +17,9 @@ export default function LoginPage() {
 
   useEffect(() => {
     const reason = new URLSearchParams(window.location.search).get("reason");
-    setReasonMessage(reason ? reasonMessages[reason] ?? "" : "");
+    window.setTimeout(() => {
+      setReasonMessage(reason ? reasonMessages[reason] ?? "" : "");
+    }, 0);
 
     if (reason === "unauthorized") {
       void createBrowserSupabaseClient().auth.signOut();
