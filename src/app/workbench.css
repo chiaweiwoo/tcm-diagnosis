@@ -1,5 +1,5 @@
 .app-shell {
-  width: min(1440px, 100%);
+  width: 100%;
   margin: 0 auto;
   padding: 14px 24px 24px;
 }
@@ -69,7 +69,7 @@
 }
 
 .panel {
-  width: min(1280px, 100%);
+  width: 100%;
   margin: 0 auto;
   padding: 16px;
   border: 1px solid var(--line);
@@ -363,7 +363,7 @@
 }
 
 .result-panel-full {
-  width: min(1280px, 100%);
+  width: 100%;
 }
 
 .result-summary {
