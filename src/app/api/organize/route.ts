@@ -6,7 +6,7 @@ import {
   TCM_ORGANIZE_SYSTEM_PROMPT,
 } from "@/lib/ai/prompts";
 import { CaseForm } from "@/lib/caseValidation";
-import { logServerEvent } from "@/lib/logging";
+import { logApiCall, logServerEvent } from "@/lib/logging";
 
 type OrganizedCase = {
   病案类型?: string;
@@ -35,6 +35,8 @@ function normalizeCaseType(value?: string): CaseForm["caseType"] {
 }
 
 export async function POST(request: NextRequest) {
+  const startedAt = Date.now();
+
   try {
     const body = (await request.json()) as { draft?: string };
     const draft = body.draft?.trim();
@@ -51,6 +53,17 @@ export async function POST(request: NextRequest) {
       maxTokens: 1800,
       model: getDeepSeekFastModel(),
       timeoutMs: 30_000,
+    });
+
+    await logApiCall({
+      route: "api/organize",
+      success: true,
+      model: result.model,
+      latencyMs: Date.now() - startedAt,
+      usage: result.usage,
+      costUsd: result.costUsd,
+      promptVersion: TCM_ORGANIZE_PROMPT_VERSION,
+      metadata: { draftLength: draft.length },
     });
 
     const data = result.data;
@@ -80,6 +93,13 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     if (error instanceof DeepSeekError) {
+      await logApiCall({
+        route: "api/organize",
+        success: false,
+        latencyMs: Date.now() - startedAt,
+        errorMessage: error.message,
+        promptVersion: TCM_ORGANIZE_PROMPT_VERSION,
+      });
       await logServerEvent({
         source: "api/organize",
         message: error.message,
@@ -88,6 +108,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: error.status });
     }
 
+    await logApiCall({
+      route: "api/organize",
+      success: false,
+      latencyMs: Date.now() - startedAt,
+      errorMessage: error instanceof Error ? error.message : String(error),
+      promptVersion: TCM_ORGANIZE_PROMPT_VERSION,
+    });
     await logServerEvent({
       source: "api/organize",
       message: "整理病案失败，请稍后重试。",

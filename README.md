@@ -88,4 +88,6 @@ Tests cover validation rules, cost estimation, and build safety. CI runs lint, t
 
 ## Debugging
 
-Server errors can be logged to Supabase once `supabase/error_logs.sql` is run and `SUPABASE_SERVICE_ROLE_KEY` is configured in Vercel/local env. Without that key, errors fall back to server console logs.
+Server errors can be logged to Supabase once `supabase/error_logs.sql` is run and `SUPABASE_SERVICE_ROLE_KEY` is configured in Vercel/local env.
+
+API call performance and token usage can be logged once `supabase/api_call_logs.sql` is run. This records route, model, latency, token usage, estimated cost, success/failure, and prompt version.

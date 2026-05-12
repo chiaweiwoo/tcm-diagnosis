@@ -6,7 +6,7 @@ import {
   TCM_ANALYSIS_SYSTEM_PROMPT,
 } from "@/lib/ai/prompts";
 import { caseSchema, CaseForm, validateCaseForm } from "@/lib/caseValidation";
-import { logServerEvent } from "@/lib/logging";
+import { logApiCall, logServerEvent } from "@/lib/logging";
 
 type AnalysisJson = {
   病例摘要?: string;
@@ -29,6 +29,8 @@ function section(title: string, items?: string[]) {
 }
 
 export async function POST(request: NextRequest) {
+  const startedAt = Date.now();
+
   try {
     const body = (await request.json()) as { form?: CaseForm };
     const parsed = caseSchema.safeParse(body.form);
@@ -54,6 +56,17 @@ export async function POST(request: NextRequest) {
         { role: "user", content: buildTcmAnalysisUserPrompt(parsed.data) },
       ],
       maxTokens: 4000,
+    });
+
+    await logApiCall({
+      route: "api/analyze",
+      success: true,
+      model: result.model,
+      latencyMs: Date.now() - startedAt,
+      usage: result.usage,
+      costUsd: result.costUsd,
+      promptVersion: TCM_ANALYSIS_PROMPT_VERSION,
+      metadata: { caseType: parsed.data.caseType },
     });
 
     const data = result.data;
@@ -83,6 +96,13 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     if (error instanceof DeepSeekError) {
+      await logApiCall({
+        route: "api/analyze",
+        success: false,
+        latencyMs: Date.now() - startedAt,
+        errorMessage: error.message,
+        promptVersion: TCM_ANALYSIS_PROMPT_VERSION,
+      });
       await logServerEvent({
         source: "api/analyze",
         message: error.message,
@@ -91,6 +111,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: error.status });
     }
 
+    await logApiCall({
+      route: "api/analyze",
+      success: false,
+      latencyMs: Date.now() - startedAt,
+      errorMessage: error instanceof Error ? error.message : String(error),
+      promptVersion: TCM_ANALYSIS_PROMPT_VERSION,
+    });
     await logServerEvent({
       source: "api/analyze",
       message: "生成分析失败，请稍后重试。",
