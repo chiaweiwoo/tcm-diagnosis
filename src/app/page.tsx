@@ -5,19 +5,15 @@ import {
   AlertTriangle,
   Brain,
   ClipboardCheck,
-  FileText,
   ListChecks,
-  MessageSquareText,
-  Pill,
   RotateCcw,
   Sparkles,
-  UserRound,
 } from "lucide-react";
-import { ChangeEvent, FormEvent, ReactNode, useState } from "react";
+import { ReactNode, useState } from "react";
 import { CaseForm, validateCaseForm } from "@/lib/caseValidation";
 import "./workbench.css";
 
-type Step = "draft" | "review" | "result";
+type Step = "draft" | "result";
 
 type AnalysisResult = {
   title: string;
@@ -52,12 +48,6 @@ const initialForm: CaseForm = {
   modelMode: "深度模式",
 };
 
-const estimatedTrialCost = {
-  inputTokens: 3500,
-  outputTokens: 1800,
-  usd: 0.0031,
-};
-
 const resultGroups = [
   { title: "临床判断", sectionTitles: ["辨证假设", "当前方案评估"] },
   { title: "建议方案", sectionTitles: ["修改建议", "备选思路"] },
@@ -74,10 +64,9 @@ async function readApiError(response: Response) {
 }
 
 export default function Home() {
-  const [form, setForm] = useState<CaseForm>(initialForm);
   const [draft, setDraft] = useState("");
+  const [form, setForm] = useState<CaseForm>(initialForm);
   const [activeStep, setActiveStep] = useState<Step>("draft");
-  const [errors, setErrors] = useState<Partial<Record<keyof CaseForm, string>>>({});
   const [blockedReasons, setBlockedReasons] = useState<string[]>([]);
   const [missingContext, setMissingContext] = useState<string[]>([]);
   const [organizeNotes, setOrganizeNotes] = useState<string[]>([]);
@@ -88,21 +77,13 @@ export default function Home() {
   const [isOrganizing, setIsOrganizing] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  const filledCount = [
-    form.caseType,
-    form.age,
-    form.sex,
-    form.chiefComplaint,
-    form.duration,
-    form.currentPlan,
-    form.doctorQuestion,
-  ].filter(Boolean).length;
+  const isBusy = isOrganizing || isAnalyzing;
+  const qualityWarnings = [...missingContext, ...organizeNotes, ...organizeSuggestions].filter(Boolean);
 
   function resetSession() {
-    setForm(initialForm);
     setDraft("");
+    setForm(initialForm);
     setActiveStep("draft");
-    setErrors({});
     setBlockedReasons([]);
     setMissingContext([]);
     setOrganizeNotes([]);
@@ -110,93 +91,69 @@ export default function Home() {
     setResult(null);
     setMeta(null);
     setApiError("");
+    setIsOrganizing(false);
+    setIsAnalyzing(false);
   }
 
-  function updateField(
-    event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
-  ) {
-    const { name, value } = event.target;
-    setForm((current) => ({ ...current, [name]: value }));
-  }
-
-  async function organizeDraft() {
+  async function analyzeDraft() {
     const text = draft.trim();
     if (!text) return;
 
-    setIsOrganizing(true);
     setApiError("");
+    setBlockedReasons([]);
+    setMissingContext([]);
+    setOrganizeNotes([]);
+    setOrganizeSuggestions([]);
     setResult(null);
     setMeta(null);
+    setIsOrganizing(true);
+    setIsAnalyzing(false);
 
     try {
-      const response = await fetch("/api/organize", {
+      const organizeResponse = await fetch("/api/organize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ draft: text }),
       });
 
-      if (!response.ok) {
-        throw new Error(await readApiError(response));
+      if (!organizeResponse.ok) {
+        throw new Error(await readApiError(organizeResponse));
       }
 
-      const body = (await response.json()) as {
+      const organized = (await organizeResponse.json()) as {
         form: CaseForm;
         notes?: string[];
         suggestions?: string[];
-        usage?: ApiMeta["usage"];
-        costUsd?: number;
-        model?: string;
-        promptVersion?: string;
       };
 
-      setForm(body.form);
-      setOrganizeNotes(body.notes ?? []);
-      setOrganizeSuggestions(body.suggestions ?? []);
-      setMeta({
-        usage: body.usage,
-        costUsd: body.costUsd,
-        model: body.model,
-        promptVersion: body.promptVersion,
-      });
-      setErrors({});
-      setBlockedReasons([]);
-      setMissingContext([]);
-      setActiveStep("review");
-    } catch (error) {
-      setApiError(error instanceof Error ? error.message : "整理病案失败，请稍后重试。");
-    } finally {
-      setIsOrganizing(false);
-    }
-  }
+      const nextForm = organized.form;
+      const validation = validateCaseForm(nextForm);
+      const hardErrors = [...Object.values(validation.errors), ...validation.blockedReasons].filter(Boolean);
 
-  async function submitCase(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+      setForm(nextForm);
+      setOrganizeNotes(organized.notes ?? []);
+      setOrganizeSuggestions(organized.suggestions ?? []);
+      setMissingContext(validation.missingContext);
 
-    const validation = validateCaseForm(form);
-    setErrors(validation.errors);
-    setBlockedReasons(validation.blockedReasons);
-    setMissingContext(validation.missingContext);
-    setApiError("");
-    setResult(null);
-
-    if (Object.keys(validation.errors).length || validation.blockedReasons.length) {
-      return;
-    }
-
-    setIsAnalyzing(true);
-
-    try {
-      const response = await fetch("/api/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ form }),
-      });
-
-      if (!response.ok) {
-        throw new Error(await readApiError(response));
+      if (hardErrors.length) {
+        setBlockedReasons(hardErrors);
+        return;
       }
 
-      const body = (await response.json()) as {
+      setIsOrganizing(false);
+      setIsAnalyzing(true);
+
+      const analyzeResponse = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ form: nextForm }),
+      });
+
+      if (!analyzeResponse.ok) {
+        throw new Error(await readApiError(analyzeResponse));
+      }
+
+      const analyzed = (await analyzeResponse.json()) as {
         result: AnalysisResult;
         usage?: ApiMeta["usage"];
         costUsd?: number;
@@ -205,18 +162,19 @@ export default function Home() {
         validation?: ReturnType<typeof validateCaseForm>;
       };
 
-      setResult(body.result);
+      setResult(analyzed.result);
       setMeta({
-        usage: body.usage,
-        costUsd: body.costUsd,
-        model: body.model,
-        promptVersion: body.promptVersion,
+        usage: analyzed.usage,
+        costUsd: analyzed.costUsd,
+        model: analyzed.model,
+        promptVersion: analyzed.promptVersion,
       });
-      setMissingContext(body.validation?.missingContext ?? validation.missingContext);
+      setMissingContext(analyzed.validation?.missingContext ?? validation.missingContext);
       setActiveStep("result");
     } catch (error) {
       setApiError(error instanceof Error ? error.message : "生成分析失败，请稍后重试。");
     } finally {
+      setIsOrganizing(false);
       setIsAnalyzing(false);
     }
   }
@@ -225,9 +183,9 @@ export default function Home() {
     <main className="app-shell">
       <section className="hero-panel">
         <p className="eyebrow">医生端测试版</p>
-        <h1>整理病案，辅助复核</h1>
+        <h1>输入草稿，生成临床参考</h1>
         <p className="hero-copy">
-          将医生草稿整理成可复核资料，提醒缺失信息，并生成务实、可追踪的中医临床参考建议。
+          系统先整理病案，再标出资料缺口，最后生成务实、可追踪的中医临床建议。
         </p>
       </section>
 
@@ -236,270 +194,129 @@ export default function Home() {
         <span>本工具仅供注册中医师临床参考，不替代医生判断。</span>
       </section>
 
-      <div className="work-grid">
-        <section className={`panel ${activeStep === "result" ? "flow-panel" : ""}`}>
-          <div className="section-heading compact-heading">
-            <div>
-              <p className="eyebrow">流程</p>
-              <h2>草稿整理 → 结构复核 → 生成分析</h2>
-            </div>
-            <div className="heading-actions">
-              <span className="quiet-label">资料 {filledCount}/7</span>
-              <button type="button" className="secondary-button compact-button" onClick={resetSession}>
-                <RotateCcw size={15} />
-                重新开始
-              </button>
-            </div>
+      <section className="panel flow-panel">
+        <div className="section-heading compact-heading">
+          <div>
+            <p className="eyebrow">流程</p>
+            <h2>草稿输入 → 分析结果</h2>
           </div>
+          <button type="button" className="secondary-button compact-button" onClick={resetSession}>
+            <RotateCcw size={15} />
+            重新开始
+          </button>
+        </div>
 
-          <div className="steps" aria-label="流程步骤">
-            <button
-              type="button"
-              className={activeStep === "draft" ? "active" : ""}
-              onClick={() => setActiveStep("draft")}
-            >
-              1 草稿整理
-            </button>
-            <button
-              type="button"
-              className={activeStep === "review" ? "active" : ""}
-              onClick={() => setActiveStep("review")}
-              disabled={!form.chiefComplaint && !form.currentPlan}
-            >
-              2 结构复核
-            </button>
-            <button
-              type="button"
-              className={activeStep === "result" ? "active" : ""}
-              onClick={() => setActiveStep("result")}
-              disabled={!result}
-            >
-              3 分析结果
-            </button>
+        <div className="steps two-steps" aria-label="流程步骤">
+          <button
+            type="button"
+            className={activeStep === "draft" ? "active" : ""}
+            onClick={() => setActiveStep("draft")}
+          >
+            1 草稿输入
+          </button>
+          <button
+            type="button"
+            className={activeStep === "result" ? "active" : ""}
+            onClick={() => setActiveStep("result")}
+            disabled={!result}
+          >
+            2 分析结果
+          </button>
+        </div>
+
+        {apiError ? (
+          <div className="blocked-box">
+            <strong>请求失败</strong>
+            <span>{apiError}</span>
           </div>
+        ) : null}
 
-          {apiError ? <div className="blocked-box"><strong>请求失败</strong><span>{apiError}</span></div> : null}
+        {blockedReasons.length ? (
+          <div className="blocked-box">
+            <strong>暂不能生成</strong>
+            {blockedReasons.map((reason) => (
+              <span key={reason}>{reason}</span>
+            ))}
+          </div>
+        ) : null}
 
-          {activeStep === "draft" ? (
-            <div className="draft-panel">
-              <label className="field-block">
-                <span>医生草稿</span>
-                <textarea
-                  value={draft}
-                  onChange={(event) => setDraft(event.target.value)}
-                  rows={14}
-                  placeholder="可以直接粘贴或输入病案。系统会先整理成结构化字段，医生复核后再提交分析。"
-                />
-              </label>
+        {activeStep === "draft" ? (
+          <div className="draft-panel compact-draft">
+            <label className="field-block">
+              <span>医生草稿</span>
+              <textarea
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                rows={12}
+                placeholder="直接粘贴病案、当前治疗方案和医生问题。系统会自动整理资料并提示可能影响判断的缺口。"
+              />
+            </label>
+
+            <div className="action-bar">
               <button
                 className="primary-button"
                 type="button"
-                onClick={organizeDraft}
-                disabled={!draft.trim() || isOrganizing}
+                onClick={analyzeDraft}
+                disabled={!draft.trim() || isBusy}
               >
-                {isOrganizing ? "整理中..." : "整理成结构"}
+                <Sparkles size={18} />
+                {isOrganizing ? "整理资料中..." : isAnalyzing ? "生成分析中..." : "生成分析"}
               </button>
+              <p className="cost-note">先整理资料，再调用DeepSeek生成分析；若资料不足会先提示。</p>
             </div>
-          ) : null}
-
-          {activeStep === "review" ? (
-            <form className="case-form" onSubmit={submitCase}>
-              {(organizeNotes.length > 0 || organizeSuggestions.length > 0) && (
-                <div className="reminder-box">
-                  <strong>整理提示</strong>
-                  {[...organizeNotes, ...organizeSuggestions].map((item) => (
-                    <span key={item}>{item}</span>
-                  ))}
-                </div>
-              )}
-
-              <div className="form-section">
-                <SectionTitle icon={<UserRound size={18} />}>患者与病案</SectionTitle>
-                <div className="form-row four">
-                  <Field label="病案类型" badge="必填" error={errors.caseType}>
-                    <select name="caseType" value={form.caseType} onChange={updateField}>
-                      <option>方药分析</option>
-                      <option>针灸方案</option>
-                      <option>综合调理</option>
-                    </select>
-                  </Field>
-
-                  <Field label="年龄" badge="建议补充" error={errors.age}>
-                    <input name="age" value={form.age} onChange={updateField} inputMode="numeric" />
-                  </Field>
-
-                  <Field label="性别" badge="建议补充" error={errors.sex}>
-                    <select name="sex" value={form.sex} onChange={updateField}>
-                      <option value="">未填写</option>
-                      <option>女</option>
-                      <option>男</option>
-                      <option>其他</option>
-                    </select>
-                  </Field>
-
-                  <Field label="病程" badge="建议补充" error={errors.duration}>
-                    <input name="duration" value={form.duration} onChange={updateField} />
-                  </Field>
-                </div>
-              </div>
-
-              <div className="form-section">
-                <SectionTitle icon={<FileText size={18} />}>临床背景</SectionTitle>
-                <Field label="主诉" badge="必填" error={errors.chiefComplaint}>
-                  <textarea name="chiefComplaint" value={form.chiefComplaint} onChange={updateField} rows={3} />
-                </Field>
-
-                <Field label="体质与生活背景" badge="建议补充">
-                  <input name="constitution" value={form.constitution} onChange={updateField} />
-                </Field>
-
-                <Field label="病史与治疗反应" badge="建议补充">
-                  <textarea name="history" value={form.history} onChange={updateField} rows={4} />
-                </Field>
-              </div>
-
-              <div className="form-section">
-                <SectionTitle icon={<Pill size={18} />}>当前治疗</SectionTitle>
-                <Field label="当前方案" badge="必填" error={errors.currentPlan}>
-                  <textarea name="currentPlan" value={form.currentPlan} onChange={updateField} rows={4} />
-                </Field>
-
-                <div className="form-row two">
-                  <Field
-                    label="方药内容"
-                    badge={form.caseType === "方药分析" ? "必填" : "可选"}
-                    error={errors.herbs}
-                  >
-                    <textarea name="herbs" value={form.herbs} onChange={updateField} rows={4} />
-                  </Field>
-
-                  <Field
-                    label="穴位与操作"
-                    badge={form.caseType === "针灸方案" ? "必填" : "可选"}
-                    error={errors.acupoints}
-                  >
-                    <textarea name="acupoints" value={form.acupoints} onChange={updateField} rows={4} />
-                  </Field>
-                </div>
-              </div>
-
-              <div className="form-section">
-                <SectionTitle icon={<MessageSquareText size={18} />}>医生目标</SectionTitle>
-                <Field label="医生问题" badge="必填" error={errors.doctorQuestion}>
-                  <textarea name="doctorQuestion" value={form.doctorQuestion} onChange={updateField} rows={3} />
-                </Field>
-              </div>
-
-              {Object.keys(errors).length > 0 || blockedReasons.length > 0 ? (
-                <div className="blocked-box">
-                  <strong>暂不能提交</strong>
-                  {Object.values(errors).map((error) => (
-                    <span key={error}>{error}</span>
-                  ))}
-                  {blockedReasons.map((reason) => (
-                    <span key={reason}>{reason}</span>
-                  ))}
-                </div>
-              ) : null}
-
-              {missingContext.length > 0 ? (
-                <div className="reminder-box">
-                  <strong>建议下次补充</strong>
-                  {missingContext.map((item) => (
-                    <span key={item}>{item}</span>
-                  ))}
-                </div>
-              ) : null}
-
-              <div className="action-bar">
-                <button className="primary-button" type="submit" disabled={isAnalyzing}>
-                  <Sparkles size={18} />
-                  {isAnalyzing ? "分析中..." : "生成分析"}
-                </button>
-
-                <p className="cost-note">
-                  预计约US${estimatedTrialCost.usd.toFixed(4)}，实际按病案长度变化。
-                </p>
-              </div>
-            </form>
-          ) : null}
-        </section>
-
-        {activeStep === "result" && result ? (
-        <section className="panel result-panel-full">
-          {result ? (
-            <>
-              <div className="section-heading">
-                <div>
-                  <p className="eyebrow">分析结果</p>
-                  <h2>{result.title}</h2>
-                </div>
-                <span className="pill">{form.caseType}</span>
-              </div>
-
-              <section className="result-group">
-                <h3>摘要</h3>
-                <p className="result-summary">{result.summary}</p>
-              </section>
-
-              <GroupedResults sections={result.sections} />
-
-              <article className="caution-card">
-                <h3>风险提示</h3>
-                {result.cautions.map((item) => (
-                  <p key={item}>{item}</p>
-                ))}
-              </article>
-
-              {meta ? (
-                <p className="cost-note">
-                  本次调用约 {meta.usage?.total_tokens ?? 0} tokens，费用约 US${(meta.costUsd ?? 0).toFixed(6)}。
-                </p>
-              ) : null}
-
-              <div className="result-actions">
-                <button type="button" className="secondary-button" onClick={() => setActiveStep("review")}>
-                  返回复核
-                </button>
-                <button type="button" className="secondary-button" onClick={() => setActiveStep("draft")}>
-                  返回草稿
-                </button>
-              </div>
-            </>
-          ) : (
-            <div className="empty-result">
-              <Sparkles size={30} />
-              <h2>等待提交</h2>
-              <p>草稿整理并复核后，分析结果会显示在这里。</p>
-            </div>
-          )}
-        </section>
+          </div>
         ) : null}
-      </div>
-    </main>
-  );
-}
+      </section>
 
-function Field({
-  label,
-  badge,
-  error,
-  children,
-}: {
-  label: string;
-  badge?: "必填" | "建议补充" | "可选";
-  error?: string;
-  children: ReactNode;
-}) {
-  return (
-    <label className={`field-block ${error ? "has-error" : ""}`}>
-      <span>
-        {label}
-        {badge ? <em className={`field-badge ${badge === "必填" ? "required" : ""}`}>{badge}</em> : null}
-      </span>
-      {children}
-      {error ? <small className="field-error">{error}</small> : null}
-    </label>
+      {activeStep === "result" && result ? (
+        <section className="panel result-panel-full">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">分析结果</p>
+              <h2>{result.title}</h2>
+            </div>
+            <span className="pill">{form.caseType}</span>
+          </div>
+
+          {qualityWarnings.length ? (
+            <article className="warning-card">
+              <SectionTitle icon={<AlertTriangle size={18} />}>资料缺口与准确性提醒</SectionTitle>
+              <ul>
+                {qualityWarnings.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </article>
+          ) : null}
+
+          <section className="result-group">
+            <SectionTitle icon={<Sparkles size={18} />}>摘要</SectionTitle>
+            <p className="result-summary">{result.summary}</p>
+          </section>
+
+          <GroupedResults sections={result.sections} />
+
+          <article className="caution-card">
+            <SectionTitle icon={<AlertTriangle size={18} />}>风险提示</SectionTitle>
+            {result.cautions.map((item) => (
+              <p key={item}>{item}</p>
+            ))}
+          </article>
+
+          {meta ? (
+            <p className="cost-note">
+              本次分析约 {meta.usage?.total_tokens ?? 0} tokens，费用约 US${(meta.costUsd ?? 0).toFixed(6)}。
+            </p>
+          ) : null}
+
+          <div className="result-actions">
+            <button type="button" className="secondary-button" onClick={() => setActiveStep("draft")}>
+              返回草稿
+            </button>
+          </div>
+        </section>
+      ) : null}
+    </main>
   );
 }
 

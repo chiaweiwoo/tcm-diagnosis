@@ -18,7 +18,7 @@ drafts, and save interactions for later review and prompt/model improvement.
 - Prefer established tools and libraries over hand-rolled logic when they improve reliability or speed.
 - Use mobile/web responsive layouts from the start.
 - Think from the doctor's workflow first; a technically strong tool with poor usability is considered a failure.
-- Prefer a draft-first workflow. Doctors should be able to brain-dump notes first, then let the app organize fields for review.
+- Prefer a draft-first workflow. Doctors should be able to brain-dump notes first; the app should organize fields internally and show missing-information warnings without forcing a large form.
 
 ## Stack Decisions
 
@@ -42,7 +42,7 @@ drafts, and save interactions for later review and prompt/model improvement.
    - prompt version
    - doctor feedback
    - timestamp and doctor email
-4. The current workflow is draft organization, doctor review, then analysis result. Avoid showing analysis before submission.
+4. The current UX is draft input, internal organization, then analysis result. Avoid forcing doctors through a large form unless they explicitly need structured editing.
 5. AI output must avoid guaranteed cure claims and must expose uncertainty.
 6. Requests that look patient-facing, vague, or promising guaranteed efficacy should be blocked before model submission.
 7. Citation/research retrieval is important for medical credibility, but it is phase 2. Until then, do not fabricate citations.
@@ -76,7 +76,7 @@ Inspired by NovaHealth TCM's public positioning, without copying assets:
 
 - modern TCM
 - clinical, calm, professional
-- soft medical green/teal accents
+- warm clinic red/off-white visual direction, with green/teal only as secondary medical support
 - clear safety and physician-only cues
 - compact dashboard/workbench, not a marketing landing page
 
@@ -125,9 +125,8 @@ The tool should gently improve doctor data collection habits over time:
 - Show missing-context reminders and explain why each missing field matters.
 - Use missing-context logs to suggest what to ask during the next consultation.
 - Treat validation as clinical coaching, not form punishment.
-- Primary workflow should be 草稿整理 → 结构复核 → 生成分析.
-- In V0, draft organization may be local/mock, but the future product should use one LLM call for draft organization and another LLM call for analysis.
-- The product now uses two LLM calls: one faster organization call and one analysis call. Keep both steps visible so doctors can correct structured data before analysis.
+- Primary workflow should feel like 草稿输入 → 分析结果.
+- The product uses two LLM calls internally: one faster organization call and one analysis call. Keep the internal structure for consistency/logging, but do not make the form the main doctor-facing experience.
 
 ## Latency And Cost
 

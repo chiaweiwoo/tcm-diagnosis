@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { after } from "next/server";
-import { callDeepSeekJson, DeepSeekError } from "@/lib/ai/deepseek";
+import { callDeepSeekJson, DeepSeekError, getDeepSeekFastModel } from "@/lib/ai/deepseek";
 import {
   buildTcmAnalysisUserPrompt,
   TCM_ANALYSIS_PROMPT_VERSION,
@@ -56,7 +56,9 @@ export async function POST(request: NextRequest) {
         { role: "system", content: TCM_ANALYSIS_SYSTEM_PROMPT },
         { role: "user", content: buildTcmAnalysisUserPrompt(parsed.data) },
       ],
-      maxTokens: 2400,
+      maxTokens: 1400,
+      model: getDeepSeekFastModel(),
+      timeoutMs: 35_000,
     });
 
     after(() => logApiCall({

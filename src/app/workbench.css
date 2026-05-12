@@ -1,13 +1,13 @@
 .app-shell {
-  width: min(1180px, 100%);
+  width: min(1440px, 100%);
   margin: 0 auto;
-  padding: 20px;
+  padding: 14px 24px 24px;
 }
 
 .hero-panel {
   position: relative;
   overflow: hidden;
-  padding: 24px;
+  padding: 18px 22px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: linear-gradient(135deg, var(--clinic-red) 0%, var(--clinic-red-strong) 42%, #2f4f49 100%);
@@ -38,16 +38,16 @@
 
 .hero-panel h1 {
   margin: 0;
-  font-size: 42px;
+  font-size: 34px;
   line-height: 1.12;
   letter-spacing: 0;
 }
 
 .hero-copy {
-  max-width: 620px;
-  margin: 12px 0 0;
+  max-width: 760px;
+  margin: 8px 0 0;
   color: #fff3ed;
-  font-size: 17px;
+  font-size: 15px;
   line-height: 1.6;
 }
 
@@ -55,8 +55,8 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 14px 0;
-  padding: 12px 14px;
+  margin: 12px 0;
+  padding: 9px 12px;
   border: 1px solid #ead5a8;
   border-radius: 8px;
   background: #fffaf0;
@@ -69,9 +69,9 @@
 }
 
 .panel {
-  width: min(980px, 100%);
+  width: min(1280px, 100%);
   margin: 0 auto;
-  padding: 18px;
+  padding: 16px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--paper-strong);
@@ -79,7 +79,7 @@
 }
 
 .flow-panel {
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .section-heading {
@@ -87,7 +87,7 @@
   align-items: start;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .heading-actions {
@@ -126,7 +126,7 @@
 
 .case-form {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .form-section {
@@ -163,14 +163,18 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   padding: 4px;
   border-radius: 8px;
   background: var(--sage);
 }
 
+.steps.two-steps {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .steps button {
-  min-height: 40px;
+  min-height: 38px;
   border: 0;
   border-radius: 6px;
   background: transparent;
@@ -191,7 +195,11 @@
 
 .draft-panel {
   display: grid;
-  gap: 14px;
+  gap: 12px;
+}
+
+.compact-draft textarea {
+  min-height: 320px;
 }
 
 .form-row {
@@ -256,7 +264,7 @@
 .field-block textarea,
 .field-block select {
   width: 100%;
-  min-height: 42px;
+  min-height: 40px;
   padding: 9px 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -320,7 +328,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding-top: 10px;
+  padding-top: 8px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0), var(--paper-strong) 35%);
 }
 
@@ -329,7 +337,7 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 46px;
+  min-height: 42px;
   padding: 0 18px;
   border: 0;
   border-radius: 8px;
@@ -355,7 +363,7 @@
 }
 
 .result-panel-full {
-  width: min(980px, 100%);
+  width: min(1280px, 100%);
 }
 
 .result-summary {
@@ -370,6 +378,7 @@
 .result-sections {
   display: grid;
   gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .result-actions {
@@ -421,6 +430,24 @@
   background: var(--paper);
 }
 
+.warning-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid #ead5a8;
+  border-radius: 8px;
+  background: #fffaf0;
+  color: #6b4a12;
+}
+
+.warning-card ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 20px;
+  line-height: 1.6;
+}
+
 .result-card h4 {
   margin: 0;
   color: #294940;
@@ -459,6 +486,10 @@
   .panel,
   .result-panel-full {
     width: 100%;
+  }
+
+  .result-sections {
+    grid-template-columns: 1fr;
   }
 }
 
