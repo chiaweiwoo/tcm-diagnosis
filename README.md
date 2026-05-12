@@ -12,14 +12,16 @@ The focus is practical Singapore clinic use: missing context, realistic treatmen
 
 Current flow:
 
-1. Doctor pastes a case record.
-2. DeepSeek organizes the note internally.
-3. DeepSeek generates a clinical reference.
-4. The page keeps the original note on top and shows the analysis below for comparison.
+1. Doctor signs in with an allowed Google account.
+2. Doctor pastes a case record.
+3. DeepSeek organizes the note internally.
+4. DeepSeek generates a clinical reference.
+5. The page keeps the original note on top and shows the analysis below for comparison.
 
 ```mermaid
 flowchart LR
-    D["Doctor case record"] --> O["Internal structure"]
+    G["Google OAuth"] --> D["Doctor case record"]
+    D --> O["Internal structure"]
     O --> A["Clinical reference"]
     A --> W["Completeness warnings"]
     A --> R["Review sections"]
@@ -43,6 +45,7 @@ The output is grouped for clinical review:
 | Frontend | Next.js + TypeScript |
 | UI | Custom CSS + lucide-react |
 | AI | DeepSeek |
+| Auth | Supabase Google OAuth + email allowlist |
 | Validation | Zod |
 | Tests | Vitest |
 | Deploy | Vercel |
@@ -78,11 +81,26 @@ Next database step: add `clinical_cases` and `analysis_runs`, then link feedback
 
 ---
 
+## Access Control
+
+The workbench is protected by Google OAuth through Supabase.
+
+Allowed doctors are configured with:
+
+```bash
+ALLOWED_DOCTOR_EMAILS=chiaweiwoo123@gmail.com,ardytcm@gmail.com
+```
+
+Unauthenticated visitors are redirected to `/login`. Signed-in users whose email is not in the allowlist are signed out and shown an authorization message.
+
+---
+
 ## Architecture
 
 ```mermaid
 flowchart LR
-    FE["Web app\nVercel"] --> ORG["/api/organize\nDeepSeek"]
+    LOGIN["Google OAuth\nSupabase"] --> FE["Web app\nVercel"]
+    FE --> ORG["/api/organize\nDeepSeek"]
     ORG --> AN["/api/analyze\nDeepSeek"]
     AN --> FE
     ORG --> LOG[("Supabase\nAPI call logs")]

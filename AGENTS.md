@@ -26,15 +26,16 @@ drafts, and save interactions for later review and prompt/model improvement.
 - UI system: keep the current Next.js + focused CSS approach unless a library clearly reduces complexity.
 - Icons: lucide-react.
 - Form and validation: zod plus focused validation helpers. Keep guardrails centralized and testable.
-- Auth/data: Supabase for future auth/storage and current server-side logging.
+- Auth/data: Supabase for Google OAuth allowlist, future clinical storage, and current server-side logging.
 - AI: DeepSeek through server-side API routes only.
 
 ## Hard Invariants
 
 1. DeepSeek and Supabase service-role credentials must never be exposed to frontend code.
 2. No `NEXT_PUBLIC_DEEPSEEK_*` environment variables.
-3. Current Supabase storage only saves server/API logs. Full patient/case interaction storage is still planned.
-4. All patient/case interaction records should be designed for future saving:
+3. Google OAuth is required before entering the workbench. Allowed emails are configured through `ALLOWED_DOCTOR_EMAILS`.
+4. Current Supabase storage only saves server/API logs. Full patient/case interaction storage is still planned.
+5. All patient/case interaction records should be designed for future saving:
    - case input
    - validation result
    - blocked reason
@@ -43,11 +44,11 @@ drafts, and save interactions for later review and prompt/model improvement.
    - prompt version
    - doctor feedback
    - timestamp and doctor email
-5. The current UX is a continuous workbench: draft/case note on top, analysis below, with a left analysis navigation rail. Avoid forcing doctors through a large form unless they explicitly need structured editing.
-6. AI output must avoid guaranteed cure claims and must expose uncertainty.
-7. Requests that look patient-facing, vague, or promising guaranteed efficacy should be treated as low-confidence or not-ready clinical material in the output, not as a polished recommendation.
-8. Citation/research retrieval is important for medical credibility, but it is phase 2. Until then, do not fabricate citations.
-9. Medical AI prompts should use a critique loop: draft analysis, self-check for safety/evidence/logic gaps, then revise or lower confidence before returning the final answer.
+6. The current UX is a continuous workbench: draft/case note on top, analysis below, with a left analysis navigation rail. Avoid forcing doctors through a large form unless they explicitly need structured editing.
+7. AI output must avoid guaranteed cure claims and must expose uncertainty.
+8. Requests that look patient-facing, vague, or promising guaranteed efficacy should be treated as low-confidence or not-ready clinical material in the output, not as a polished recommendation.
+9. Citation/research retrieval is important for medical credibility, but it is phase 2. Until then, do not fabricate citations.
+10. Medical AI prompts should use a critique loop: draft analysis, self-check for safety/evidence/logic gaps, then revise or lower confidence before returning the final answer.
 
 ## Clinical Guardrail Requirements
 
@@ -143,12 +144,21 @@ The tool should gently improve doctor data collection habits over time:
 - Future prompt improvement should support clinic-specific distilled rules and doctor style preferences, stored separately from the base prompt so the system can improve over time without rewriting core safety rules.
 - Product wording should feel like a modern clinical tool, not an IT demo. Prefer terms such as 病案记录, 临床研判, 资料完整性, 病案摘要, 临床风险, 新建病案. Avoid over-explaining internal mechanics in visible UI copy.
 
+## Auth Requirements
+
+- OAuth provider: Google through Supabase.
+- Allowlist source: `ALLOWED_DOCTOR_EMAILS`, comma-separated emails.
+- Current allowed emails: `chiaweiwoo123@gmail.com`, `ardytcm@gmail.com`.
+- Visiting `/` without a valid session must redirect to `/login`.
+- A signed-in but non-allowlisted Google account must be signed out and shown a Chinese authorization message.
+- Keep OAuth and clinical history separate for now. Do not implement case CRUD until auth is stable.
+
 ## Next Planned Phases
 
 1. Add Supabase tables for `clinical_cases` and `analysis_runs`.
 2. Save full doctor draft, structured case, final analysis JSON, validation/missing-context state, and model metadata.
 3. Add doctor feedback and accepted/rejected suggestion capture.
-4. Add Supabase auth with Google OAuth and email allowlist.
+4. Add full consultation history CRUD after OAuth is verified.
 5. Add citation retrieval layer for PubMed/TCM sources.
 
 ## Prompt Architecture Direction

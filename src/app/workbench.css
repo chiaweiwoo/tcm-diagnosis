@@ -51,6 +51,30 @@
   line-height: 1.6;
 }
 
+.hero-head {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.hero-action {
+  max-width: 340px;
+  overflow: hidden;
+  border-color: rgba(255, 255, 255, 0.34);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fffdf8;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hero-action:hover {
+  border-color: rgba(255, 255, 255, 0.58);
+  background: rgba(255, 255, 255, 0.18);
+}
+
 .notice-bar {
   display: flex;
   align-items: center;
@@ -76,6 +100,37 @@
   border-radius: 8px;
   background: var(--paper-strong);
   box-shadow: 0 10px 32px rgba(31, 55, 48, 0.06);
+}
+
+.login-panel {
+  display: grid;
+  gap: 14px;
+  width: min(560px, 100%);
+  margin-top: 12px;
+}
+
+.login-copy {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: #4f3d38;
+}
+
+.login-copy svg {
+  flex: 0 0 auto;
+  margin-top: 4px;
+  color: var(--clinic-red);
+}
+
+.login-copy h2 {
+  margin: 0 0 4px;
+  font-size: 20px;
+}
+
+.login-copy p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
 }
 
 .flow-panel {
@@ -535,6 +590,14 @@
 
   .section-heading {
     display: grid;
+  }
+
+  .hero-head {
+    display: grid;
+  }
+
+  .hero-action {
+    max-width: 100%;
   }
 
   .result-timeline {
