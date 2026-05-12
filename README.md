@@ -85,3 +85,7 @@ npm run check:deepseek
 ```
 
 Tests cover validation rules, cost estimation, and build safety. CI runs lint, tests, and build on every push.
+
+## Debugging
+
+Server errors can be logged to Supabase once `supabase/error_logs.sql` is run and `SUPABASE_SERVICE_ROLE_KEY` is configured in Vercel/local env. Without that key, errors fall back to server console logs.

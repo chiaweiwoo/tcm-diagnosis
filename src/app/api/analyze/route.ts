@@ -6,6 +6,7 @@ import {
   TCM_ANALYSIS_SYSTEM_PROMPT,
 } from "@/lib/ai/prompts";
 import { caseSchema, CaseForm, validateCaseForm } from "@/lib/caseValidation";
+import { logServerEvent } from "@/lib/logging";
 
 type AnalysisJson = {
   病例摘要?: string;
@@ -82,9 +83,19 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     if (error instanceof DeepSeekError) {
+      await logServerEvent({
+        source: "api/analyze",
+        message: error.message,
+        details: { status: error.status },
+      });
       return NextResponse.json({ error: error.message }, { status: error.status });
     }
 
+    await logServerEvent({
+      source: "api/analyze",
+      message: "生成分析失败，请稍后重试。",
+      details: { error: error instanceof Error ? error.message : String(error) },
+    });
     return NextResponse.json({ error: "生成分析失败，请稍后重试。" }, { status: 500 });
   }
 }
