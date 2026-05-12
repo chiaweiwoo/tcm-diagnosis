@@ -33,7 +33,8 @@ drafts, and save interactions for later review and prompt/model improvement.
 
 1. DeepSeek and Supabase service-role credentials must never be exposed to frontend code.
 2. No `NEXT_PUBLIC_DEEPSEEK_*` environment variables.
-3. All patient/case interaction records should be designed for future saving:
+3. Current Supabase storage only saves server/API logs. Full patient/case interaction storage is still planned.
+4. All patient/case interaction records should be designed for future saving:
    - case input
    - validation result
    - blocked reason
@@ -42,11 +43,11 @@ drafts, and save interactions for later review and prompt/model improvement.
    - prompt version
    - doctor feedback
    - timestamp and doctor email
-4. The current UX is draft input, internal organization, then analysis result. Avoid forcing doctors through a large form unless they explicitly need structured editing.
-5. AI output must avoid guaranteed cure claims and must expose uncertainty.
-6. Requests that look patient-facing, vague, or promising guaranteed efficacy should be blocked before model submission.
-7. Citation/research retrieval is important for medical credibility, but it is phase 2. Until then, do not fabricate citations.
-8. Medical AI prompts should use a critique loop: draft analysis, self-check for safety/evidence/logic gaps, then revise or lower confidence before returning the final answer.
+5. The current UX is a continuous workbench: draft/case note on top, analysis below, with a left analysis navigation rail. Avoid forcing doctors through a large form unless they explicitly need structured editing.
+6. AI output must avoid guaranteed cure claims and must expose uncertainty.
+7. Requests that look patient-facing, vague, or promising guaranteed efficacy should be treated as low-confidence or not-ready clinical material in the output, not as a polished recommendation.
+8. Citation/research retrieval is important for medical credibility, but it is phase 2. Until then, do not fabricate citations.
+9. Medical AI prompts should use a critique loop: draft analysis, self-check for safety/evidence/logic gaps, then revise or lower confidence before returning the final answer.
 
 ## Clinical Guardrail Requirements
 
@@ -103,6 +104,7 @@ Implementation direction:
 
 - Store `prompt_version`, `model`, provider, temperature/reasoning settings, input JSON, output JSON, validation result, and doctor feedback for every run.
 - Store API-call performance for every model call: route, provider, model, latency, success/failure, token usage, estimated cost, prompt version, and useful metadata.
+- Today only API-call performance and server errors are saved. Full clinical history requires future `clinical_cases` and `analysis_runs` tables.
 - API logging should not slow down doctor-facing responses. Use background logging where possible; the UI should wait for DeepSeek, not for Supabase inserts.
 - Use strict schemas and stable output sections rather than free-form prose.
 - If a provider returns malformed JSON, use a small cleanup call that only repairs syntax and does not add clinical content.
@@ -126,7 +128,8 @@ The tool should gently improve doctor data collection habits over time:
 - Show missing-context reminders and explain why each missing field matters.
 - Use missing-context logs to suggest what to ask during the next consultation.
 - Treat validation as clinical coaching, not form punishment.
-- Primary workflow should feel like one continuous workbench: 草稿输入 on top, 分析结果 below, so doctors can compare source notes and AI output without switching tabs.
+- Primary workflow should feel like one continuous workbench: 病案记录 on top, 临床参考 below, so doctors can compare source notes and AI output without switching tabs.
+- Analysis results should include a left rail/timeline for stages: 资料完整性, 病案摘要, 临床判断, 建议方案, 复核与随访, 临床风险. On mobile this must collapse without overlap.
 - The product uses two LLM calls internally: one faster organization call and one analysis call. Keep the internal structure for consistency/logging, but do not make the form the main doctor-facing experience.
 
 ## Latency And Cost
@@ -142,10 +145,11 @@ The tool should gently improve doctor data collection habits over time:
 
 ## Next Planned Phases
 
-1. Improve analysis result readability and clinical grouping.
-2. Add Supabase auth with Google OAuth and email allowlist.
-3. Save cases, AI runs, blocked validations, and feedback.
-4. Add citation retrieval layer for PubMed/TCM sources.
+1. Add Supabase tables for `clinical_cases` and `analysis_runs`.
+2. Save full doctor draft, structured case, final analysis JSON, validation/missing-context state, and model metadata.
+3. Add doctor feedback and accepted/rejected suggestion capture.
+4. Add Supabase auth with Google OAuth and email allowlist.
+5. Add citation retrieval layer for PubMed/TCM sources.
 
 ## Prompt Architecture Direction
 

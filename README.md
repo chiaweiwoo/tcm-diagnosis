@@ -1,10 +1,10 @@
 # TCM Diagnosis
 
-> 医生端中医病案分析 · DeepSeek workflow test
+> Doctor-facing TCM case review workbench · DeepSeek prototype
 
-Turn rough TCM consultation notes into a structured case, let the doctor review the details, then generate a practical clinical analysis draft in simplified Chinese.
+This project tests whether an AI workflow can help TCM doctors review real clinic notes more consistently. The app is intentionally small: paste a case record, run clinical review, then compare the original note with structured AI output in simplified Chinese.
 
-This is a doctor-facing prototype for testing whether DeepSeek can support TCM physicians with more consistent, realistic, and practical case analysis. The focus is Singapore clinic use: clear suggestions, reasonable complexity, medicine/material availability, safety reminders, and no guaranteed claims.
+The focus is practical Singapore clinic use: missing context, realistic treatment complexity, medicine/material availability, safety reminders, and no guaranteed claims.
 
 ---
 
@@ -12,20 +12,27 @@ This is a doctor-facing prototype for testing whether DeepSeek can support TCM p
 
 Current flow:
 
-1. Doctor writes a rough case draft.
-2. DeepSeek organizes it into structured fields.
-3. Doctor reviews and edits the structure.
-4. DeepSeek generates the analysis.
-
-The app shows missing required fields clearly, gives gentle reminders for useful-but-missing context, and keeps the workflow simple enough for quick clinical testing.
+1. Doctor pastes a case record.
+2. DeepSeek organizes the note internally.
+3. DeepSeek generates a clinical reference.
+4. The page keeps the original note on top and shows the analysis below for comparison.
 
 ```mermaid
 flowchart LR
-    D["医生草稿"] --> O["整理病案"]
-    O --> R["医生复核"]
-    R --> V["提交前校验"]
-    V --> A["生成分析"]
+    D["Doctor case record"] --> O["Internal structure"]
+    O --> A["Clinical reference"]
+    A --> W["Completeness warnings"]
+    A --> R["Review sections"]
 ```
+
+The output is grouped for clinical review:
+
+- 资料完整性
+- 病案摘要
+- 临床判断
+- 建议方案
+- 复核与随访
+- 临床风险
 
 ---
 
@@ -34,36 +41,53 @@ flowchart LR
 | Layer | Technology |
 |---|---|
 | Frontend | Next.js + TypeScript |
-| UI | Chakra UI, custom CSS, lucide-react |
+| UI | Custom CSS + lucide-react |
 | AI | DeepSeek |
 | Validation | Zod |
 | Tests | Vitest |
 | Deploy | Vercel |
-| Database/Auth | Supabase planned |
+| Logging | Supabase |
 
 ---
 
-## APIs & Services
+## Storage Status
 
-| API / Service | Purpose | Cost |
-|---|---|---|
-| DeepSeek | Draft organization + clinical analysis | Pay per token |
-| Supabase | Auth + case storage, planned next | Free tier / paid tiers |
-| Vercel | Web app hosting + server routes | Free tier / paid tiers |
+Currently saved:
+
+- API route
+- provider
+- model
+- success/failure
+- latency
+- token usage
+- estimated cost
+- prompt version
+- error message
+- small metadata such as case type, draft length, JSON repair status
+
+Not yet saved:
+
+- full doctor draft
+- structured extracted case
+- final analysis JSON
+- doctor feedback
+- accepted/rejected suggestions
+- doctor email
+
+Next database step: add `clinical_cases` and `analysis_runs`, then link feedback to each run.
 
 ---
 
 ## Architecture
 
-The first version keeps the workflow small: two AI calls, with doctor review between them.
-
 ```mermaid
 flowchart LR
     FE["Web app\nVercel"] --> ORG["/api/organize\nDeepSeek"]
-    ORG --> REVIEW["Doctor review"]
-    REVIEW --> AN["/api/analyze\nDeepSeek"]
+    ORG --> AN["/api/analyze\nDeepSeek"]
     AN --> FE
-    REVIEW -. "planned" .-> DB[("Supabase\ncases + feedback")]
+    ORG --> LOG[("Supabase\nAPI call logs")]
+    AN --> LOG
+    FE -. "planned" .-> CASES[("Supabase\ncases + analysis runs")]
 ```
 
 ---
@@ -73,7 +97,6 @@ flowchart LR
 ```bash
 npm install
 npm run dev
-npm run lint
 npm run test
 npm run build
 ```
@@ -84,10 +107,10 @@ DeepSeek smoke test:
 npm run check:deepseek
 ```
 
-Tests cover validation rules, cost estimation, and build safety. CI runs lint, tests, and build on every push.
+Use checks pragmatically. For UI/routes, `npm run build` is usually enough before push. Run unit tests when validation, JSON handling, or prompt parsing changes.
 
 ## Debugging
 
-Server errors can be logged to Supabase once `supabase/error_logs.sql` is run and `SUPABASE_SERVICE_ROLE_KEY` is configured in Vercel/local env.
+`supabase/error_logs.sql` stores server errors.
 
-API call performance and token usage can be logged once `supabase/api_call_logs.sql` is run. This records route, model, latency, token usage, estimated cost, success/failure, and prompt version.
+`supabase/api_call_logs.sql` stores model-call performance and cost details. Use this table to compare latency, model choice, token usage, JSON repair frequency, and failed runs.

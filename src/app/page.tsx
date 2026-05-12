@@ -47,9 +47,18 @@ const initialForm: CaseForm = {
 };
 
 const resultGroups = [
-  { title: "临床判断", sectionTitles: ["辨证假设", "当前方案评估"] },
-  { title: "建议方案", sectionTitles: ["修改建议", "备选思路"] },
-  { title: "复核与随访", sectionTitles: ["检查与监测", "证据缺口", "需要复核"] },
+  { id: "judgement", title: "临床判断", sectionTitles: ["辨证假设", "当前方案评估"] },
+  { id: "recommendation", title: "建议方案", sectionTitles: ["修改建议", "备选思路"] },
+  { id: "followup", title: "复核与随访", sectionTitles: ["检查与监测", "证据缺口", "需要复核"] },
+];
+
+const resultTimeline = [
+  { id: "completeness", label: "资料完整性" },
+  { id: "summary", label: "病案摘要" },
+  { id: "judgement", label: "临床判断" },
+  { id: "recommendation", label: "建议方案" },
+  { id: "followup", label: "复核与随访" },
+  { id: "risk", label: "临床风险" },
 ];
 
 async function readApiError(response: Response) {
@@ -279,36 +288,50 @@ export default function Home() {
             <span className="pill">{form.caseType}</span>
           </div>
 
-          {qualityWarnings.length ? (
-            <article className="warning-card">
-              <SectionTitle icon={<AlertTriangle size={18} />}>资料完整性</SectionTitle>
-              <ul>
-                {qualityWarnings.map((item) => (
-                  <li key={item}>{item}</li>
+          <div className="result-workspace">
+            <aside className="result-timeline" aria-label="研判导航">
+              <p>研判路径</p>
+              {resultTimeline.map((item, index) => (
+                <a href={`#${item.id}`} key={item.id}>
+                  <span>{index + 1}</span>
+                  {item.label}
+                </a>
+              ))}
+            </aside>
+
+            <div className="result-content">
+              {qualityWarnings.length ? (
+                <article className="warning-card" id="completeness">
+                  <SectionTitle icon={<AlertTriangle size={18} />}>资料完整性</SectionTitle>
+                  <ul>
+                    {qualityWarnings.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </article>
+              ) : null}
+
+              <section className="result-group" id="summary">
+                <SectionTitle icon={<Sparkles size={18} />}>病案摘要</SectionTitle>
+                <p className="result-summary">{result.summary}</p>
+              </section>
+
+              <GroupedResults sections={result.sections} />
+
+              <article className="caution-card" id="risk">
+                <SectionTitle icon={<AlertTriangle size={18} />}>临床风险</SectionTitle>
+                {result.cautions.map((item) => (
+                  <p key={item}>{item}</p>
                 ))}
-              </ul>
-            </article>
-          ) : null}
+              </article>
 
-          <section className="result-group">
-            <SectionTitle icon={<Sparkles size={18} />}>病案摘要</SectionTitle>
-            <p className="result-summary">{result.summary}</p>
-          </section>
-
-          <GroupedResults sections={result.sections} />
-
-          <article className="caution-card">
-            <SectionTitle icon={<AlertTriangle size={18} />}>临床风险</SectionTitle>
-            {result.cautions.map((item) => (
-              <p key={item}>{item}</p>
-            ))}
-          </article>
-
-          {meta ? (
-            <p className="cost-note">
-              本次研判约 {meta.usage?.total_tokens ?? 0} tokens，费用约 US${(meta.costUsd ?? 0).toFixed(6)}。
-            </p>
-          ) : null}
+              {meta ? (
+                <p className="cost-note">
+                  本次研判约 {meta.usage?.total_tokens ?? 0} tokens，费用约 US${(meta.costUsd ?? 0).toFixed(6)}。
+                </p>
+              ) : null}
+            </div>
+          </div>
 
         </section>
       ) : null}
@@ -334,6 +357,7 @@ function GroupedResults({ sections }: { sections: AnalysisResult["sections"] }) 
       {resultGroups.map((group) => (
         <ResultGroup
           key={group.title}
+          id={group.id}
           title={group.title}
           sections={sections.filter((section) => group.sectionTitles.includes(section.title))}
         />
@@ -344,16 +368,18 @@ function GroupedResults({ sections }: { sections: AnalysisResult["sections"] }) 
 }
 
 function ResultGroup({
+  id,
   title,
   sections,
 }: {
+  id?: string;
   title: string;
   sections: AnalysisResult["sections"];
 }) {
   if (!sections.length) return null;
 
   return (
-    <section className="result-group">
+    <section className="result-group" id={id}>
       <SectionTitle icon={getResultIcon(title)}>{title}</SectionTitle>
       <div className="result-sections">
         {sections.map((section) => (
