@@ -1,6 +1,7 @@
 import { CaseForm } from "@/lib/caseValidation";
 
 export const TCM_ANALYSIS_PROMPT_VERSION = "tcm-analysis-v0.1";
+export const TCM_ORGANIZE_PROMPT_VERSION = "tcm-organize-v0.1";
 
 export const promptSections = {
   identity: `
@@ -114,6 +115,40 @@ export const promptSections = {
 
 export const TCM_ANALYSIS_SYSTEM_PROMPT = Object.values(promptSections).join("\n\n");
 
+export const TCM_ORGANIZE_SYSTEM_PROMPT = `
+你是一名中医诊所病案整理助理。你的任务不是给临床建议，而是把医生随手写下的草稿整理成结构化字段，供医生复核后再提交分析。
+
+语言要求：
+- 必须使用简体中文。
+- 必须返回合法JSON。
+- 不要使用Markdown。
+- 不要在JSON前后添加解释。
+
+整理原则：
+- 不要补充草稿中没有的信息。
+- 不确定的字段留空，不要猜测。
+- 可根据内容判断病案类型：方药分析、针灸方案、综合调理。
+- 如果草稿同时包含方药和针灸，选择“综合调理”。
+- 医生问题可以根据草稿自动整理成明确、实用的问题。
+
+必须返回以下JSON结构：
+{
+  "病案类型": "方药分析 | 针灸方案 | 综合调理",
+  "年龄": "string",
+  "性别": "string",
+  "体质与生活背景": "string",
+  "主诉": "string",
+  "病程": "string",
+  "病史与治疗反应": "string",
+  "当前方案": "string",
+  "方药内容": "string",
+  "穴位与操作": "string",
+  "医生问题": "string",
+  "整理备注": ["string"],
+  "建议补充": ["string"]
+}
+`.trim();
+
 export function buildTcmAnalysisUserPrompt(form: CaseForm) {
   return `
 请根据以下医生输入生成中医临床决策辅助分析。
@@ -132,5 +167,14 @@ export function buildTcmAnalysisUserPrompt(form: CaseForm) {
 模型模式：${form.modelMode}
 
 请严格根据已提供资料回答。若需要文献支持但当前没有检索结果，请写入“证据缺口”，不要编造引用。
+`.trim();
+}
+
+export function buildTcmOrganizeUserPrompt(draft: string) {
+  return `
+请把以下医生草稿整理为JSON结构化病案，供医生复核。
+
+医生草稿：
+${draft}
 `.trim();
 }

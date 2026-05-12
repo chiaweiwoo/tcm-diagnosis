@@ -6,9 +6,9 @@ Preserve these rules across future changes.
 ## Product Purpose
 
 This project is a doctor-facing TCM clinical workbench for testing DeepSeek API output quality.
-It is not patient-facing. It should help registered TCM doctors enter structured cases, receive
-Chinese clinical decision-support drafts, and save interactions for later review and prompt/model
-improvement.
+It is not patient-facing. It should help registered TCM doctors write rough clinical drafts,
+organize them into structured fields, review the fields, receive Chinese clinical decision-support
+drafts, and save interactions for later review and prompt/model improvement.
 
 ## User Preferences
 
@@ -18,6 +18,7 @@ improvement.
 - Prefer established tools and libraries over hand-rolled logic when they improve reliability or speed.
 - Use mobile/web responsive layouts from the start.
 - Think from the doctor's workflow first; a technically strong tool with poor usability is considered a failure.
+- Prefer a draft-first workflow. Doctors should be able to brain-dump notes first, then let the app organize fields for review.
 
 ## Stack Decisions
 
@@ -122,6 +123,8 @@ The tool should gently improve doctor data collection habits over time:
 - Show missing-context reminders and explain why each missing field matters.
 - Use missing-context logs to suggest what to ask during the next consultation.
 - Treat validation as clinical coaching, not form punishment.
+- Primary workflow should be 草稿整理 → 结构复核 → 生成分析.
+- In V0, draft organization may be local/mock, but the future product should use one LLM call for draft organization and another LLM call for analysis.
 
 ## Next Planned Phases
 

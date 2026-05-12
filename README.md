@@ -1,28 +1,26 @@
 # TCM Diagnosis
 
-> 医生端中医病案分析 · DeepSeek / OpenAI clinical workflow test
+> 医生端中医病案分析 · DeepSeek clinical workflow test
 
-A mobile-friendly doctor workbench for structured TCM case review. The first version is a mock dashboard: doctors can load sample cases, enter structured clinical notes, see validation guardrails, view a mock AI analysis, and record feedback.
+Write rough TCM case notes, let AI organize them into structured fields, review the structure, then generate a practical simplified-Chinese clinical analysis draft.
 
-The goal is not to replace physician judgment. The goal is to test whether AI can produce **consistent, practical, simplified-Chinese clinical decision-support drafts** for registered TCM doctors, especially in a Singapore clinic context.
+The app is **doctor-facing only**. It is designed to test whether LLMs can produce consistent, realistic, Singapore-clinic-friendly decision-support drafts for registered TCM physicians. It does not replace physician judgment.
 
 ---
 
-## Current Status
+## Current Flow
 
-V0 is a working mock UI only.
+V0 now has server-side DeepSeek API routes for draft organization and analysis. Supabase auth/storage is still planned.
 
-- Chinese-only product UI and mock clinical data
-- Structured case form
-- Required / recommended / optional field labels
-- Validation guardrails with educational reminders
-- Two sample cases: PCOS formula review and trigger finger acupuncture plan
-- Mock AI output sections
-- Prompt architecture file with modular Chinese prompt sections
-- Unit tests for validation rules
-- GitHub Actions CI for lint, test, and build
+```mermaid
+flowchart LR
+    D["医生草稿\n自由输入"] --> O["草稿整理\n当前为本地模拟"]
+    O --> R["结构复核\n医生确认字段"]
+    R --> V["提交前校验\n拦截或提醒"]
+    V --> A["生成分析\nDeepSeek"]
+```
 
-Real Supabase auth/storage and DeepSeek/OpenAI calls are planned next.
+Core product principle: doctors should be able to start with a brain dump, not a large form.
 
 ---
 
@@ -35,9 +33,62 @@ Real Supabase auth/storage and DeepSeek/OpenAI calls are planned next.
 | Validation | Zod |
 | Forms | react-hook-form installed for next form refactor |
 | Tests | Vitest |
-| Database/Auth | Supabase planned |
-| AI | DeepSeek planned first, OpenAI planned as second provider |
+| Auth / Database | Supabase planned |
+| AI | DeepSeek |
 | Deploy | Vercel |
+
+---
+
+## APIs & Services
+
+| Service | Purpose | Status |
+|---|---|---|
+| DeepSeek | Draft organization + clinical analysis | Active server routes |
+| Supabase Auth | Google OAuth + allowed doctor emails | Planned |
+| Supabase Postgres | Cases, AI runs, validation logs, feedback | Planned |
+| Vercel | Hosting + server routes | Active |
+| PubMed / TCM sources | Evidence retrieval layer | Later phase |
+
+---
+
+## Architecture
+
+```mermaid
+flowchart LR
+    subgraph input["Doctor Workflow"]
+        D["医生草稿"]
+        O["整理病案"]
+        R["结构复核"]
+        V["Zod校验"]
+        A["分析结果"]
+        D --> O --> R --> V --> A
+    end
+
+    subgraph future["Future Server Flow"]
+        API["/api/analyze"]
+        AUTH["Supabase Auth\n邮箱白名单"]
+        AI["DeepSeek\n服务端调用"]
+        DB[("Supabase\n病案 / AI运行 / 反馈")]
+        API --> AUTH
+        API --> AI
+        API --> DB
+        AI --> DB
+    end
+
+    V -. "后续启用" .-> API
+```
+
+Prompt modules:
+
+```text
+src/lib/ai/prompts.ts
+```
+
+Validation rules:
+
+```text
+src/lib/caseValidation.ts
+```
 
 ---
 
@@ -57,7 +108,7 @@ Open:
 http://localhost:3000
 ```
 
-Windows PowerShell may block `npm.ps1`; use `npm.cmd` if needed:
+On Windows PowerShell, use `npm.cmd` if `npm.ps1` is blocked:
 
 ```bash
 npm.cmd run dev
@@ -67,80 +118,58 @@ npm.cmd run dev
 
 ## Environment
 
-Copy `.env.local.example` to `.env.local` when wiring real services.
+Copy `.env.local.example` to `.env.local` when real services are wired.
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://gegeuztvzecsikhxcvgl.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key_here
 DEEPSEEK_API_KEY=your_deepseek_api_key_here
-DEEPSEEK_MODEL=deepseek-v4-flash
+DEEPSEEK_MODEL_FAST=deepseek-v4-flash
+DEEPSEEK_MODEL_DEEP=deepseek-v4-pro
 ```
 
-Never expose server keys in frontend env names:
-
-- No `NEXT_PUBLIC_DEEPSEEK_*`
-- No `NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY`
-
----
-
-## Architecture Direction
-
-```mermaid
-flowchart LR
-    DR["医生输入\n结构化病案"] --> VAL["Zod校验\n拦截或提醒"]
-    VAL --> UI["Mock分析预览\n当前V0"]
-    VAL --> API["/api/analyze\n后续启用"]
-    API --> AUTH["Supabase Auth\n邮箱白名单"]
-    API --> AI["DeepSeek / OpenAI\n服务端调用"]
-    API --> DB[("Supabase\n病案 / AI运行 / 反馈")]
-    AI --> DB
-    DB --> REVIEW["医生反馈\n后续评估"]
-```
-
-Prompt modules live in:
+Never expose server secrets with `NEXT_PUBLIC_`:
 
 ```text
-src/lib/ai/prompts.ts
-```
-
-Validation rules live in:
-
-```text
-src/lib/caseValidation.ts
+NEXT_PUBLIC_DEEPSEEK_API_KEY      # wrong
+NEXT_PUBLIC_SUPABASE_SERVICE_ROLE # wrong
 ```
 
 ---
 
-## Product Invariants
+## Invariants
 
-- Chat with the project owner in English; product UI/data/output use simplified Chinese.
+- Product UI, validation messages, stored labels, and AI output use simplified Chinese.
+- Project discussion with the owner can be in English.
 - Doctor-facing only, not patient-facing.
-- Do not promise cure or guaranteed efficacy.
+- The workflow is draft-first: 草稿整理 → 结构复核 → 生成分析.
+- Missing context should usually produce helpful reminders, not hard blocks.
+- Hard-block vague, unsafe, patient-facing, or guaranteed-cure requests.
 - Prefer practical Singapore clinic recommendations over theoretical maximalism.
 - Similar inputs should produce similar core recommendations.
-- Store prompt version, model, input, output, validation result, blocked reason, and doctor feedback once real storage is enabled.
-- Missing information should usually trigger helpful reminders, not hard blocks, unless minimum safe context is missing.
 - Do not fabricate citations. Evidence retrieval is a later phase.
 
 ---
 
-## Tests
+## Testing
 
 ```bash
 npm run test
 ```
 
-Current coverage focuses on clinical validation rules:
+Current tests cover validation rules:
 
-- complete formula case passes
-- formula case without herbs blocks
-- acupuncture case without treatment details blocks
-- missing age/sex/duration gives reminders, not blocks
-- vague doctor questions block
-- guaranteed efficacy wording blocks
-- patient self-use wording blocks
+| Scenario | Expected |
+|---|---|
+| Complete formula case | Pass |
+| Formula case without herbs | Block |
+| Acupuncture case without treatment details | Block |
+| Missing age / sex / duration | Reminder only |
+| Vague doctor question | Block |
+| Guaranteed efficacy wording | Block |
+| Patient self-use wording | Block |
 
-CI runs:
+CI runs on GitHub Actions:
 
 ```text
 npm run lint
