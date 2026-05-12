@@ -1,36 +1,149 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# TCM Diagnosis
 
-## Getting Started
+> 医生端中医病案分析 · DeepSeek / OpenAI clinical workflow test
 
-First, run the development server:
+A mobile-friendly doctor workbench for structured TCM case review. The first version is a mock dashboard: doctors can load sample cases, enter structured clinical notes, see validation guardrails, view a mock AI analysis, and record feedback.
+
+The goal is not to replace physician judgment. The goal is to test whether AI can produce **consistent, practical, simplified-Chinese clinical decision-support drafts** for registered TCM doctors, especially in a Singapore clinic context.
+
+---
+
+## Current Status
+
+V0 is a working mock UI only.
+
+- Chinese-only product UI and mock clinical data
+- Structured case form
+- Required / recommended / optional field labels
+- Validation guardrails with educational reminders
+- Two sample cases: PCOS formula review and trigger finger acupuncture plan
+- Mock AI output sections
+- Prompt architecture file with modular Chinese prompt sections
+- Unit tests for validation rules
+- GitHub Actions CI for lint, test, and build
+
+Real Supabase auth/storage and DeepSeek/OpenAI calls are planned next.
+
+---
+
+## Stack
+
+| Layer | Technology |
+|---|---|
+| App | Next.js + TypeScript |
+| UI | Chakra UI, custom CSS, lucide-react |
+| Validation | Zod |
+| Forms | react-hook-form installed for next form refactor |
+| Tests | Vitest |
+| Database/Auth | Supabase planned |
+| AI | DeepSeek planned first, OpenAI planned as second provider |
+| Deploy | Vercel |
+
+---
+
+## Development
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run lint
+npm run test
+npm run build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```text
+http://localhost:3000
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Windows PowerShell may block `npm.ps1`; use `npm.cmd` if needed:
 
-## Learn More
+```bash
+npm.cmd run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Environment
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Copy `.env.local.example` to `.env.local` when wiring real services.
 
-## Deploy on Vercel
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://gegeuztvzecsikhxcvgl.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key_here
+DEEPSEEK_API_KEY=your_deepseek_api_key_here
+DEEPSEEK_MODEL=deepseek-v4-flash
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Never expose server keys in frontend env names:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- No `NEXT_PUBLIC_DEEPSEEK_*`
+- No `NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY`
+
+---
+
+## Architecture Direction
+
+```mermaid
+flowchart LR
+    DR["医生输入\n结构化病案"] --> VAL["Zod校验\n拦截或提醒"]
+    VAL --> UI["Mock分析预览\n当前V0"]
+    VAL --> API["/api/analyze\n后续启用"]
+    API --> AUTH["Supabase Auth\n邮箱白名单"]
+    API --> AI["DeepSeek / OpenAI\n服务端调用"]
+    API --> DB[("Supabase\n病案 / AI运行 / 反馈")]
+    AI --> DB
+    DB --> REVIEW["医生反馈\n后续评估"]
+```
+
+Prompt modules live in:
+
+```text
+src/lib/ai/prompts.ts
+```
+
+Validation rules live in:
+
+```text
+src/lib/caseValidation.ts
+```
+
+---
+
+## Product Invariants
+
+- Chat with the project owner in English; product UI/data/output use simplified Chinese.
+- Doctor-facing only, not patient-facing.
+- Do not promise cure or guaranteed efficacy.
+- Prefer practical Singapore clinic recommendations over theoretical maximalism.
+- Similar inputs should produce similar core recommendations.
+- Store prompt version, model, input, output, validation result, blocked reason, and doctor feedback once real storage is enabled.
+- Missing information should usually trigger helpful reminders, not hard blocks, unless minimum safe context is missing.
+- Do not fabricate citations. Evidence retrieval is a later phase.
+
+---
+
+## Tests
+
+```bash
+npm run test
+```
+
+Current coverage focuses on clinical validation rules:
+
+- complete formula case passes
+- formula case without herbs blocks
+- acupuncture case without treatment details blocks
+- missing age/sex/duration gives reminders, not blocks
+- vague doctor questions block
+- guaranteed efficacy wording blocks
+- patient self-use wording blocks
+
+CI runs:
+
+```text
+npm run lint
+npm run test
+npm run build
+```

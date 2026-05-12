@@ -1,5 +1,148 @@
-<!-- BEGIN:nextjs-agent-rules -->
-# This is NOT the Next.js you know
+# TCM Diagnosis — AI Session Memory
 
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
-<!-- END:nextjs-agent-rules -->
+This file records project preferences and invariants for Codex and other AI coding agents.
+Preserve these rules across future changes.
+
+## Product Purpose
+
+This project is a doctor-facing TCM clinical workbench for testing DeepSeek API output quality.
+It is not patient-facing. It should help registered TCM doctors enter structured cases, receive
+Chinese clinical decision-support drafts, and save interactions for later review and prompt/model
+improvement.
+
+## User Preferences
+
+- Chat with the project owner in English.
+- The product UI, mock data, stored database-facing labels, validation messages, and AI output must use simplified Chinese.
+- Keep the app practical and easy to use. The user gets overwhelmed by overly broad setup lists, so give step-by-step actions in the correct sequence.
+- Prefer established tools and libraries over hand-rolled logic when they improve reliability or speed.
+- Use mobile/web responsive layouts from the start.
+- Think from the doctor's workflow first; a technically strong tool with poor usability is considered a failure.
+
+## Stack Decisions
+
+- Frontend/deployment: Next.js + TypeScript, deployable to Vercel.
+- UI system: Chakra UI is installed and should be preferred for reusable components; custom CSS is acceptable for product-specific layout and branding.
+- Icons: lucide-react.
+- Form and validation: react-hook-form + zod. Do not scatter medical guardrails across ad hoc conditionals when a schema/refinement can express the rule.
+- Auth/data: Supabase in a later phase.
+- AI: DeepSeek in a later phase through server-side API routes only.
+
+## Hard Invariants
+
+1. DeepSeek and Supabase service-role credentials must never be exposed to frontend code.
+2. No `NEXT_PUBLIC_DEEPSEEK_*` environment variables.
+3. All patient/case interaction records should be designed for future saving:
+   - case input
+   - validation result
+   - blocked reason
+   - AI output
+   - selected model
+   - prompt version
+   - doctor feedback
+   - timestamp and doctor email
+4. V0 is a mock dashboard, but it must reflect the real workflow: input, validation, analysis preview, history, feedback.
+5. AI output must avoid guaranteed cure claims and must expose uncertainty.
+6. Requests that look patient-facing, vague, or promising guaranteed efficacy should be blocked before model submission.
+7. Citation/research retrieval is important for medical credibility, but it is phase 2. Until then, do not fabricate citations.
+8. Medical AI prompts should use a critique loop: draft analysis, self-check for safety/evidence/logic gaps, then revise or lower confidence before returning the final answer.
+
+## Clinical Guardrail Requirements
+
+Minimum blocking fields before submission:
+
+- 病案类型
+- 主诉
+- 当前方案
+- 医生问题
+
+Fields such as 年龄, 性别, 病程, 体质与生活背景, 病史与治疗反应 are highly recommended but should usually produce reminders rather than hard blocks, because doctors may have privacy constraints or incomplete information.
+
+Type-specific requirements:
+
+- 方药分析: require 方药内容.
+- 针灸方案: require 穴位与操作 or sufficient current treatment method.
+
+Block examples:
+
+- vague question such as "帮我看看"
+- guaranteed outcome wording such as "保证", "治愈", "包好", "一定好"
+- patient self-use wording such as "我是患者", "我自己", "我可以吃", "我该怎么办"
+
+## Design Direction
+
+Inspired by NovaHealth TCM's public positioning, without copying assets:
+
+- modern TCM
+- clinical, calm, professional
+- soft medical green/teal accents
+- clear safety and physician-only cues
+- compact dashboard/workbench, not a marketing landing page
+
+## Clinical Style Preference
+
+The product should prefer practical Singapore-clinic recommendations over theoretical
+maximalism:
+
+- Persona should feel like a senior, experienced, pragmatic TCM physician familiar with Singapore outpatient practice.
+- Respect classical TCM reasoning, but avoid overcomplicated scholastic analysis when it does not change action.
+- Hybrid reasoning is preferred: TCM pattern thinking + modern checks + patient adherence + safety.
+- Recommendations must consider ingredient/material availability, HSA/TCM practice context, cost, treatment complexity, appointment time, and follow-up convenience.
+- Prefer 1-3 high-impact changes over long lists of herbs/acupoints.
+- Preserve reasonable parts of the current doctor plan before suggesting changes.
+- If a "best in theory" option is hard to obtain or hard to execute in Singapore, mark it as a backup rather than the main recommendation.
+
+## Consistency Requirements
+
+The core product problem is repeatability. The doctor friend reported that free-form Claude
+chats produced different answers for similar questions, partly because prompts were not stable.
+The app must reduce this variance.
+
+Implementation direction:
+
+- Store `prompt_version`, `model`, provider, temperature/reasoning settings, input JSON, output JSON, validation result, and doctor feedback for every run.
+- Use strict schemas and stable output sections rather than free-form prose.
+- Use low temperature for clinical analysis.
+- Keep a regression set of representative doctor cases and compare outputs when prompt/model changes.
+- Prompt should force a fixed judgment order:
+  1. data completeness
+  2. case type
+  3. reasonable parts of current plan
+  4. major risks
+  5. minimum necessary changes
+  6. monitoring and review
+- Similar inputs should produce similar core recommendations; alternative schools of thought should be clearly marked as backup, not randomly promoted to the main plan.
+
+## Clinical Education UX
+
+The tool should gently improve doctor data collection habits over time:
+
+- Distinguish 必填, 建议补充, and 可选 fields in UI.
+- Do not over-block imperfect cases when minimum safe context exists.
+- Show missing-context reminders and explain why each missing field matters.
+- Use missing-context logs to suggest what to ask during the next consultation.
+- Treat validation as clinical coaching, not form punishment.
+
+## Next Planned Phases
+
+1. Finish mock dashboard and verify desktop/mobile rendering.
+2. Add Supabase auth with Google OAuth and email allowlist.
+3. Add `/api/analyze` server route with DeepSeek.
+4. Save cases, AI runs, blocked validations, and feedback.
+5. Add citation retrieval layer for PubMed/TCM sources.
+
+## Prompt Architecture Direction
+
+Future model calls should not be a single direct answer. Use a two-stage or structured
+self-critique process:
+
+1. Produce a draft clinical analysis.
+2. Critique the draft for missing patient context, unsafe claims, weak evidence,
+   overconfident language, formula/acupoint mismatch, and unanswered doctor questions.
+3. Revise the final output and include:
+   - 置信度
+   - 需要复核的地方
+   - 证据缺口
+   - 不建议采纳的内容
+
+Do not show raw hidden chain-of-thought. Show concise clinical self-check summaries only.
