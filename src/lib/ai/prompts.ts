@@ -1,6 +1,6 @@
 import { CaseForm } from "@/lib/caseValidation";
 
-export const TCM_ANALYSIS_PROMPT_VERSION = "tcm-analysis-v0.1";
+export const TCM_ANALYSIS_PROMPT_VERSION = "tcm-analysis-v0.2";
 export const TCM_ORGANIZE_PROMPT_VERSION = "tcm-organize-v0.1";
 
 export const promptSections = {
@@ -69,33 +69,14 @@ export const promptSections = {
 {
   "病例摘要": "string",
   "病案类型": "方药分析 | 针灸方案 | 综合调理",
-  "置信度": {
-    "等级": "低 | 中 | 高",
-    "理由": "string"
-  },
   "中医辨证假设": ["string"],
   "当前方案评估": ["string"],
   "修改建议": ["string"],
   "备选思路": ["string"],
-  "实用性评估": {
-    "药材或材料可得性": "string",
-    "操作复杂度": "低 | 中 | 高",
-    "患者依从性": "string",
-    "新加坡门诊注意点": "string"
-  },
   "安全风险": ["string"],
   "检查与监测建议": ["string"],
   "证据缺口": ["string"],
-  "需要复核的地方": ["string"],
-  "不建议采纳的内容": ["string"],
-  "给医生的追问": ["string"],
-  "自我检查摘要": {
-    "安全性": "string",
-    "证据强度": "string",
-    "逻辑一致性": "string",
-    "过度自信检查": "string",
-    "实用性检查": "string"
-  }
+  "需要复核的地方": ["string"]
 }
 `.trim(),
 

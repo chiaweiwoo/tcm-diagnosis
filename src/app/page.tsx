@@ -9,7 +9,7 @@ import {
   RotateCcw,
   Sparkles,
 } from "lucide-react";
-import { ReactNode, useState } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { CaseForm, validateCaseForm } from "@/lib/caseValidation";
 import "./workbench.css";
 
@@ -76,9 +76,22 @@ export default function Home() {
   const [apiError, setApiError] = useState("");
   const [isOrganizing, setIsOrganizing] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   const isBusy = isOrganizing || isAnalyzing;
   const qualityWarnings = [...missingContext, ...organizeNotes, ...organizeSuggestions].filter(Boolean);
+
+  useEffect(() => {
+    if (!isBusy) return;
+
+    const startedAt = Date.now();
+    setElapsedSeconds(0);
+    const timer = window.setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [isBusy]);
 
   function resetSession() {
     setDraft("");
@@ -91,6 +104,7 @@ export default function Home() {
     setResult(null);
     setMeta(null);
     setApiError("");
+    setElapsedSeconds(0);
     setIsOrganizing(false);
     setIsAnalyzing(false);
   }
@@ -128,17 +142,15 @@ export default function Home() {
 
       const nextForm = organized.form;
       const validation = validateCaseForm(nextForm);
-      const hardErrors = [...Object.values(validation.errors), ...validation.blockedReasons].filter(Boolean);
 
       setForm(nextForm);
       setOrganizeNotes(organized.notes ?? []);
       setOrganizeSuggestions(organized.suggestions ?? []);
-      setMissingContext(validation.missingContext);
-
-      if (hardErrors.length) {
-        setBlockedReasons(hardErrors);
-        return;
-      }
+      setMissingContext([
+        ...validation.missingContext,
+        ...Object.values(validation.errors),
+        ...validation.blockedReasons,
+      ].filter(Boolean));
 
       setIsOrganizing(false);
       setIsAnalyzing(true);
@@ -262,7 +274,10 @@ export default function Home() {
                 <Sparkles size={18} />
                 {isOrganizing ? "整理资料中..." : isAnalyzing ? "生成分析中..." : "生成分析"}
               </button>
-              <p className="cost-note">先整理资料，再调用DeepSeek生成分析；若资料不足会先提示。</p>
+              <p className="cost-note">
+                {isBusy ? `已用 ${elapsedSeconds} 秒 · ` : ""}
+                先整理资料，再调用DeepSeek生成分析；若资料不足会先提示。
+              </p>
             </div>
           </div>
         ) : null}

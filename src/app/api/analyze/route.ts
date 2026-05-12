@@ -41,24 +41,16 @@ export async function POST(request: NextRequest) {
     }
 
     const validation = validateCaseForm(parsed.data);
-    if (Object.keys(validation.errors).length || validation.blockedReasons.length) {
-      return NextResponse.json(
-        {
-          error: "病案资料未通过校验，请先复核必填字段。",
-          validation,
-        },
-        { status: 400 },
-      );
-    }
 
     const result = await callDeepSeekJson<AnalysisJson>({
       messages: [
         { role: "system", content: TCM_ANALYSIS_SYSTEM_PROMPT },
         { role: "user", content: buildTcmAnalysisUserPrompt(parsed.data) },
       ],
-      maxTokens: 1400,
+      maxTokens: 1800,
       model: getDeepSeekFastModel(),
-      timeoutMs: 35_000,
+      timeoutMs: 45_000,
+      repairJson: true,
     });
 
     after(() => logApiCall({
@@ -69,7 +61,7 @@ export async function POST(request: NextRequest) {
       usage: result.usage,
       costUsd: result.costUsd,
       promptVersion: TCM_ANALYSIS_PROMPT_VERSION,
-      metadata: { caseType: parsed.data.caseType },
+      metadata: { caseType: parsed.data.caseType, repairedJson: result.repairedJson ?? false },
     }));
 
     const data = result.data;

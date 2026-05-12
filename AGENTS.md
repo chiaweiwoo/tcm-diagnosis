@@ -76,7 +76,7 @@ Inspired by NovaHealth TCM's public positioning, without copying assets:
 
 - modern TCM
 - clinical, calm, professional
-- warm clinic red/off-white visual direction, with green/teal only as secondary medical support
+- warm clinic red/off-white visual direction; avoid sudden green/blue accents because they make the app feel less cohesive
 - clear safety and physician-only cues
 - compact dashboard/workbench, not a marketing landing page
 
@@ -105,6 +105,7 @@ Implementation direction:
 - Store API-call performance for every model call: route, provider, model, latency, success/failure, token usage, estimated cost, prompt version, and useful metadata.
 - API logging should not slow down doctor-facing responses. Use background logging where possible; the UI should wait for DeepSeek, not for Supabase inserts.
 - Use strict schemas and stable output sections rather than free-form prose.
+- If a provider returns malformed JSON, use a small cleanup call that only repairs syntax and does not add clinical content.
 - Use low temperature for clinical analysis.
 - Keep a regression set of representative doctor cases and compare outputs when prompt/model changes.
 - Prompt should force a fixed judgment order:
@@ -135,6 +136,7 @@ The tool should gently improve doctor data collection habits over time:
 - Keep `max_tokens` conservative for the analysis route unless the UI needs more detail.
 - Use API call logs before changing default models. Compare similar saved cases across model, latency, cost, and doctor feedback.
 - Keep verification pragmatic for this small project. Build before push when routes/UI changed, run unit tests when validation or JSON handling changed, and avoid style-only or heavyweight checks unless they prevent a likely broken deployment.
+- Show elapsed time during model calls so latency is visible to the project owner and future clinicians.
 
 ## Next Planned Phases
 
