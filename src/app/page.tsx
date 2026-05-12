@@ -9,7 +9,7 @@ import {
   RotateCcw,
   Sparkles,
 } from "lucide-react";
-import { ReactNode, useEffect, useState } from "react";
+import { KeyboardEvent, ReactNode, useEffect, useState } from "react";
 import { CaseForm, validateCaseForm } from "@/lib/caseValidation";
 import "./workbench.css";
 
@@ -191,6 +191,13 @@ export default function Home() {
     }
   }
 
+  function handleDraftKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if ((event.ctrlKey || event.metaKey) && event.key === "Enter" && draft.trim() && !isLocked) {
+      event.preventDefault();
+      void analyzeDraft();
+    }
+  }
+
   return (
     <main className="app-shell">
       <section className="hero-panel">
@@ -240,6 +247,7 @@ export default function Home() {
             <textarea
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={handleDraftKeyDown}
               disabled={isLocked}
               rows={8}
               placeholder="粘贴病案、处方或针灸方案、复诊目标，以及需要复核的临床问题。"
@@ -258,7 +266,7 @@ export default function Home() {
             </button>
             <p className="cost-note">
               {elapsedSeconds > 0 ? `用时 ${elapsedSeconds} 秒 · ` : ""}
-              资料将先结构化，再进入临床研判；结果需由医生复核。
+              资料将先结构化，再进入临床研判；可按Ctrl+Enter提交。
             </p>
           </div>
         </div>
