@@ -13,8 +13,6 @@ import { ReactNode, useEffect, useState } from "react";
 import { CaseForm, validateCaseForm } from "@/lib/caseValidation";
 import "./workbench.css";
 
-type Step = "draft" | "result";
-
 type AnalysisResult = {
   title: string;
   summary: string;
@@ -66,7 +64,6 @@ async function readApiError(response: Response) {
 export default function Home() {
   const [draft, setDraft] = useState("");
   const [form, setForm] = useState<CaseForm>(initialForm);
-  const [activeStep, setActiveStep] = useState<Step>("draft");
   const [blockedReasons, setBlockedReasons] = useState<string[]>([]);
   const [missingContext, setMissingContext] = useState<string[]>([]);
   const [organizeNotes, setOrganizeNotes] = useState<string[]>([]);
@@ -96,7 +93,6 @@ export default function Home() {
   function resetSession() {
     setDraft("");
     setForm(initialForm);
-    setActiveStep("draft");
     setBlockedReasons([]);
     setMissingContext([]);
     setOrganizeNotes([]);
@@ -182,7 +178,6 @@ export default function Home() {
         promptVersion: analyzed.promptVersion,
       });
       setMissingContext(analyzed.validation?.missingContext ?? validation.missingContext);
-      setActiveStep("result");
     } catch (error) {
       setApiError(error instanceof Error ? error.message : "生成分析失败，请稍后重试。");
     } finally {
@@ -209,30 +204,12 @@ export default function Home() {
       <section className="panel flow-panel">
         <div className="section-heading compact-heading">
           <div>
-            <p className="eyebrow">流程</p>
-            <h2>草稿输入 → 分析结果</h2>
+            <p className="eyebrow">工作台</p>
+            <h2>草稿与分析</h2>
           </div>
           <button type="button" className="secondary-button compact-button" onClick={resetSession}>
             <RotateCcw size={15} />
             重新开始
-          </button>
-        </div>
-
-        <div className="steps two-steps" aria-label="流程步骤">
-          <button
-            type="button"
-            className={activeStep === "draft" ? "active" : ""}
-            onClick={() => setActiveStep("draft")}
-          >
-            1 草稿输入
-          </button>
-          <button
-            type="button"
-            className={activeStep === "result" ? "active" : ""}
-            onClick={() => setActiveStep("result")}
-            disabled={!result}
-          >
-            2 分析结果
           </button>
         </div>
 
@@ -252,38 +229,36 @@ export default function Home() {
           </div>
         ) : null}
 
-        {activeStep === "draft" ? (
-          <div className="draft-panel compact-draft">
-            <label className="field-block">
-              <span>医生草稿</span>
-              <textarea
-                value={draft}
-                onChange={(event) => setDraft(event.target.value)}
-                rows={12}
-                placeholder="直接粘贴病案、当前治疗方案和医生问题。系统会自动整理资料并提示可能影响判断的缺口。"
-              />
-            </label>
+        <div className="draft-panel compact-draft">
+          <label className="field-block">
+            <span>医生草稿</span>
+            <textarea
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              rows={8}
+              placeholder="直接粘贴病案、当前治疗方案和医生问题。系统会自动整理资料并提示可能影响判断的缺口。"
+            />
+          </label>
 
-            <div className="action-bar">
-              <button
-                className="primary-button"
-                type="button"
-                onClick={analyzeDraft}
-                disabled={!draft.trim() || isBusy}
-              >
-                <Sparkles size={18} />
-                {isOrganizing ? "整理资料中..." : isAnalyzing ? "生成分析中..." : "生成分析"}
-              </button>
-              <p className="cost-note">
-                {isBusy ? `已用 ${elapsedSeconds} 秒 · ` : ""}
-                先整理资料，再调用DeepSeek生成分析；若资料不足会先提示。
-              </p>
-            </div>
+          <div className="action-bar">
+            <button
+              className="primary-button"
+              type="button"
+              onClick={analyzeDraft}
+              disabled={!draft.trim() || isBusy}
+            >
+              <Sparkles size={18} />
+              {isOrganizing ? "整理资料中..." : isAnalyzing ? "生成分析中..." : "生成分析"}
+            </button>
+            <p className="cost-note">
+              {isBusy ? `已用 ${elapsedSeconds} 秒 · ` : ""}
+              先整理资料，再调用DeepSeek生成分析；若资料不足会先提示。
+            </p>
           </div>
-        ) : null}
+        </div>
       </section>
 
-      {activeStep === "result" && result ? (
+      {result ? (
         <section className="panel result-panel-full">
           <div className="section-heading">
             <div>
@@ -324,11 +299,6 @@ export default function Home() {
             </p>
           ) : null}
 
-          <div className="result-actions">
-            <button type="button" className="secondary-button" onClick={() => setActiveStep("draft")}>
-              返回草稿
-            </button>
-          </div>
         </section>
       ) : null}
     </main>

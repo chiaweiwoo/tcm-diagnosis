@@ -126,7 +126,7 @@ The tool should gently improve doctor data collection habits over time:
 - Show missing-context reminders and explain why each missing field matters.
 - Use missing-context logs to suggest what to ask during the next consultation.
 - Treat validation as clinical coaching, not form punishment.
-- Primary workflow should feel like 草稿输入 → 分析结果.
+- Primary workflow should feel like one continuous workbench: 草稿输入 on top, 分析结果 below, so doctors can compare source notes and AI output without switching tabs.
 - The product uses two LLM calls internally: one faster organization call and one analysis call. Keep the internal structure for consistency/logging, but do not make the form the main doctor-facing experience.
 
 ## Latency And Cost
@@ -137,6 +137,7 @@ The tool should gently improve doctor data collection habits over time:
 - Use API call logs before changing default models. Compare similar saved cases across model, latency, cost, and doctor feedback.
 - Keep verification pragmatic for this small project. Build before push when routes/UI changed, run unit tests when validation or JSON handling changed, and avoid style-only or heavyweight checks unless they prevent a likely broken deployment.
 - Show elapsed time during model calls so latency is visible to the project owner and future clinicians.
+- Future prompt improvement should support clinic-specific distilled rules and doctor style preferences, stored separately from the base prompt so the system can improve over time without rewriting core safety rules.
 
 ## Next Planned Phases
 
