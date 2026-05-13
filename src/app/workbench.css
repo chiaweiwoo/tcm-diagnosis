@@ -359,9 +359,39 @@
   background: #fff6f3;
 }
 
+.status-active {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-rotating {
+  animation: status-spin 1s linear infinite;
+}
+
 .status-ready {
   border-color: #ead5a8;
   background: #fff9ef;
+}
+
+.status-organized {
+  border-color: #ead5a8;
+  background: #fffaf2;
+}
+
+.status-blocked {
+  border-color: #f1b8ad;
+  background: #fff6f3;
+}
+
+@keyframes status-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .compact-draft textarea {

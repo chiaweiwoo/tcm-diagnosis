@@ -546,7 +546,7 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
       <section className="panel flow-panel">
         <div className="section-heading compact-heading">
           <div>
-            <h2>病案记录</h2>
+            <h2>临床记录</h2>
           </div>
           <div className="heading-actions">
             <button
@@ -641,7 +641,7 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
               onKeyDown={handleDraftKeyDown}
               disabled={isLocked}
               rows={8}
-              placeholder="粘贴病案、处方或针灸方案、复诊目标，以及需要复核的临床问题。"
+              placeholder="先按你的习惯写下病情、当前处理与想确认的问题；系统会先帮你整理重点，再给出临床复核建议。"
             />
           </label>
 
@@ -653,10 +653,10 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
               disabled={!draft.trim() || isLocked}
             >
               <Sparkles size={18} />
-              {isOrganizing ? "整理资料中..." : isAnalyzing ? "临床研判中..." : "开始研判"}
+              {isOrganizing ? "资料整理中..." : isAnalyzing ? "临床研判中..." : "生成临床复核"}
             </button>
             <p className="cost-note">
-              资料将先结构化，再进入临床研判；可按Ctrl+Enter提交。
+              资料将先结构化，再进入临床研判；可按 Ctrl+Enter 提交。
             </p>
           </div>
           </div>
