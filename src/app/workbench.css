@@ -103,21 +103,32 @@
   background: rgba(255, 255, 255, 0.18);
 }
 
-.project-meta {
+.hero-note,
+.hero-meta {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  margin: 8px 0 0;
-  color: var(--muted);
+  gap: 8px;
+  margin: 10px 0 0;
+  color: #ffe7de;
   font-size: 13px;
+  line-height: 1.45;
 }
 
-.project-meta a {
+.hero-note svg {
+  flex: 0 0 auto;
+}
+
+.hero-meta {
+  gap: 14px;
+  flex-wrap: wrap;
+  color: #f9d8d0;
+}
+
+.hero-meta a {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  color: var(--clinic-red-strong);
+  color: #fffdf8;
   font-weight: 800;
 }
 
@@ -462,64 +473,61 @@
 
 .result-workspace {
   display: grid;
-  grid-template-columns: 210px minmax(0, 1fr);
-  gap: 16px;
-  align-items: start;
-}
-
-.result-timeline {
-  position: sticky;
-  top: 12px;
-  display: grid;
-  gap: 8px;
-  padding: 14px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #fffdf8;
-}
-
-.result-timeline p {
-  margin: 0 0 4px;
-  color: var(--clinic-red-strong);
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.result-timeline a {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  min-height: 34px;
-  color: #4f3d38;
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.result-timeline span {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 999px;
-  background: var(--clinic-red-soft);
-  color: var(--clinic-red-strong);
-  font-size: 12px;
-  font-weight: 900;
-  flex: 0 0 auto;
+  gap: 10px;
 }
 
 .result-content {
   min-width: 0;
 }
 
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.metric-card {
+  display: grid;
+  gap: 3px;
+  min-height: 86px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffdf8;
+}
+
+.metric-card span,
+.metric-card em {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.metric-card strong {
+  color: #332724;
+  font-size: 28px;
+  line-height: 1;
+}
+
+.metric-card.warn {
+  border-color: #ead5a8;
+  background: #fffaf0;
+}
+
+.metric-card.focus {
+  border-color: #dfc6be;
+  background: var(--clinic-red-soft);
+}
+
 .result-summary {
-  margin: 0 0 12px;
-  padding: 14px;
+  margin: 0;
+  padding: 11px 12px;
   border-radius: 8px;
   background: var(--sage);
   color: #3e302d;
-  line-height: 1.7;
+  line-height: 1.55;
 }
 
 .result-sections {
@@ -555,18 +563,18 @@
 
 .result-group {
   display: grid;
-  gap: 10px;
-  margin-top: 14px;
+  gap: 8px;
+  margin-top: 10px;
   scroll-margin-top: 16px;
 }
 
 .result-group > .section-title {
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .result-card,
 .caution-card {
-  padding: 14px;
+  padding: 11px 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--paper);
@@ -574,8 +582,8 @@
 
 .warning-card {
   display: grid;
-  gap: 10px;
-  padding: 14px;
+  gap: 8px;
+  padding: 11px 12px;
   border: 1px solid #ead5a8;
   border-radius: 8px;
   background: #fffaf0;
@@ -585,10 +593,10 @@
 
 .warning-card ul {
   display: grid;
-  gap: 6px;
+  gap: 4px;
   margin: 0;
   padding-left: 20px;
-  line-height: 1.6;
+  line-height: 1.5;
 }
 
 .result-card h4 {
@@ -600,17 +608,17 @@
 
 .result-card ul {
   display: grid;
-  gap: 8px;
-  margin: 10px 0 0;
+  gap: 5px;
+  margin: 8px 0 0;
   padding-left: 20px;
-  line-height: 1.65;
+  line-height: 1.5;
   color: #463833;
 }
 
 .caution-card {
   display: grid;
-  gap: 8px;
-  margin-top: 12px;
+  gap: 6px;
+  margin-top: 10px;
   border-color: #ead5a8;
   background: #fff8e8;
   color: #6b4a12;
@@ -619,7 +627,7 @@
 
 .caution-card p {
   margin: 0;
-  line-height: 1.6;
+  line-height: 1.5;
 }
 
 @media (max-width: 900px) {
@@ -640,21 +648,12 @@
     grid-template-columns: 1fr;
   }
 
-  .result-workspace {
-    grid-template-columns: 1fr;
-  }
-
   .history-row {
     grid-template-columns: 1fr;
   }
 
-  .result-timeline {
-    position: static;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .result-timeline p {
-    grid-column: 1 / -1;
+  .metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -681,12 +680,7 @@
     max-width: 100%;
   }
 
-  .project-meta {
-    justify-content: flex-start;
-    flex-wrap: wrap;
-  }
-
-  .result-timeline {
+  .metric-grid {
     grid-template-columns: 1fr;
   }
 

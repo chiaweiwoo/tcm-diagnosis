@@ -44,7 +44,7 @@ drafts, and save interactions for later review and prompt/model improvement.
    - prompt version
    - doctor feedback
    - timestamp and doctor email
-6. The current UX is a continuous workbench: draft/case note on top, analysis below, with a left analysis navigation rail. Avoid forcing doctors through a large form unless they explicitly need structured editing.
+6. The current UX is a continuous workbench: draft/case note on top, compact dashboard-style analysis below. Avoid forcing doctors through a large form unless they explicitly need structured editing.
 7. AI output must avoid guaranteed cure claims and must expose uncertainty.
 8. Requests that look patient-facing, vague, or promising guaranteed efficacy should be treated as low-confidence or not-ready clinical material in the output, not as a polished recommendation.
 9. Citation/research retrieval is important for medical credibility, but it is phase 2. Until then, do not fabricate citations.
@@ -81,6 +81,7 @@ Inspired by NovaHealth TCM's public positioning, without copying assets:
 - warm clinic red/off-white visual direction; avoid sudden green/blue accents because they make the app feel less cohesive
 - clear safety and physician-only cues
 - compact dashboard/workbench, not a marketing landing page
+- Analysis results should not use a left navigation rail. Prefer KPI-style summary cards and dense grouped sections. Use only countable indicators; avoid decorative or fake charts.
 
 ## Clinical Style Preference
 
@@ -130,7 +131,7 @@ The tool should gently improve doctor data collection habits over time:
 - Use missing-context logs to suggest what to ask during the next consultation.
 - Treat validation as clinical coaching, not form punishment.
 - Primary workflow should feel like one continuous workbench: 病案记录 on top, 临床参考 below, so doctors can compare source notes and AI output without switching tabs.
-- Analysis results should include a left rail/timeline for stages: 资料完整性, 病案摘要, 临床判断, 建议方案, 复核与随访, 临床风险. On mobile this must collapse without overlap.
+- Analysis results should start with compact KPI-style cards such as 资料完整性, 临床风险, 需要复核, and 建议重点, followed by grouped clinical details. On mobile these cards must stack without overlap.
 - The product uses two LLM calls internally: one faster organization call and one analysis call. Keep the internal structure for consistency/logging, but do not make the form the main doctor-facing experience.
 
 ## Latency And Cost
@@ -143,6 +144,15 @@ The tool should gently improve doctor data collection habits over time:
 - Show elapsed time during model calls so latency is visible to the project owner and future clinicians.
 - Future prompt improvement should support clinic-specific distilled rules and doctor style preferences, stored separately from the base prompt so the system can improve over time without rewriting core safety rules.
 - Product wording should feel like a modern clinical tool, not an IT demo. Prefer terms such as 病案记录, 临床研判, 资料完整性, 病案摘要, 临床风险, 新建病案. Avoid over-explaining internal mechanics in visible UI copy.
+- Token usage and cost should be logged internally, not shown on each doctor-facing result. Revisit later as an admin/analytics view.
+
+## Documentation Direction
+
+- README is product-facing, not a developer/debugging log.
+- Describe what the tool helps doctors do; do not frame the app as an AI experiment.
+- Keep author and repository attribution in the dashboard, not README.
+- Avoid README sections for access-control setup, storage implementation details, development commands, or debugging notes unless explicitly requested.
+- Combine stack and architecture into a concise overview.
 
 ## Auth Requirements
 
@@ -152,6 +162,7 @@ The tool should gently improve doctor data collection habits over time:
 - Visiting `/` without a valid session must redirect to `/login`.
 - A signed-in but non-allowlisted Google account must be signed out and shown a Chinese authorization message.
 - Keep future patient-facing access separate from this doctor-facing OAuth flow.
+- Future improvement: move doctor allowlist management into Supabase instead of Vercel env secrets, so doctor access can be updated without redeploying and later support roles/metadata.
 
 ## Consultation History Requirements
 
@@ -164,8 +175,9 @@ The tool should gently improve doctor data collection habits over time:
 ## Next Planned Phases
 
 1. Add doctor feedback and accepted/rejected suggestion capture.
-2. Add citation retrieval layer for PubMed/TCM sources.
-3. Add regression-set comparisons for saved cases across prompt/model changes.
+2. Move doctor allowlist management into Supabase.
+3. Add citation retrieval layer for PubMed/TCM sources.
+4. Add regression-set comparisons for saved cases across prompt/model changes.
 
 ## Prompt Architecture Direction
 

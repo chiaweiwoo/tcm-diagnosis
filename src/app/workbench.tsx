@@ -81,15 +81,6 @@ const resultGroups = [
   { id: "followup", title: "复核与随访", sectionTitles: ["检查与监测", "证据缺口", "需要复核"] },
 ];
 
-const resultTimeline = [
-  { id: "completeness", label: "资料完整性" },
-  { id: "summary", label: "病案摘要" },
-  { id: "judgement", label: "临床判断" },
-  { id: "recommendation", label: "建议方案" },
-  { id: "followup", label: "复核与随访" },
-  { id: "risk", label: "临床风险" },
-];
-
 async function readApiError(response: Response) {
   try {
     const body = (await response.json()) as { error?: string };
@@ -142,6 +133,8 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
   const isLocked = isBusy || (Boolean(result) && !isEditing);
   const hasSavedRecord = Boolean(activeConsultationId);
   const qualityWarnings = [...missingContext, ...organizeNotes, ...organizeSuggestions].filter(Boolean);
+  const reviewItems = result?.sections.find((section) => section.title === "需要复核")?.items ?? [];
+  const recommendationItems = result?.sections.find((section) => section.title === "修改建议")?.items ?? [];
 
   useEffect(() => {
     void loadConsultations();
@@ -484,25 +477,23 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
             <p className="hero-copy">
               从病案记录中提炼关键信息，标出影响判断的资料缺口，并输出可复核的中医临床参考。
             </p>
+            <p className="hero-note">
+              <AlertTriangle size={15} />
+              仅供注册中医师临床参考，最终判断以医生面诊与专业评估为准。
+            </p>
+            <div className="hero-meta">
+              <span>作者：Woo Chia Wei</span>
+              <a href="https://github.com/chiaweiwoo/tcm-diagnosis" target="_blank" rel="noreferrer">
+                <GitBranch size={15} />
+                GitHub 仓库
+              </a>
+            </div>
           </div>
           <a className="secondary-button hero-action" href="/auth/signout">
             <LogOut size={15} />
             {userEmail}
           </a>
         </div>
-      </section>
-
-      <section className="project-meta">
-        <span>作者：Woo Chia Wei</span>
-        <a href="https://github.com/chiaweiwoo/tcm-diagnosis" target="_blank" rel="noreferrer">
-          <GitBranch size={15} />
-          GitHub 仓库
-        </a>
-      </section>
-
-      <section className="notice-bar">
-        <AlertTriangle size={18} />
-        <span>仅供注册中医师临床参考，最终判断以医生面诊与专业评估为准。</span>
       </section>
 
       <section className="panel flow-panel">
@@ -635,17 +626,14 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
           </div>
 
           <div className="result-workspace">
-            <aside className="result-timeline" aria-label="研判导航">
-              <p>研判路径</p>
-              {resultTimeline.map((item, index) => (
-                <a href={`#${item.id}`} key={item.id}>
-                  <span>{index + 1}</span>
-                  {item.label}
-                </a>
-              ))}
-            </aside>
-
             <div className="result-content">
+              <div className="metric-grid">
+                <MetricCard title="资料完整性" value={qualityWarnings.length} detail="项提醒" tone={qualityWarnings.length ? "warn" : "ok"} />
+                <MetricCard title="临床风险" value={result.cautions.length} detail="项需注意" tone={result.cautions.length ? "warn" : "ok"} />
+                <MetricCard title="需要复核" value={reviewItems.length} detail="项待确认" tone={reviewItems.length ? "warn" : "ok"} />
+                <MetricCard title="建议重点" value={recommendationItems.length} detail="项调整" tone={recommendationItems.length ? "focus" : "ok"} />
+              </div>
+
               {qualityWarnings.length ? (
                 <article className="warning-card" id="completeness">
                   <SectionTitle icon={<AlertTriangle size={18} />}>资料完整性</SectionTitle>
@@ -670,13 +658,6 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
                   <p key={item}>{item}</p>
                 ))}
               </article>
-
-              {meta ? (
-                <p className="cost-note">
-                  本次研判约 {meta.usage?.total_tokens ?? 0} tokens，费用约 US$
-                  {(meta.costUsd ?? 0).toFixed(6)}。
-                </p>
-              ) : null}
             </div>
           </div>
         </section>
@@ -691,6 +672,26 @@ function SectionTitle({ icon, children }: { icon: ReactNode; children: ReactNode
       <span>{icon}</span>
       {children}
     </h3>
+  );
+}
+
+function MetricCard({
+  title,
+  value,
+  detail,
+  tone,
+}: {
+  title: string;
+  value: number;
+  detail: string;
+  tone: "ok" | "warn" | "focus";
+}) {
+  return (
+    <article className={`metric-card ${tone}`}>
+      <span>{title}</span>
+      <strong>{value}</strong>
+      <em>{detail}</em>
+    </article>
   );
 }
 
