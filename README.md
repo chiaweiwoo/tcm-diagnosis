@@ -75,3 +75,14 @@ flowchart LR
 - A build label is shown in the workbench so deployment status can be checked visually after release.
 - Token usage, estimated cost, model metadata, and latency stay internal and are stored for traceability rather than shown in the doctor-facing UI.
 - Doctor allowlist is now read from Supabase when the `doctor_allowlist` table is available, with environment-variable fallback during transition.
+- Local development can optionally use a strict dev-only auth bypass with `DEV_AUTH_BYPASS=true` and `DEV_AUTH_EMAIL=...`; it is ignored outside `NODE_ENV=development`.
+
+---
+
+## Local Development Notes
+
+- Keep Google OAuth for normal usage.
+- For local UI iteration only, you may enable:
+  - `DEV_AUTH_BYPASS=true`
+  - `DEV_AUTH_EMAIL=<allowed doctor email>`
+- The bypass still checks the allowlist and never applies in production.

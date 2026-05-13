@@ -242,6 +242,15 @@
   white-space: nowrap;
 }
 
+.dev-bypass-badge {
+  padding: 4px 9px;
+  border: 1px solid rgba(255, 220, 148, 0.55);
+  border-radius: 999px;
+  background: rgba(255, 244, 207, 0.18);
+  color: #fff1c4;
+  font-weight: 800;
+}
+
 .notice-bar {
   display: flex;
   align-items: center;

@@ -3,6 +3,22 @@ type DoctorAllowlistRecord = {
   is_active?: boolean | null;
 };
 
+export function normalizeDoctorEmail(email?: string | null) {
+  return email?.trim().toLowerCase() ?? "";
+}
+
+export function getDevBypassDoctorEmail() {
+  if (process.env.NODE_ENV !== "development") {
+    return "";
+  }
+
+  if (process.env.DEV_AUTH_BYPASS !== "true") {
+    return "";
+  }
+
+  return normalizeDoctorEmail(process.env.DEV_AUTH_EMAIL);
+}
+
 function parseEnvAllowlist() {
   return (process.env.ALLOWED_DOCTOR_EMAILS || "")
     .split(",")
@@ -95,8 +111,4 @@ export async function isAllowedDoctorEmail(email?: string | null) {
   }
 
   return parseEnvAllowlist().includes(normalized);
-}
-
-export function normalizeDoctorEmail(email?: string | null) {
-  return email?.trim().toLowerCase() ?? "";
 }

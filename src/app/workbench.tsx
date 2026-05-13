@@ -117,9 +117,11 @@ function normalizeName(value: string) {
 export default function Workbench({
   userEmail,
   buildLabel,
+  isDevBypass,
 }: {
   userEmail: string;
   buildLabel: string;
+  isDevBypass: boolean;
 }) {
   const [consultationName, setConsultationName] = useState("");
   const [activeConsultationId, setActiveConsultationId] = useState("");
@@ -610,6 +612,7 @@ export default function Workbench({
           </a>
         </div>
         <div className="hero-meta-row">
+          {isDevBypass ? <span className="dev-bypass-badge">本地开发模式</span> : null}
           <span>构建：{buildLabel}</span>
           <span>作者：Woo Chia Wei</span>
           <a href="https://github.com/chiaweiwoo/tcm-diagnosis" target="_blank" rel="noreferrer">

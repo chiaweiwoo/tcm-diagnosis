@@ -46,6 +46,11 @@ The tool helps registered TCM doctors:
 4. Doctor allowlist should be read from Supabase `doctor_allowlist` when available, with `ALLOWED_DOCTOR_EMAILS` as fallback only.
 5. Unauthenticated access to `/` must redirect to `/login`.
 6. Signed-in but non-allowlisted users must be signed out and shown a Chinese authorization message.
+7. A dev-only auth bypass is allowed strictly for local UI testing when:
+   - `NODE_ENV === "development"`
+   - `DEV_AUTH_BYPASS === "true"`
+   - `DEV_AUTH_EMAIL` is present and still passes the doctor allowlist check
+8. The dev-only bypass must never be honored in production or preview deployments.
 
 ## Stage-One Clinical Guardrails
 
@@ -150,6 +155,7 @@ Logging should not block doctor-facing responses.
 - Prefer kanban/dashboard-style analysis grouping over document-style sprawl.
 - Keep a visible help surface in the dashboard so doctors can understand workflow assumptions without reading external docs.
 - Show a visible build label in the UI so deployed-version checks are easy.
+- When local dev bypass is active, show a clear in-product indicator such as `本地开发模式`.
 
 ## Documentation Direction
 
@@ -157,6 +163,7 @@ Logging should not block doctor-facing responses.
 - Explain what the tool helps doctors do.
 - Keep setup and operational notes concise.
 - Mention the two-step pipeline, organize-stage stop behavior, internal-only token/cost tracking, and allowlist source.
+- Document the local dev auth bypass in `.env.local.example` and keep the explanation brief and explicit.
 
 ## Deferred Scope
 
