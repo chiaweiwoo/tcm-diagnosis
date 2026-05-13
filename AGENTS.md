@@ -179,6 +179,23 @@ The tool should gently improve doctor data collection habits over time:
 3. Add citation retrieval layer for PubMed/TCM sources.
 4. Add regression-set comparisons for saved cases across prompt/model changes.
 
+## Current Phase Lock (Supportive Partner v1)
+
+- Doctor feedback capture is intentionally out of scope in this phase.
+- No visible doctor score/rank/grade in UI or API output.
+- Analysis output must follow grouped clinician reading order:
+  - `重点结论`
+  - `病案摘要`
+  - `资料完整性` (`已提供`, `建议补充`)
+  - `当前思路` (`可取之处`, `需要复核`)
+  - `建议优化`
+  - `可选思路`
+  - `风险与提醒`
+  - `随访监测`
+  - `证据状态`
+- The two real doctor examples are human calibration references for tone and practicality, not strict expected-output fixtures.
+- Product tone should feel like a supportive senior peer: acknowledge what is good first, then suggest practical improvements and caution points.
+
 ## Prompt Architecture Direction
 
 Future model calls should not be a single direct answer. Use a two-stage or structured

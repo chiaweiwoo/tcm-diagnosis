@@ -21,9 +21,14 @@ import "./workbench.css";
 
 type AnalysisResult = {
   title: string;
+  keyPoints: string[];
   summary: string;
-  sections: Array<{ title: string; items: string[] }>;
+  groups: Array<{
+    title: string;
+    sections: Array<{ title: string; items: string[] }>;
+  }>;
   cautions: string[];
+  evidence: string[];
 };
 
 type ApiMeta = {
@@ -74,12 +79,6 @@ const initialForm: CaseForm = {
   doctorQuestion: "",
   modelMode: "深度模式",
 };
-
-const resultGroups = [
-  { id: "judgement", title: "临床判断", sectionTitles: ["辨证假设", "当前方案评估"] },
-  { id: "recommendation", title: "建议方案", sectionTitles: ["修改建议", "备选思路"] },
-  { id: "followup", title: "复核与随访", sectionTitles: ["检查与监测", "证据缺口", "需要复核"] },
-];
 
 async function readApiError(response: Response) {
   try {
@@ -133,8 +132,14 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
   const isLocked = isBusy || (Boolean(result) && !isEditing);
   const hasSavedRecord = Boolean(activeConsultationId);
   const qualityWarnings = [...missingContext, ...organizeNotes, ...organizeSuggestions].filter(Boolean);
-  const reviewItems = result?.sections.find((section) => section.title === "需要复核")?.items ?? [];
-  const recommendationItems = result?.sections.find((section) => section.title === "修改建议")?.items ?? [];
+  const reviewItems = result?.groups
+    .find((group) => group.title === "当前思路")
+    ?.sections.find((section) => section.title === "需要复核")
+    ?.items ?? [];
+  const recommendationItems = result?.groups
+    .find((group) => group.title === "建议优化")
+    ?.sections.find((section) => section.title === "主要建议")
+    ?.items ?? [];
 
   useEffect(() => {
     void loadConsultations();
@@ -634,6 +639,17 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
                 <MetricCard title="建议重点" value={recommendationItems.length} detail="项调整" tone={recommendationItems.length ? "focus" : "ok"} />
               </div>
 
+              <section className="result-group" id="key-points">
+                <SectionTitle icon={<Sparkles size={18} />}>重点结论</SectionTitle>
+                <article className="result-card">
+                  <ul>
+                    {result.keyPoints.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </article>
+              </section>
+
               {qualityWarnings.length ? (
                 <article className="warning-card" id="completeness">
                   <SectionTitle icon={<AlertTriangle size={18} />}>资料完整性</SectionTitle>
@@ -650,14 +666,25 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
                 <p className="result-summary">{result.summary}</p>
               </section>
 
-              <GroupedResults sections={result.sections} />
+              <GroupedResults groups={result.groups} />
 
               <article className="caution-card" id="risk">
-                <SectionTitle icon={<AlertTriangle size={18} />}>临床风险</SectionTitle>
+                <SectionTitle icon={<AlertTriangle size={18} />}>风险与提醒</SectionTitle>
                 {result.cautions.map((item) => (
                   <p key={item}>{item}</p>
                 ))}
               </article>
+
+              <section className="result-group" id="evidence">
+                <SectionTitle icon={<ClipboardCheck size={18} />}>证据状态</SectionTitle>
+                <article className="result-card">
+                  <ul>
+                    {result.evidence.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </article>
+              </section>
             </div>
           </div>
         </section>
@@ -695,21 +722,12 @@ function MetricCard({
   );
 }
 
-function GroupedResults({ sections }: { sections: AnalysisResult["sections"] }) {
-  const groupedTitles = new Set(resultGroups.flatMap((group) => group.sectionTitles));
-  const otherSections = sections.filter((section) => !groupedTitles.has(section.title));
-
+function GroupedResults({ groups }: { groups: AnalysisResult["groups"] }) {
   return (
     <>
-      {resultGroups.map((group) => (
-        <ResultGroup
-          key={group.title}
-          id={group.id}
-          title={group.title}
-          sections={sections.filter((section) => group.sectionTitles.includes(section.title))}
-        />
+      {groups.map((group) => (
+        <ResultGroup key={group.title} title={group.title} sections={group.sections} />
       ))}
-      {otherSections.length ? <ResultGroup title="其他信息" sections={otherSections} /> : null}
     </>
   );
 }
@@ -721,7 +739,7 @@ function ResultGroup({
 }: {
   id?: string;
   title: string;
-  sections: AnalysisResult["sections"];
+  sections: AnalysisResult["groups"][number]["sections"];
 }) {
   if (!sections.length) return null;
 
