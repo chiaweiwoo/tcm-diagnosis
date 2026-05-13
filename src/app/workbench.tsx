@@ -288,7 +288,13 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
         draft: draft.trim(),
         organizedCase: input.organized,
         analysisResult: input.analyzed.result,
-        analysisRaw: input.analyzed.raw ?? null,
+        analysisRaw: {
+          analyze_input: {
+            form,
+            doctorDraft: draft.trim(),
+          },
+          analyze_output: input.analyzed.raw ?? null,
+        },
         validationResult: input.analyzed.validation ?? null,
         modelMeta,
         analysisStatus: "ready",
@@ -303,6 +309,38 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
     showToast("临床研判已保存到历史记录。", "success");
   }
 
+
+  async function saveOrganizeSnapshot(input: {
+    recordId: string;
+    draftText: string;
+    organized: {
+      form: CaseForm;
+      notes?: string[];
+      suggestions?: string[];
+      usage?: ApiMeta["usage"];
+      costUsd?: number;
+      model?: string;
+      promptVersion?: string;
+    };
+  }) {
+    const response = await fetch(`/api/consultations/${input.recordId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        consultationName: normalizeName(consultationName),
+        draft: input.draftText,
+        organizedCase: {
+          organize_input: { draft: input.draftText },
+          organize_output: input.organized,
+        },
+        analysisStatus: "draft",
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(await readApiError(response));
+    }
+  }
   async function loadConsultation(id: string) {
     if (!id) {
       resetSession();
@@ -400,6 +438,10 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
         form: CaseForm;
         notes?: string[];
         suggestions?: string[];
+        usage?: ApiMeta["usage"];
+        costUsd?: number;
+        model?: string;
+        promptVersion?: string;
       };
 
       const nextForm = organized.form;
@@ -413,6 +455,15 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
         ...Object.values(validation.errors),
         ...validation.blockedReasons,
       ].filter(Boolean));
+
+      const recordId = activeConsultationId || (await saveDraftOnly(text, consultationName));
+      if (recordId) {
+        await saveOrganizeSnapshot({
+          recordId,
+          draftText: text,
+          organized,
+        });
+      }
 
       setIsOrganizing(false);
       setIsAnalyzing(true);
@@ -437,7 +488,6 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
         validation?: ReturnType<typeof validateCaseForm>;
       };
 
-      const recordId = activeConsultationId || (await saveDraftOnly(text, consultationName));
       if (recordId) {
         await saveAnalysisResult({ recordId, organized, analyzed });
       }
@@ -768,3 +818,5 @@ function getResultIcon(title: string) {
   if (title === "复核与随访") return <ClipboardCheck size={18} />;
   return <Activity size={18} />;
 }
+
+
