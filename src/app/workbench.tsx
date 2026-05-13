@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { KeyboardEvent, ReactNode, useEffect, useState } from "react";
 import { CaseForm, getStageOneRequirements, validateCaseForm } from "@/lib/caseValidation";
+import { ensureAnalysisResult } from "@/lib/ai/analysisResult";
 import "./workbench.css";
 
 type AnalysisResult = {
@@ -416,7 +417,10 @@ export default function Workbench({
         setActiveConsultationId(record.id);
         setConsultationName(record.consultation_name ?? "");
         setDraft(record.draft ?? "");
-        setResult(record.analysis_result ?? null);
+        const savedCaseType =
+          (record.organized_case as { organize_output?: { form?: { caseType?: CaseForm["caseType"] } } } | null)?.organize_output?.form
+            ?.caseType ?? "方药分析";
+        setResult(ensureAnalysisResult(record.analysis_result, savedCaseType));
         setMeta(record.model_meta ?? null);
         setStageOneHints(record.validation_result?.stageOneHints ?? []);
         setMissingContext(record.validation_result?.missingContext ?? []);

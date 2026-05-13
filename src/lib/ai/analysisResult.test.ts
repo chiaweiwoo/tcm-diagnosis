@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildAnalysisResult, normalizeStringList } from "./analysisResult";
+import { buildAnalysisResult, ensureAnalysisResult, normalizeStringList } from "./analysisResult";
 
 describe("buildAnalysisResult", () => {
   it("maps grouped analysis fields to UI contract", () => {
@@ -76,5 +76,31 @@ describe("normalizeStringList", () => {
     expect(normalizeStringList(["A", " ", 2, false])).toEqual(["A", "2", "false"]);
     expect(normalizeStringList("单条")).toEqual(["单条"]);
     expect(normalizeStringList(null)).toEqual([]);
+  });
+});
+
+describe("ensureAnalysisResult", () => {
+  it("normalizes legacy saved analysis results into stable groups", () => {
+    const result = ensureAnalysisResult(
+      {
+        title: "方药分析研判",
+        keyPoints: ["先看这一点"],
+        summary: "旧记录摘要",
+        groups: [
+          {
+            title: "资料完整性",
+            sections: [{ title: "建议补充", items: ["补舌脉"] }],
+          },
+        ],
+      },
+      "方药分析",
+    );
+
+    expect(result).not.toBeNull();
+    expect(result?.groups.map((group) => group.title)).toEqual(["资料完整性", "当前思路", "建议优化", "随访监测"]);
+    expect(result?.groups[0].sections[0].title).toBe("已提供");
+    expect(result?.groups[0].sections[1].items).toContain("补舌脉");
+    expect(result?.cautions.length).toBeGreaterThan(0);
+    expect(result?.evidence.length).toBeGreaterThan(0);
   });
 });

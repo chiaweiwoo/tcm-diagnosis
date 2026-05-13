@@ -32,6 +32,24 @@ export type AnalysisResult = {
   evidence: string[];
 };
 
+function normalizeSection(section: unknown, fallbackTitle: string, fallbackItem: string) {
+  if (!section || typeof section !== "object") {
+    return {
+      title: fallbackTitle,
+      items: [fallbackItem],
+    };
+  }
+
+  const record = section as { title?: unknown; items?: unknown };
+  const title = normalizeText(record.title) || fallbackTitle;
+  const items = normalizeStringList(record.items);
+
+  return {
+    title,
+    items: items.length ? items : [fallbackItem],
+  };
+}
+
 function normalizeText(value: unknown) {
   if (typeof value === "string") return value.trim();
   if (typeof value === "number" || typeof value === "boolean") return String(value).trim();
@@ -96,4 +114,167 @@ export function buildAnalysisResult(data: AnalysisJson, caseType: CaseForm["case
     cautions: cautions.length ? cautions : ["请结合面诊与必要检查复核后执行。"],
     evidence: evidence.length ? evidence : ["基于临床经验与通用知识，尚未接入外部文献检索。"],
   };
+}
+
+export function ensureAnalysisResult(
+  value: unknown,
+  caseType: CaseForm["caseType"] = "方药分析",
+): AnalysisResult | null {
+  if (!value || typeof value !== "object") return null;
+
+  const record = value as {
+    title?: unknown;
+    keyPoints?: unknown;
+    summary?: unknown;
+    groups?: unknown;
+    cautions?: unknown;
+    evidence?: unknown;
+  };
+
+  if (Array.isArray(record.groups)) {
+    const normalizedGroups: ResultGroup[] = [
+      {
+        title: "资料完整性",
+        sections: [
+          normalizeSection(
+            record.groups.find(
+              (group) => typeof group === "object" && group && normalizeText((group as { title?: unknown }).title) === "资料完整性",
+            ) && (record.groups.find(
+              (group) => typeof group === "object" && group && normalizeText((group as { title?: unknown }).title) === "资料完整性",
+            ) as { sections?: unknown }).sections instanceof Array
+              ? ((record.groups.find(
+                  (group) => typeof group === "object" && group && normalizeText((group as { title?: unknown }).title) === "资料完整性",
+                ) as { sections?: unknown }).sections as unknown[]).find(
+                  (section) => typeof section === "object" && section && normalizeText((section as { title?: unknown }).title) === "已提供",
+                )
+              : null,
+            "已提供",
+            "当前未额外归纳已提供信息，可继续结合原始病案核对。",
+          ),
+          normalizeSection(
+            record.groups.find(
+              (group) => typeof group === "object" && group && normalizeText((group as { title?: unknown }).title) === "资料完整性",
+            ) && (record.groups.find(
+              (group) => typeof group === "object" && group && normalizeText((group as { title?: unknown }).title) === "资料完整性",
+            ) as { sections?: unknown }).sections instanceof Array
+              ? ((record.groups.find(
+                  (group) => typeof group === "object" && group && normalizeText((group as { title?: unknown }).title) === "资料完整性",
+                ) as { sections?: unknown }).sections as unknown[]).find(
+                  (section) => typeof section === "object" && section && normalizeText((section as { title?: unknown }).title) === "建议补充",
+                )
+              : null,
+            "建议补充",
+            "本次未形成新的补充提示，可继续结合面诊补全。",
+          ),
+        ],
+      },
+      {
+        title: "当前思路",
+        sections: [
+          normalizeSection(
+            record.groups.find(
+              (group) => typeof group === "object" && group && normalizeText((group as { title?: unknown }).title) === "当前思路",
+            ) && (record.groups.find(
+              (group) => typeof group === "object" && group && normalizeText((group as { title?: unknown }).title) === "当前思路",
+            ) as { sections?: unknown }).sections instanceof Array
+              ? ((record.groups.find(
+                  (group) => typeof group === "object" && group && normalizeText((group as { title?: unknown }).title) === "当前思路",
+                ) as { sections?: unknown }).sections as unknown[]).find(
+                  (section) => typeof section === "object" && section && normalizeText((section as { title?: unknown }).title) === "可取之处",
+                )
+              : null,
+            "可取之处",
+            "本次未额外提炼明确保留点，可继续结合面诊判断。",
+          ),
+          normalizeSection(
+            record.groups.find(
+              (group) => typeof group === "object" && group && normalizeText((group as { title?: unknown }).title) === "当前思路",
+            ) && (record.groups.find(
+              (group) => typeof group === "object" && group && normalizeText((group as { title?: unknown }).title) === "当前思路",
+            ) as { sections?: unknown }).sections instanceof Array
+              ? ((record.groups.find(
+                  (group) => typeof group === "object" && group && normalizeText((group as { title?: unknown }).title) === "当前思路",
+                ) as { sections?: unknown }).sections as unknown[]).find(
+                  (section) => typeof section === "object" && section && normalizeText((section as { title?: unknown }).title) === "需要复核",
+                )
+              : null,
+            "需要复核",
+            "当前未识别出必须立即调整的复核点，仍建议结合面诊核对。",
+          ),
+        ],
+      },
+      {
+        title: "建议优化",
+        sections: [
+          normalizeSection(
+            record.groups.find(
+              (group) => typeof group === "object" && group && normalizeText((group as { title?: unknown }).title) === "建议优化",
+            ) && (record.groups.find(
+              (group) => typeof group === "object" && group && normalizeText((group as { title?: unknown }).title) === "建议优化",
+            ) as { sections?: unknown }).sections instanceof Array
+              ? ((record.groups.find(
+                  (group) => typeof group === "object" && group && normalizeText((group as { title?: unknown }).title) === "建议优化",
+                ) as { sections?: unknown }).sections as unknown[]).find(
+                  (section) => typeof section === "object" && section && normalizeText((section as { title?: unknown }).title) === "主要建议",
+                )
+              : null,
+            "主要建议",
+            "本次未形成新的优化建议，可先结合当前方案继续观察。",
+          ),
+          normalizeSection(
+            record.groups.find(
+              (group) => typeof group === "object" && group && normalizeText((group as { title?: unknown }).title) === "建议优化",
+            ) && (record.groups.find(
+              (group) => typeof group === "object" && group && normalizeText((group as { title?: unknown }).title) === "建议优化",
+            ) as { sections?: unknown }).sections instanceof Array
+              ? ((record.groups.find(
+                  (group) => typeof group === "object" && group && normalizeText((group as { title?: unknown }).title) === "建议优化",
+                ) as { sections?: unknown }).sections as unknown[]).find(
+                  (section) => typeof section === "object" && section && normalizeText((section as { title?: unknown }).title) === "可选思路",
+                )
+              : null,
+            "可选思路",
+            "本次未提出额外备选思路。",
+          ),
+        ],
+      },
+      {
+        title: "随访监测",
+        sections: [
+          normalizeSection(
+            record.groups.find(
+              (group) => typeof group === "object" && group && normalizeText((group as { title?: unknown }).title) === "随访监测",
+            ) && (record.groups.find(
+              (group) => typeof group === "object" && group && normalizeText((group as { title?: unknown }).title) === "随访监测",
+            ) as { sections?: unknown }).sections instanceof Array
+              ? ((record.groups.find(
+                  (group) => typeof group === "object" && group && normalizeText((group as { title?: unknown }).title) === "随访监测",
+                ) as { sections?: unknown }).sections as unknown[]).find(
+                  (section) => typeof section === "object" && section && normalizeText((section as { title?: unknown }).title) === "监测建议",
+                )
+              : null,
+            "监测建议",
+            "可按常规复诊节奏结合症状变化继续观察。",
+          ),
+        ],
+      },
+    ];
+
+    return {
+      title: normalizeText(record.title) || `${caseType}研判`,
+      keyPoints: normalizeStringList(record.keyPoints).length
+        ? normalizeStringList(record.keyPoints)
+        : ["当前方案仍可继续结合面诊信息复核，系统未提炼出更高优先级的结论。"],
+      summary: normalizeText(record.summary) || "已完成病案研判，请结合门诊面诊与复诊计划继续核对。",
+      groups: normalizedGroups,
+      cautions: normalizeStringList(record.cautions).length
+        ? normalizeStringList(record.cautions)
+        : ["请结合面诊与必要检查复核后执行。"],
+      evidence: normalizeStringList(record.evidence).length
+        ? normalizeStringList(record.evidence)
+        : ["基于临床经验与通用知识，尚未接入外部文献检索。"],
+    };
+  }
+
+  return buildAnalysisResult(value as AnalysisJson, caseType);
 }
