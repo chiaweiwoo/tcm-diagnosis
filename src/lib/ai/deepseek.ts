@@ -32,6 +32,8 @@ type DeepSeekJsonResult<T> = {
   repairedJson?: boolean;
 };
 
+type DeepSeekErrorDetails = Record<string, unknown>;
+
 const DEEPSEEK_URL = "https://api.deepseek.com/chat/completions";
 const PRO_INPUT_PER_1M = 0.435;
 const PRO_OUTPUT_PER_1M = 0.87;
@@ -39,11 +41,13 @@ const DEFAULT_TIMEOUT_MS = 45_000;
 
 export class DeepSeekError extends Error {
   status: number;
+  details?: DeepSeekErrorDetails;
 
-  constructor(message: string, status = 500) {
+  constructor(message: string, status = 500, details?: DeepSeekErrorDetails) {
     super(message);
     this.name = "DeepSeekError";
     this.status = status;
+    this.details = details;
   }
 }
 
@@ -62,14 +66,21 @@ export function estimateDeepSeekCost(usage?: DeepSeekUsage) {
   return Number(((input / 1_000_000) * PRO_INPUT_PER_1M + (output / 1_000_000) * PRO_OUTPUT_PER_1M).toFixed(6));
 }
 
-function combineUsage(first?: DeepSeekUsage, second?: DeepSeekUsage): DeepSeekUsage | undefined {
-  if (!first && !second) return undefined;
+function combineUsage(...usages: Array<DeepSeekUsage | undefined>): DeepSeekUsage | undefined {
+  if (!usages.some(Boolean)) return undefined;
 
-  return {
-    prompt_tokens: (first?.prompt_tokens ?? 0) + (second?.prompt_tokens ?? 0),
-    completion_tokens: (first?.completion_tokens ?? 0) + (second?.completion_tokens ?? 0),
-    total_tokens: (first?.total_tokens ?? 0) + (second?.total_tokens ?? 0),
-  };
+  return usages.reduce<DeepSeekUsage>(
+    (acc, usage) => ({
+      prompt_tokens: (acc.prompt_tokens ?? 0) + (usage?.prompt_tokens ?? 0),
+      completion_tokens: (acc.completion_tokens ?? 0) + (usage?.completion_tokens ?? 0),
+      total_tokens: (acc.total_tokens ?? 0) + (usage?.total_tokens ?? 0),
+    }),
+    {},
+  );
+}
+
+function snippet(content: string, limit = 500) {
+  return content.replace(/\s+/g, " ").trim().slice(0, limit);
 }
 
 export function extractJsonObject(content: string) {
@@ -80,7 +91,10 @@ export function extractJsonObject(content: string) {
   const end = candidate.lastIndexOf("}");
 
   if (start === -1 || end === -1 || end <= start) {
-    throw new DeepSeekError("DeepSeek返回的JSON无法解析。", 502);
+    throw new DeepSeekError("DeepSeek返回的JSON无法解析。", 502, {
+      parserStage: "extract",
+      rawSnippet: snippet(content),
+    });
   }
 
   return candidate.slice(start, end + 1);
@@ -152,15 +166,19 @@ async function requestDeepSeek({
 
 async function repairJsonContent({
   content,
+  model,
   timeoutMs,
+  maxTokens,
 }: {
   content: string;
+  model: string;
   timeoutMs: number;
+  maxTokens: number;
 }) {
   return requestDeepSeek({
-    model: getDeepSeekFastModel(),
+    model,
     timeoutMs,
-    maxTokens: 800,
+    maxTokens,
     temperature: 0,
     messages: [
       {
@@ -174,6 +192,25 @@ async function repairJsonContent({
       },
     ],
   });
+}
+
+function parseJson<T>(content: string, parserStage: string) {
+  try {
+    return JSON.parse(extractJsonObject(content)) as T;
+  } catch (error) {
+    if (error instanceof DeepSeekError) {
+      throw new DeepSeekError(error.message, error.status, {
+        ...error.details,
+        parserStage,
+        rawSnippet: snippet(content),
+      });
+    }
+
+    throw new DeepSeekError("DeepSeek返回的JSON无法解析。", 502, {
+      parserStage,
+      rawSnippet: snippet(content),
+    });
+  }
 }
 
 export async function callDeepSeekJson<T>({
@@ -198,7 +235,7 @@ export async function callDeepSeekJson<T>({
   });
 
   try {
-    const data = JSON.parse(extractJsonObject(first.content)) as T;
+    const data = parseJson<T>(first.content, "first_parse");
 
     return {
       data,
@@ -206,19 +243,24 @@ export async function callDeepSeekJson<T>({
       costUsd: estimateDeepSeekCost(first.usage),
       model,
     };
-  } catch {
+  } catch (error) {
     if (!repairJson) {
-      throw new DeepSeekError("DeepSeek返回的JSON无法解析。", 502);
+      throw error;
     }
   }
 
+  let fastRepair: DeepSeekCall | undefined;
+
   try {
-    const repaired = await repairJsonContent({
+    fastRepair = await repairJsonContent({
       content: first.content,
-      timeoutMs: Math.min(timeoutMs, 20_000),
+      model: getDeepSeekFastModel(),
+      timeoutMs: Math.min(timeoutMs, 15_000),
+      maxTokens: 900,
     });
-    const usage = combineUsage(first.usage, repaired.usage);
-    const data = JSON.parse(extractJsonObject(repaired.content)) as T;
+
+    const data = parseJson<T>(fastRepair.content, "fast_repair_parse");
+    const usage = combineUsage(first.usage, fastRepair.usage);
 
     return {
       data,
@@ -228,6 +270,40 @@ export async function callDeepSeekJson<T>({
       repairedJson: true,
     };
   } catch {
-    throw new DeepSeekError("DeepSeek返回的JSON无法解析。", 502);
+    // Fall through to deep repair.
+  }
+
+  try {
+    const deepRepair = await repairJsonContent({
+      content: fastRepair?.content || first.content,
+      model,
+      timeoutMs: Math.min(timeoutMs, 20_000),
+      maxTokens: 1200,
+    });
+
+    const data = parseJson<T>(deepRepair.content, "deep_repair_parse");
+    const usage = combineUsage(first.usage, fastRepair?.usage, deepRepair.usage);
+
+    return {
+      data,
+      usage,
+      costUsd: estimateDeepSeekCost(usage),
+      model,
+      repairedJson: true,
+    };
+  } catch (error) {
+    if (error instanceof DeepSeekError) {
+      throw new DeepSeekError("DeepSeek返回的JSON无法解析。", 502, {
+        ...error.details,
+        firstSnippet: snippet(first.content),
+        fastRepairSnippet: fastRepair ? snippet(fastRepair.content) : null,
+      });
+    }
+
+    throw new DeepSeekError("DeepSeek返回的JSON无法解析。", 502, {
+      parserStage: "deep_repair_parse",
+      firstSnippet: snippet(first.content),
+      fastRepairSnippet: fastRepair ? snippet(fastRepair.content) : null,
+    });
   }
 }

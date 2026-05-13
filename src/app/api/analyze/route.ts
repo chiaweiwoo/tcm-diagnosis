@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
         { role: "system", content: TCM_ANALYSIS_SYSTEM_PROMPT },
         { role: "user", content: buildTcmAnalysisUserPrompt(parsed.data) },
       ],
-      maxTokens: 1100,
+      maxTokens: 1400,
       model: getDeepSeekModel(),
       timeoutMs: 45_000,
       repairJson: true,
@@ -92,14 +92,14 @@ export async function POST(request: NextRequest) {
           latencyMs: Date.now() - startedAt,
           errorMessage: error.message,
           promptVersion: TCM_ANALYSIS_PROMPT_VERSION,
-          metadata: { stage: "failed", reason: "deepseek_call" },
+          metadata: { stage: "failed", reason: "deepseek_call", ...(error.details ?? {}) },
         }),
       );
       after(() =>
         logServerEvent({
           source: "api/analyze",
           message: error.message,
-          details: { status: error.status, stage: "deepseek_call" },
+          details: { status: error.status, stage: "deepseek_call", ...(error.details ?? {}) },
         }),
       );
       return NextResponse.json({ error: error.message }, { status: error.status });
