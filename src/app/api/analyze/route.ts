@@ -38,6 +38,25 @@ export async function POST(request: NextRequest) {
     const output = buildAnalysisResult(data, parsed.data.caseType);
     const latencyMs = Date.now() - startedAt;
 
+    if (result.repairedJson) {
+      after(() =>
+        logApiCall({
+          route: "api/analyze",
+          success: true,
+          model: result.model,
+          latencyMs,
+          usage: result.usage,
+          costUsd: result.costUsd,
+          promptVersion: TCM_ANALYSIS_PROMPT_VERSION,
+          metadata: {
+            stage: "repair",
+            caseType: parsed.data.caseType,
+            repairedJson: true,
+          },
+        }),
+      );
+    }
+
     after(() =>
       logApiCall({
         route: "api/analyze",

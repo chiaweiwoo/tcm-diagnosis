@@ -34,6 +34,25 @@ export async function POST(request: NextRequest) {
     const mapped = mapOrganizedCaseToForm(result.data, draft);
     const latencyMs = Date.now() - startedAt;
 
+    if (result.repairedJson) {
+      after(() =>
+        logApiCall({
+          route: "api/organize",
+          success: true,
+          model: result.model,
+          latencyMs,
+          usage: result.usage,
+          costUsd: result.costUsd,
+          promptVersion: TCM_ORGANIZE_PROMPT_VERSION,
+          metadata: {
+            stage: "repair",
+            draftLength: draft.length,
+            repairedJson: true,
+          },
+        }),
+      );
+    }
+
     after(() =>
       logApiCall({
         route: "api/organize",
