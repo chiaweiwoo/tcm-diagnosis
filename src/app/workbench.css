@@ -4,32 +4,121 @@
   padding: 12px 20px 18px;
 }
 
-.toast-message {
+.toast-region {
   position: fixed;
   top: 16px;
   right: 24px;
-  z-index: 20;
-  max-width: min(420px, calc(100vw - 32px));
-  padding: 11px 14px;
+  z-index: 40;
+  max-width: min(460px, calc(100vw - 32px));
+}
+
+.toast-message {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: 10px;
+  min-width: min(360px, calc(100vw - 32px));
+  padding: 12px 12px 12px 13px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 10px;
   background: #fffdf8;
   color: #3e302d;
-  box-shadow: 0 14px 34px rgba(31, 55, 48, 0.16);
-  font-size: 14px;
-  font-weight: 800;
+  box-shadow: 0 16px 36px rgba(31, 55, 48, 0.18);
+  animation: toast-in 180ms ease-out;
+}
+
+.toast-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-top: 1px;
+  border-radius: 999px;
+  background: #f7ebe6;
+  color: var(--clinic-red-strong);
+}
+
+.toast-copy {
+  display: grid;
+  gap: 2px;
+}
+
+.toast-copy strong {
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.toast-copy span {
+  font-size: 13px;
   line-height: 1.45;
+  color: #5b4a45;
+}
+
+.toast-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #8b7267;
+  cursor: pointer;
+}
+
+.toast-close:hover {
+  background: rgba(115, 81, 69, 0.08);
 }
 
 .toast-message.success {
   border-color: #dfc6be;
+}
+
+.toast-message.success .toast-icon {
+  background: #f7ebe6;
   color: var(--clinic-red-strong);
 }
 
 .toast-message.error {
   border-color: #f1b8ad;
   background: var(--danger-bg);
+}
+
+.toast-message.error .toast-icon {
+  background: #f8ddd7;
   color: var(--danger);
+}
+
+.toast-message.error .toast-copy span,
+.toast-message.error .toast-copy strong {
+  color: var(--danger);
+}
+
+.toast-message.info {
+  border-color: #ead5a8;
+  background: #fffaf0;
+}
+
+.toast-message.info .toast-icon {
+  background: #fff1cc;
+  color: #8a6110;
+}
+
+.toast-message.info .toast-copy strong {
+  color: #7f5a12;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .hero-panel {
@@ -807,6 +896,10 @@
   }
 
   .toast-message {
+    min-width: 0;
+  }
+
+  .toast-region {
     right: 14px;
   }
 

@@ -3,9 +3,12 @@
 import {
   AlertTriangle,
   Brain,
+  CheckCircle2,
+  CircleAlert,
   ClipboardCheck,
   FileText,
   GitBranch,
+  Info,
   LoaderCircle,
   ListChecks,
   LogOut,
@@ -14,6 +17,7 @@ import {
   Save,
   Sparkles,
   Trash2,
+  X,
 } from "lucide-react";
 import { KeyboardEvent, ReactNode, useEffect, useState } from "react";
 import { CaseForm, validateCaseForm } from "@/lib/caseValidation";
@@ -568,8 +572,12 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
   }
 
   return (
-    <main className="app-shell">
-      {toast ? <div className={`toast-message ${toast.tone}`}>{toast.message}</div> : null}
+      <main className="app-shell">
+      {toast ? (
+        <div className="toast-region" aria-live="polite" aria-atomic="true">
+          <ToastBanner message={toast.message} tone={toast.tone} onClose={() => setToast(null)} />
+        </div>
+      ) : null}
 
       <section className="hero-panel">
         <div className="hero-head">
@@ -770,6 +778,34 @@ function SectionTitle({ icon, children }: { icon: ReactNode; children: ReactNode
       <span>{icon}</span>
       {children}
     </h3>
+  );
+}
+
+function ToastBanner({
+  message,
+  tone,
+  onClose,
+}: {
+  message: string;
+  tone: ToastState["tone"];
+  onClose: () => void;
+}) {
+  const icon =
+    tone === "success" ? <CheckCircle2 size={16} /> : tone === "error" ? <CircleAlert size={16} /> : <Info size={16} />;
+
+  const title = tone === "success" ? "操作已完成" : tone === "error" ? "这次没有完成" : "状态更新";
+
+  return (
+    <div className={`toast-message ${tone}`} role="status">
+      <div className="toast-icon">{icon}</div>
+      <div className="toast-copy">
+        <strong>{title}</strong>
+        <span>{message}</span>
+      </div>
+      <button type="button" className="toast-close" onClick={onClose} aria-label="关闭提示">
+        <X size={14} />
+      </button>
+    </div>
   );
 }
 

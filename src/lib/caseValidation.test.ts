@@ -41,9 +41,9 @@ describe("病案校验", () => {
     expect(result.errors.age).toBeUndefined();
     expect(result.errors.sex).toBeUndefined();
     expect(result.errors.duration).toBeUndefined();
-    expect(result.missingContext).toContain("年龄未填写，会影响剂量、风险与病程判断。");
-    expect(result.missingContext).toContain("性别未填写，会影响妇科、泌尿、生殖与部分禁忌判断。");
-    expect(result.missingContext).toContain("病程未填写，难以区分急性、慢性或反复发作。");
+    expect(result.missingContext).toContain("年龄未填写，后续可补充以帮助判断剂量与风险。");
+    expect(result.missingContext).toContain("性别未填写，后续可补充以帮助妇科、生殖与禁忌判断。");
+    expect(result.missingContext).toContain("若能补充更明确的病程时间线，后续判断会更稳。");
   });
 
   it("针灸方案缺少当前方案时拦截，并提醒补充穴位操作", () => {
@@ -56,8 +56,7 @@ describe("病案校验", () => {
     });
 
     expect(result.errors.currentPlan).toBe("请填写当前方案。");
-    expect(result.errors.acupoints).toBe("针灸方案至少需要填写现有穴位或治疗方法。");
-    expect(result.missingContext).toContain("穴位与操作未填写，建议补充穴位、针刺深度、刺激量与疗程。");
+    expect(result.errors.acupoints).toBe("针灸方案至少需要填写穴位与操作。");
   });
 
   it("拦截过于笼统的医生问题", () => {
@@ -66,8 +65,8 @@ describe("病案校验", () => {
       doctorQuestion: "帮我看看",
     });
 
-    expect(result.errors.doctorQuestion).toBe("问题过于笼统，请写明需要判断、改良或比较的临床目标。");
-    expect(result.blockedReasons).toContain("医生问题过于笼统。");
+    expect(result.errors.doctorQuestion).toBe("问题过于笼统，请写明想确认的临床目标。");
+    expect(result.blockedReasons).toContain("医生问题过于笼统，暂时无法形成有针对性的复核。");
   });
 
   it("拦截保证疗效表述", () => {
@@ -76,7 +75,7 @@ describe("病案校验", () => {
       doctorQuestion: "请给出一定好的方案。",
     });
 
-    expect(result.blockedReasons).toContain("请求含有保证疗效或治愈表述。");
+    expect(result.blockedReasons).toContain("当前表述含有保证疗效或治愈倾向，不符合本工具的临床边界。");
   });
 
   it("拦截疑似患者自用请求", () => {
@@ -85,6 +84,6 @@ describe("病案校验", () => {
       doctorQuestion: "我是患者，我可以吃这个方吗？",
     });
 
-    expect(result.blockedReasons).toContain("请求疑似患者自用场景，本工具仅供注册中医师参考。");
+    expect(result.blockedReasons).toContain("内容疑似患者自用场景；本工具仅供注册中医师参考。");
   });
 });
