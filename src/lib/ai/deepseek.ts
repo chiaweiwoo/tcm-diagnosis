@@ -152,17 +152,15 @@ async function requestDeepSeek({
 
 async function repairJsonContent({
   content,
-  model,
   timeoutMs,
 }: {
   content: string;
-  model: string;
   timeoutMs: number;
 }) {
   return requestDeepSeek({
-    model,
+    model: getDeepSeekFastModel(),
     timeoutMs,
-    maxTokens: 1800,
+    maxTokens: 800,
     temperature: 0,
     messages: [
       {
@@ -217,7 +215,6 @@ export async function callDeepSeekJson<T>({
   try {
     const repaired = await repairJsonContent({
       content: first.content,
-      model,
       timeoutMs: Math.min(timeoutMs, 20_000),
     });
     const usage = combineUsage(first.usage, repaired.usage);

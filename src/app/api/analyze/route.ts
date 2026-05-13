@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
         { role: "system", content: TCM_ANALYSIS_SYSTEM_PROMPT },
         { role: "user", content: buildTcmAnalysisUserPrompt(parsed.data) },
       ],
-      maxTokens: 1800,
+      maxTokens: 1100,
       model: getDeepSeekModel(),
       timeoutMs: 45_000,
       repairJson: true,
