@@ -131,15 +131,7 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
   const isLocked = isBusy || (Boolean(result) && !isEditing);
   const hasSavedRecord = Boolean(activeConsultationId);
   const qualityWarnings = [...missingContext, ...organizeNotes, ...organizeSuggestions].filter(Boolean);
-  const reviewItems = result?.groups
-    .find((group) => group.title === "当前思路")
-    ?.sections.find((section) => section.title === "需要复核")
-    ?.items ?? [];
-  const recommendationItems = result?.groups
-    .find((group) => group.title === "建议优化")
-    ?.sections.find((section) => section.title === "主要建议")
-    ?.items ?? [];
-  const keyPointPreview = result?.keyPoints.slice(0, 2) ?? [];
+  const analysisReady = Boolean(result);
 
   useEffect(() => {
     void loadConsultations();
@@ -664,7 +656,6 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
               {isOrganizing ? "整理资料中..." : isAnalyzing ? "临床研判中..." : "开始研判"}
             </button>
             <p className="cost-note">
-              {elapsedSeconds > 0 ? `用时 ${elapsedSeconds} 秒 · ` : ""}
               资料将先结构化，再进入临床研判；可按Ctrl+Enter提交。
             </p>
           </div>
@@ -676,7 +667,7 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
             isAnalyzing={isAnalyzing}
             isOrganizing={isOrganizing}
             elapsedSeconds={elapsedSeconds}
-            keyPointPreview={keyPointPreview}
+            analysisReady={analysisReady}
           />
         </div>
       </section>
@@ -693,13 +684,6 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
 
           <div className="result-workspace">
             <div className="result-content">
-              <div className="metric-grid">
-                <MetricCard title="资料完整性" value={qualityWarnings.length} detail="项提醒" tone={qualityWarnings.length ? "warn" : "ok"} />
-                <MetricCard title="临床风险" value={result.cautions.length} detail="项需注意" tone={result.cautions.length ? "warn" : "ok"} />
-                <MetricCard title="需要复核" value={reviewItems.length} detail="项待确认" tone={reviewItems.length ? "warn" : "ok"} />
-                <MetricCard title="建议重点" value={recommendationItems.length} detail="项建议" tone={recommendationItems.length ? "focus" : "ok"} />
-              </div>
-
               <section className="result-group" id="key-points">
                 <SectionTitle icon={<Sparkles size={18} />}>重点结论</SectionTitle>
                 <article className="result-card">
@@ -729,26 +713,6 @@ function SectionTitle({ icon, children }: { icon: ReactNode; children: ReactNode
   );
 }
 
-function MetricCard({
-  title,
-  value,
-  detail,
-  tone,
-}: {
-  title: string;
-  value: number;
-  detail: string;
-  tone: "ok" | "warn" | "focus";
-}) {
-  return (
-    <article className={`metric-card ${tone}`}>
-      <span>{title}</span>
-      <strong>{value}</strong>
-      <em>{detail}</em>
-    </article>
-  );
-}
-
 function EntryStatusPanel({
   apiError,
   draft,
@@ -756,7 +720,7 @@ function EntryStatusPanel({
   isAnalyzing,
   isOrganizing,
   elapsedSeconds,
-  keyPointPreview,
+  analysisReady,
 }: {
   apiError: string;
   draft: string;
@@ -764,7 +728,7 @@ function EntryStatusPanel({
   isAnalyzing: boolean;
   isOrganizing: boolean;
   elapsedSeconds: number;
-  keyPointPreview: string[];
+  analysisReady: boolean;
 }) {
   const isRunning = isOrganizing || isAnalyzing;
   const draftChars = draft.trim().length;
@@ -784,7 +748,7 @@ function EntryStatusPanel({
           <p>请先录入病案内容，系统会在提交后生成结构化临床参考。</p>
         </article>
       ) : null}
-      {!apiError && draftChars > 0 && !isRunning && keyPointPreview.length === 0 ? (
+      {!apiError && draftChars > 0 && !isRunning && !analysisReady ? (
         <article className="status-card">
           <h4>待研判</h4>
           <ul>
@@ -800,15 +764,12 @@ function EntryStatusPanel({
           <p>已用时：{elapsedSeconds} 秒</p>
         </article>
       ) : null}
-      {!apiError && keyPointPreview.length > 0 && !isRunning ? (
+      {!apiError && analysisReady && !isRunning ? (
         <article className="status-card status-ready">
-          <h4>最新重点结论</h4>
-          <ul>
-            {keyPointPreview.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
+          <h4>研判完成</h4>
+          <p>已生成临床参考。</p>
           <p>生成用时：{elapsedSeconds} 秒</p>
+          <p>可在下方查看完整研判。</p>
         </article>
       ) : null}
     </aside>
