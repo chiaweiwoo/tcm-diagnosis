@@ -59,6 +59,10 @@ export function getDeepSeekAnalyzeModel() {
   return process.env.DEEPSEEK_MODEL_ANALYZE || process.env.DEEPSEEK_MODEL_FAST || "deepseek-v4-flash";
 }
 
+export function getDeepSeekSmartModel() {
+  return process.env.DEEPSEEK_MODEL_DEEP || "deepseek-v4-pro";
+}
+
 export function getDeepSeekFastModel() {
   return process.env.DEEPSEEK_MODEL_FAST || "deepseek-v4-flash";
 }

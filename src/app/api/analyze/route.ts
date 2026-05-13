@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { after } from "next/server";
-import { callDeepSeekJson, DeepSeekError, getDeepSeekAnalyzeModel } from "@/lib/ai/deepseek";
+import { callDeepSeekJson, DeepSeekError, getDeepSeekAnalyzeModel, getDeepSeekSmartModel } from "@/lib/ai/deepseek";
 import {
   buildTcmAnalysisUserPrompt,
   TCM_ANALYSIS_PROMPT_VERSION,
@@ -12,14 +12,17 @@ import { AnalysisJson, buildAnalysisResult } from "@/lib/ai/analysisResult";
 
 export async function POST(request: NextRequest) {
   const startedAt = Date.now();
+  let reviewMode: "smart" | "normal" = "smart";
 
   try {
-    const body = (await request.json()) as { form?: CaseForm };
+    const body = (await request.json()) as { form?: CaseForm; mode?: "smart" | "normal" };
     const parsed = caseSchema.safeParse(body.form);
 
     if (!parsed.success) {
       return NextResponse.json({ error: "病案资料未通过校验，请先复核必填字段。" }, { status: 400 });
     }
+
+    reviewMode = body.mode === "normal" ? "normal" : "smart";
 
     const validation = validateCaseForm(parsed.data);
 
@@ -29,7 +32,7 @@ export async function POST(request: NextRequest) {
         { role: "user", content: buildTcmAnalysisUserPrompt(parsed.data) },
       ],
       maxTokens: 1400,
-      model: getDeepSeekAnalyzeModel(),
+      model: reviewMode === "smart" ? getDeepSeekSmartModel() : getDeepSeekAnalyzeModel(),
       timeoutMs: 45_000,
       repairJson: true,
     });
@@ -52,6 +55,7 @@ export async function POST(request: NextRequest) {
             stage: "repair",
             caseType: parsed.data.caseType,
             repairedJson: true,
+            reviewMode,
           },
         }),
       );
@@ -70,6 +74,7 @@ export async function POST(request: NextRequest) {
           stage: "completed",
           caseType: parsed.data.caseType,
           repairedJson: result.repairedJson ?? false,
+          reviewMode,
         },
       }),
     );
@@ -80,6 +85,7 @@ export async function POST(request: NextRequest) {
       usage: result.usage,
       costUsd: result.costUsd,
       model: result.model,
+      reviewMode,
       promptVersion: TCM_ANALYSIS_PROMPT_VERSION,
       validation,
     });
@@ -92,14 +98,14 @@ export async function POST(request: NextRequest) {
           latencyMs: Date.now() - startedAt,
           errorMessage: error.message,
           promptVersion: TCM_ANALYSIS_PROMPT_VERSION,
-          metadata: { stage: "failed", reason: "deepseek_call", ...(error.details ?? {}) },
+          metadata: { stage: "failed", reason: "deepseek_call", reviewMode, ...(error.details ?? {}) },
         }),
       );
       after(() =>
         logServerEvent({
           source: "api/analyze",
           message: error.message,
-          details: { status: error.status, stage: "deepseek_call", ...(error.details ?? {}) },
+          details: { status: error.status, stage: "deepseek_call", reviewMode, ...(error.details ?? {}) },
         }),
       );
       return NextResponse.json({ error: error.message }, { status: error.status });
@@ -112,7 +118,7 @@ export async function POST(request: NextRequest) {
         latencyMs: Date.now() - startedAt,
         errorMessage: error instanceof Error ? error.message : String(error),
         promptVersion: TCM_ANALYSIS_PROMPT_VERSION,
-        metadata: { stage: "failed", reason: "normalize_or_map" },
+        metadata: { stage: "failed", reason: "normalize_or_map", reviewMode },
       }),
     );
     after(() =>

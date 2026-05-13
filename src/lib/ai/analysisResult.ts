@@ -40,64 +40,58 @@ function normalizeText(value: unknown) {
 
 export function normalizeStringList(value: unknown): string[] {
   if (Array.isArray(value)) {
-    return value
-      .map((item) => normalizeText(item))
-      .filter(Boolean);
+    return value.map((item) => normalizeText(item)).filter(Boolean);
   }
 
   const single = normalizeText(value);
   return single ? [single] : [];
 }
 
-function section(title: string, items: unknown) {
+function stableSection(title: string, items: unknown, fallback: string) {
   const normalized = normalizeStringList(items);
-  return normalized.length ? { title, items: normalized } : null;
+  return {
+    title,
+    items: normalized.length ? normalized : [fallback],
+  };
 }
 
 export function buildAnalysisResult(data: AnalysisJson, caseType: CaseForm["caseType"]): AnalysisResult {
   const keyPoints = normalizeStringList(data.重点结论);
   const cautions = normalizeStringList(data.风险与提醒);
   const evidence = normalizeStringList(data.证据状态);
-  const completenessProvided = normalizeStringList(data.资料完整性?.已提供);
-  const completenessMissing = normalizeStringList(data.资料完整性?.建议补充);
-  const strengths = normalizeStringList(data.当前思路?.可取之处);
-  const toReview = normalizeStringList(data.当前思路?.需要复核);
-  const optimize = normalizeStringList(data.建议优化);
-  const alternatives = normalizeStringList(data.可选思路);
-  const followUp = normalizeStringList(data.随访监测);
 
   const groups: ResultGroup[] = [
     {
       title: "资料完整性",
       sections: [
-        section("已提供", completenessProvided),
-        section("建议补充", completenessMissing),
-      ].filter((item): item is NonNullable<typeof item> => Boolean(item)),
+        stableSection("已提供", data.资料完整性?.已提供, "当前未额外归纳已提供信息，可继续结合原始病案核对。"),
+        stableSection("建议补充", data.资料完整性?.建议补充, "本次未形成新的补充提示，可继续结合面诊补全。"),
+      ],
     },
     {
       title: "当前思路",
       sections: [
-        section("可取之处", strengths),
-        section("需要复核", toReview),
-      ].filter((item): item is NonNullable<typeof item> => Boolean(item)),
+        stableSection("可取之处", data.当前思路?.可取之处, "本次未额外提炼明确保留点，可继续结合面诊判断。"),
+        stableSection("需要复核", data.当前思路?.需要复核, "当前未识别出必须立即调整的复核点，仍建议结合面诊核对。"),
+      ],
     },
     {
       title: "建议优化",
       sections: [
-        section("主要建议", optimize),
-        section("可选思路", alternatives),
-      ].filter((item): item is NonNullable<typeof item> => Boolean(item)),
+        stableSection("主要建议", data.建议优化, "本次未形成新的优化建议，可先结合当前方案继续观察。"),
+        stableSection("可选思路", data.可选思路, "本次未提出额外备选思路。"),
+      ],
     },
     {
       title: "随访监测",
-      sections: [section("监测建议", followUp)].filter((item): item is NonNullable<typeof item> => Boolean(item)),
+      sections: [stableSection("监测建议", data.随访监测, "可按常规复诊节奏结合症状变化继续观察。")],
     },
-  ].filter((group) => group.sections.length > 0);
+  ];
 
   return {
     title: `${caseType}研判`,
-    keyPoints: keyPoints.length ? keyPoints : ["当前方案存在可优化空间，建议结合复诊信息分步调整。"],
-    summary: normalizeText(data.病案摘要) || "已完成病案研判，请结合门诊复核。",
+    keyPoints: keyPoints.length ? keyPoints : ["当前方案仍可继续结合面诊信息复核，系统未提炼出更高优先级的结论。"],
+    summary: normalizeText(data.病案摘要) || "已完成病案研判，请结合门诊面诊与复诊计划继续核对。",
     groups,
     cautions: cautions.length ? cautions : ["请结合面诊与必要检查复核后执行。"],
     evidence: evidence.length ? evidence : ["基于临床经验与通用知识，尚未接入外部文献检索。"],

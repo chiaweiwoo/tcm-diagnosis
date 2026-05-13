@@ -73,6 +73,8 @@ flowchart LR
 - Organize-stage output is surfaced immediately in the workbench and can stop before analysis when hard guardrails fail.
 - The dashboard includes an in-app help surface so doctors can review assumptions, minimum input expectations, and workflow behavior without leaving the page.
 - A build label is shown in the workbench so deployment status can be checked visually after release.
+- Doctors can switch between `智能` and `常规` review modes in the workbench; the preference is stored in local browser storage and defaults to `智能`.
+- The analysis dashboard keeps its core section structure stable even when a model returns fewer suggestions, so clinicians do not see key sections randomly disappear.
 - Token usage, estimated cost, model metadata, and latency stay internal and are stored for traceability rather than shown in the doctor-facing UI.
 - Doctor allowlist is now read from Supabase when the `doctor_allowlist` table is available, with environment-variable fallback during transition.
 - Local development can optionally use a strict dev-only auth bypass with `DEV_AUTH_BYPASS=true` and `DEV_AUTH_EMAIL=...`; it is ignored outside `NODE_ENV=development`.

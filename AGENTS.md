@@ -96,6 +96,11 @@ Recommended-but-not-hard-block fields:
   - stop before analyze if validation hard-blocks the case
   - keep the right-side panel as a merged `研判状态 + 资料完整性` surface
   - when organize is ready but analysis is not yet available, show an intermediate organize result panel in the main workspace
+- Review mode selector:
+  - show a visible `智能 / 常规` switch in the workbench
+  - store the preference in local browser storage
+  - default to `智能`
+  - `智能` should use the deeper analysis model path, while `常规` uses the faster default analyze path
 - Analyze output should follow this reading order:
   1. `重点结论`
   2. `病案摘要`
@@ -155,6 +160,7 @@ Logging should not block doctor-facing responses.
 - Prefer kanban/dashboard-style analysis grouping over document-style sprawl.
 - Keep a visible help surface in the dashboard so doctors can understand workflow assumptions without reading external docs.
 - Show a visible build label in the UI so deployed-version checks are easy.
+- Core analysis sections should remain structurally stable; avoid a doctor seeing major sections appear in one case and disappear in another just because the model returned fewer bullets.
 - When local dev bypass is active, show a clear in-product indicator such as `本地开发模式`.
 
 ## Documentation Direction

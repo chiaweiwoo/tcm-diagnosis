@@ -73,6 +73,8 @@ type ToastState = {
   tone: "success" | "error" | "info";
 };
 
+type ReviewMode = "smart" | "normal";
+
 const initialForm: CaseForm = {
   caseType: "方药分析",
   age: "",
@@ -146,6 +148,7 @@ export default function Workbench({
   const [toast, setToast] = useState<ToastState | null>(null);
   const [organizeReady, setOrganizeReady] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
+  const [reviewMode, setReviewMode] = useState<ReviewMode>("smart");
 
   const isBusy = isOrganizing || isAnalyzing || isSaving;
   const isLocked = isBusy || (Boolean(result) && !isEditing);
@@ -157,6 +160,13 @@ export default function Workbench({
 
   useEffect(() => {
     void loadConsultations();
+  }, []);
+
+  useEffect(() => {
+    const savedMode = window.localStorage.getItem("tcm-review-mode");
+    if (savedMode === "smart" || savedMode === "normal") {
+      setReviewMode(savedMode);
+    }
   }, []);
 
   useEffect(() => {
@@ -194,6 +204,16 @@ export default function Workbench({
 
   function showToast(message: string, tone: ToastState["tone"] = "info") {
     setToast({ message, tone });
+  }
+
+  function handleReviewModeChange(nextMode: ReviewMode) {
+    setReviewMode(nextMode);
+    window.localStorage.setItem("tcm-review-mode", nextMode);
+    setForm((current) => ({
+      ...current,
+      modelMode: nextMode === "smart" ? "深度模式" : "快速模式",
+    }));
+    showToast(nextMode === "smart" ? "已切换为智能模式。" : "已切换为常规模式。", "info");
   }
 
   function resetSession() {
@@ -520,11 +540,11 @@ export default function Workbench({
 
       setIsAnalyzing(true);
 
-      const analyzeResponse = await fetch("/api/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ form: nextForm }),
-      });
+        const analyzeResponse = await fetch("/api/analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ form: nextForm, mode: reviewMode }),
+        });
 
       if (!analyzeResponse.ok) {
         throw new Error(await readApiError(analyzeResponse));
@@ -628,13 +648,31 @@ export default function Workbench({
             <h2>临床记录</h2>
           </div>
           <div className="heading-actions">
-            <button type="button" className="secondary-button compact-button" onClick={() => setShowGuide(true)}>
-              <CircleHelp size={15} />
-              使用说明
-            </button>
-            <button
-              type="button"
-              className="secondary-button compact-button"
+              <button type="button" className="secondary-button compact-button" onClick={() => setShowGuide(true)}>
+                <CircleHelp size={15} />
+                使用说明
+              </button>
+              <div className="mode-switch" role="group" aria-label="复核模式">
+                <button
+                  type="button"
+                  className={`mode-option ${reviewMode === "smart" ? "active" : ""}`}
+                  onClick={() => handleReviewModeChange("smart")}
+                  disabled={isBusy}
+                >
+                  智能
+                </button>
+                <button
+                  type="button"
+                  className={`mode-option ${reviewMode === "normal" ? "active" : ""}`}
+                  onClick={() => handleReviewModeChange("normal")}
+                  disabled={isBusy}
+                >
+                  常规
+                </button>
+              </div>
+              <button
+                type="button"
+                className="secondary-button compact-button"
               onClick={() => void saveDraftOnly()}
               disabled={!draft.trim() || isBusy}
             >
@@ -677,13 +715,13 @@ export default function Workbench({
               <span>
                 病案名称 <em className="field-badge">可选</em>
               </span>
-              <input
-                value={consultationName}
-                onChange={(event) => handleNameChange(event.target.value)}
-                disabled={isLocked}
-                placeholder="例如：PCOS复诊、拇指弹响指"
-              />
-            </label>
+                <input
+                  value={consultationName}
+                  onChange={(event) => handleNameChange(event.target.value)}
+                  disabled={isLocked}
+                  placeholder="例如：患者代号 A-01、PCOS 复诊（请勿填写真实姓名）"
+                />
+              </label>
             <label className="field-block history-field">
               <span>历史记录</span>
               <select
@@ -1108,15 +1146,20 @@ function AnalysisBoard({
   result: AnalysisResult;
   qualityWarnings: string[];
 }) {
+  const completeness = result.groups.find((group) => group.title === "资料完整性");
   const currentThinking = result.groups.find((group) => group.title === "当前思路");
   const suggestions = result.groups.find((group) => group.title === "建议优化");
   const alternatives = result.groups.find((group) => group.title === "可选思路");
   const followUp = result.groups.find((group) => group.title === "随访监测");
 
+  const completenessProvided = completeness?.sections.find((section) => section.title === "已提供")?.items ?? [];
+  const completenessSuggested = completeness?.sections.find((section) => section.title === "建议补充")?.items ?? [];
+
   const dataSections = [
-    qualityWarnings.length ? { title: "资料完整性", items: qualityWarnings } : null,
-    result.summary ? { title: "病案摘要", items: [result.summary] } : null,
-  ].filter((section): section is { title: string; items: string[] } => Boolean(section));
+    { title: "资料完整性", items: [...completenessSuggested, ...qualityWarnings].filter(Boolean) },
+    { title: "已提供", items: completenessProvided },
+    { title: "病案摘要", items: [result.summary].filter(Boolean) },
+  ];
 
   const judgementSections = currentThinking?.sections ?? [];
   const planSections = [...(suggestions?.sections ?? []), ...(alternatives?.sections ?? [])];
