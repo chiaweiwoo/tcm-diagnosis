@@ -1,27 +1,26 @@
 # TCM Diagnosis
 
-Doctor-facing TCM clinical workbench for organizing case notes, identifying missing clinical context, generating structured Chinese clinical references, and saving consultation review history.
+Doctor-facing TCM clinical workbench for turning rough case notes into structured clinical context, supportive review guidance, and reusable consultation history.
 
-The product is designed for practical Singapore clinic use: concise case review, realistic treatment adjustments, safety reminders, and repeatable clinical reasoning without guaranteed claims.
-The backend uses a defensive two-step AI pipeline (`organize -> analyze`) with JSON repair fallback, schema normalization, and stage-based API logging for traceability.
+The product is designed for practical outpatient use: help doctors capture what matters, surface what is worth keeping in mind, and review treatment thinking in a calm, repeatable way.
 
 ---
 
 ## What It Helps With
 
-1. Registered doctors sign in with Google.
-2. A doctor pastes or edits a case record.
+1. Doctors sign in with Google and enter the protected workbench.
+2. A case draft is pasted or edited in free form.
 3. The system organizes the draft into structured clinical context.
-4. DeepSeek generates a simplified-Chinese clinical reference.
-5. The dashboard highlights completeness, risks, review points, and suggested priorities.
+4. The system highlights completeness guidance before or alongside analysis.
+5. DeepSeek generates a simplified-Chinese clinical reference.
 6. Consultation history can be saved, renamed, reopened, edited, regenerated, and deleted.
 
 ```mermaid
 flowchart LR
-    D["Doctor case record"] --> O["Structured context"]
-    O --> A["Clinical reference"]
-    A --> K["Dashboard indicators"]
-    A --> H["Consultation history"]
+    D["Doctor case draft"] --> O["Structured case context"]
+    O --> R["Clinical reference"]
+    O --> G["Completeness guidance"]
+    R --> H["Consultation history"]
 ```
 
 ---
@@ -33,19 +32,20 @@ flowchart LR
 | Web app | Next.js + TypeScript on Vercel |
 | UI | Custom CSS + lucide-react |
 | AI | DeepSeek via server routes |
-| Auth | Supabase Google OAuth + email allowlist |
-| Data | Supabase JSONB consultation records + API logs |
+| Auth | Supabase Google OAuth + doctor allowlist |
+| Data | Supabase JSONB consultation records + API/error logs |
 | Validation | Zod + focused clinical guardrails |
-| Reliability | JSON repair fallback + defensive mapping + stage metadata logging |
+| Reliability | Two-step pipeline, JSON repair fallback, defensive mapping |
 | Checks | Vitest + production build |
 
 ```mermaid
 flowchart LR
-    LOGIN["Google OAuth"] --> WEB["Next.js app"]
+    LOGIN["Google OAuth"] --> WEB["Next.js workbench"]
     WEB --> ORG["/api/organize"]
     ORG --> AN["/api/analyze"]
     WEB --> CASES[("Supabase consultations")]
-    ORG --> LOGS[("Supabase API logs")]
+    WEB --> ALLOW[("Supabase doctor_allowlist")]
+    ORG --> LOGS[("Supabase logs")]
     AN --> LOGS
 ```
 
@@ -55,12 +55,21 @@ flowchart LR
 
 | Route | Purpose |
 |---|---|
-| `POST /api/organize` | Organize a doctor draft into structured case data. |
-| `POST /api/analyze` | Generate clinical reference output. |
+| `POST /api/organize` | Organize a doctor draft into structured case data and completeness guidance. |
+| `POST /api/analyze` | Generate structured clinical reference output. |
 | `GET /api/consultations` | List consultation history for the logged-in doctor. |
 | `POST /api/consultations` | Create a consultation record. |
 | `GET /api/consultations/[id]` | Read one owned consultation record. |
-| `PATCH /api/consultations/[id]` | Rename, edit, mark status, and store JSON analysis data. |
+| `PATCH /api/consultations/[id]` | Rename, edit, store organized/analyzed JSON, and update status. |
 | `DELETE /api/consultations/[id]` | Delete one owned consultation record. |
-| `GET /auth/callback` | Complete Google OAuth and allowlist check. |
+| `GET /auth/callback` | Complete Google OAuth and doctor allowlist check. |
 | `GET /auth/signout` | Sign out and return to login. |
+
+---
+
+## Current Workflow Notes
+
+- The product uses a two-step AI pipeline: `organize -> analyze`.
+- Organize-stage output is used to surface completeness reminders early and to stop before analysis when hard guardrails fail.
+- Token usage, estimated cost, model metadata, and latency stay internal and are stored for traceability rather than shown in the doctor-facing UI.
+- Doctor allowlist is now read from Supabase when the `doctor_allowlist` table is available, with environment-variable fallback during transition.

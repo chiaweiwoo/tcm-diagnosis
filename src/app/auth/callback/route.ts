@@ -23,7 +23,7 @@ export async function GET(request: Request) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!isAllowedDoctorEmail(user?.email)) {
+  if (!(await isAllowedDoctorEmail(user?.email))) {
     await supabase.auth.signOut();
     return NextResponse.redirect(new URL("/login?reason=unauthorized", origin));
   }

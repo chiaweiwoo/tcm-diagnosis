@@ -13,7 +13,7 @@ export default async function Home() {
     redirect("/login");
   }
 
-  if (!isAllowedDoctorEmail(user.email)) {
+  if (!(await isAllowedDoctorEmail(user.email))) {
     redirect("/auth/signout?reason=unauthorized");
   }
 

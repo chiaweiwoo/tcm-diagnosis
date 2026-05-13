@@ -802,22 +802,22 @@ function MergedStatusPanel({
 }) {
   const isRunning = isOrganizing || isAnalyzing;
   const draftChars = draft.trim().length;
-  const organizeItems = [...missingContext, ...organizeNotes, ...organizeSuggestions].filter(Boolean);
+  const organizeHighlights = [...missingContext, ...organizeSuggestions].filter(Boolean);
   const hasBlocked = blockedReasons.length > 0;
 
   let stageTitle = "可开始记录";
-  let stageBody = "请先录入病案内容，系统会先整理重点，再给出临床复核建议。";
+  let stageBody = "先写下病案重点；系统会先整理资料脉络，再进入临床复核。";
 
   if (draftChars > 0) {
     stageTitle = "可进入复核";
-    stageBody = "准备好后即可进入临床复核。";
+    stageBody = "记录已经就绪，提交后会先整理资料，再继续往下复核。";
   }
   if (organizeReady) {
-    stageTitle = "资料完整性";
-    stageBody = "系统已先整理出资料重点，你可以先看这些提醒。";
+    stageTitle = "资料整理完成";
+    stageBody = "系统已经整理出关键脉络，下面这些提醒值得先看一眼。";
   }
   if (isAnalyzing) {
-    stageTitle = "临床研判中";
+    stageTitle = "临床复核中";
     stageBody = "资料已整理完成，系统正在复核当前思路、方案与后续重点。";
   }
   if (isOrganizing) {
@@ -826,11 +826,11 @@ function MergedStatusPanel({
   }
   if (hasBlocked) {
     stageTitle = "建议先补充后再复核";
-    stageBody = "当前资料已经整理完毕，建议先补充这些关键信息，再继续往下复核。";
+    stageBody = "当前资料已经整理完毕；若先补充这些关键信息，后续判断会更稳。";
   }
   if (analysisReady && !isRunning && !hasBlocked) {
-    stageTitle = "研判完成";
-    stageBody = "已生成临床参考。";
+    stageTitle = "复核完成";
+    stageBody = "已生成临床参考，可继续对照病案与下方结果一起查看。";
   }
 
   return (
@@ -864,82 +864,35 @@ function MergedStatusPanel({
           {draftChars && (isRunning || analysisReady || organizeReady || hasBlocked) ? (
             <p>已用时：{elapsedSeconds} 秒</p>
           ) : null}
-          {organizeItems.length ? (
+          {organizeHighlights.length || organizeNotes.length || blockedReasons.length ? (
             <div className="status-inline-section">
               <strong>资料完整性</strong>
-              <ul>
-                {organizeItems.slice(0, 6).map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
+              {organizeHighlights.length ? (
+                <ul>
+                  {organizeHighlights.slice(0, 4).map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              ) : null}
+              {organizeNotes.length ? (
+                <ul>
+                  {organizeNotes.slice(0, 2).map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              ) : null}
+              {blockedReasons.length ? (
+                <ul>
+                  {blockedReasons.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              ) : null}
             </div>
           ) : null}
           {analysisReady && !hasBlocked ? <p>可在下方查看完整研判。</p> : null}
         </article>
       )}
-    </aside>
-  );
-}
-
-function EntryStatusPanel({
-  apiError,
-  draft,
-  hasSavedRecord,
-  isAnalyzing,
-  isOrganizing,
-  elapsedSeconds,
-  analysisReady,
-}: {
-  apiError: string;
-  draft: string;
-  hasSavedRecord: boolean;
-  isAnalyzing: boolean;
-  isOrganizing: boolean;
-  elapsedSeconds: number;
-  analysisReady: boolean;
-}) {
-  const isRunning = isOrganizing || isAnalyzing;
-  const draftChars = draft.trim().length;
-
-  return (
-    <aside className="entry-status-panel">
-      <p className="eyebrow">研判状态</p>
-      {apiError ? (
-        <article className="status-card status-error">
-          <h4>请求失败</h4>
-          <p>{apiError}</p>
-        </article>
-      ) : null}
-      {!apiError && !draftChars ? (
-        <article className="status-card">
-          <h4>待输入</h4>
-          <p>请先录入病案内容，系统会在提交后生成结构化临床参考。</p>
-        </article>
-      ) : null}
-      {!apiError && draftChars > 0 && !isRunning && !analysisReady ? (
-        <article className="status-card">
-          <h4>待研判</h4>
-          <ul>
-            <li>字数：{draftChars}</li>
-            <li>记录状态：{hasSavedRecord ? "已保存" : "新建"}</li>
-            <li>尚未生成临床参考</li>
-          </ul>
-        </article>
-      ) : null}
-      {!apiError && isRunning ? (
-        <article className="status-card status-running">
-          <h4>{isOrganizing ? "资料整理中" : "临床研判中"}</h4>
-          <p>已用时：{elapsedSeconds} 秒</p>
-        </article>
-      ) : null}
-      {!apiError && analysisReady && !isRunning ? (
-        <article className="status-card status-ready">
-          <h4>研判完成</h4>
-          <p>已生成临床参考。</p>
-          <p>生成用时：{elapsedSeconds} 秒</p>
-          <p>可在下方查看完整研判。</p>
-        </article>
-      ) : null}
     </aside>
   );
 }
