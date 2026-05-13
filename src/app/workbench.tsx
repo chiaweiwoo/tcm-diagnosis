@@ -5,6 +5,7 @@ import {
   Brain,
   CheckCircle2,
   CircleAlert,
+  CircleHelp,
   ClipboardCheck,
   FileText,
   GitBranch,
@@ -20,7 +21,7 @@ import {
   X,
 } from "lucide-react";
 import { KeyboardEvent, ReactNode, useEffect, useState } from "react";
-import { CaseForm, validateCaseForm } from "@/lib/caseValidation";
+import { CaseForm, getStageOneRequirements, validateCaseForm } from "@/lib/caseValidation";
 import "./workbench.css";
 
 type AnalysisResult = {
@@ -113,12 +114,19 @@ function normalizeName(value: string) {
   return value.trim() || null;
 }
 
-export default function Workbench({ userEmail }: { userEmail: string }) {
+export default function Workbench({
+  userEmail,
+  buildLabel,
+}: {
+  userEmail: string;
+  buildLabel: string;
+}) {
   const [consultationName, setConsultationName] = useState("");
   const [activeConsultationId, setActiveConsultationId] = useState("");
   const [consultations, setConsultations] = useState<ConsultationSummary[]>([]);
   const [draft, setDraft] = useState("");
   const [form, setForm] = useState<CaseForm>(initialForm);
+  const [stageOneHints, setStageOneHints] = useState<string[]>([]);
   const [blockedReasons, setBlockedReasons] = useState<string[]>([]);
   const [missingContext, setMissingContext] = useState<string[]>([]);
   const [organizeNotes, setOrganizeNotes] = useState<string[]>([]);
@@ -135,12 +143,15 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
   const [runStartedAt, setRunStartedAt] = useState<number | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [organizeReady, setOrganizeReady] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
 
   const isBusy = isOrganizing || isAnalyzing || isSaving;
   const isLocked = isBusy || (Boolean(result) && !isEditing);
   const hasSavedRecord = Boolean(activeConsultationId);
   const qualityWarnings = [...missingContext, ...organizeNotes, ...organizeSuggestions].filter(Boolean);
   const analysisReady = Boolean(result);
+  const blockMessages = [...stageOneHints, ...blockedReasons].filter(Boolean);
+  const stageOneRequirements = getStageOneRequirements(form.caseType);
 
   useEffect(() => {
     void loadConsultations();
@@ -188,6 +199,7 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
     setActiveConsultationId("");
     setDraft("");
     setForm(initialForm);
+    setStageOneHints([]);
     setBlockedReasons([]);
     setMissingContext([]);
     setOrganizeNotes([]);
@@ -209,6 +221,7 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
     if (!result) return;
     setResult(null);
     setMeta(null);
+    setStageOneHints([]);
     setMissingContext([]);
     setOrganizeNotes([]);
     setOrganizeSuggestions([]);
@@ -377,14 +390,15 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
       }
 
       const body = (await response.json()) as { record: ConsultationRecord };
-      const record = body.record;
-      setActiveConsultationId(record.id);
-      setConsultationName(record.consultation_name ?? "");
-      setDraft(record.draft ?? "");
-      setResult(record.analysis_result ?? null);
-      setMeta(record.model_meta ?? null);
-      setMissingContext(record.validation_result?.missingContext ?? []);
-      setBlockedReasons(record.validation_result?.blockedReasons ?? []);
+        const record = body.record;
+        setActiveConsultationId(record.id);
+        setConsultationName(record.consultation_name ?? "");
+        setDraft(record.draft ?? "");
+        setResult(record.analysis_result ?? null);
+        setMeta(record.model_meta ?? null);
+        setStageOneHints(record.validation_result?.stageOneHints ?? []);
+        setMissingContext(record.validation_result?.missingContext ?? []);
+        setBlockedReasons(record.validation_result?.blockedReasons ?? []);
       setOrganizeNotes(
         (record.organized_case as { organize_output?: { notes?: string[] } } | null)?.organize_output?.notes ?? [],
       );
@@ -437,6 +451,7 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
     const startedAt = Date.now();
 
     setApiError("");
+    setStageOneHints([]);
     setBlockedReasons([]);
     setMissingContext([]);
     setOrganizeNotes([]);
@@ -474,14 +489,11 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
       const validation = validateCaseForm(nextForm);
 
       setForm(nextForm);
+      setStageOneHints(validation.stageOneHints ?? []);
       setOrganizeNotes(organized.notes ?? []);
       setOrganizeSuggestions(organized.suggestions ?? []);
       setBlockedReasons(validation.blockedReasons);
-      setMissingContext([
-        ...validation.missingContext,
-        ...Object.values(validation.errors),
-        ...validation.blockedReasons,
-      ].filter(Boolean));
+      setMissingContext(validation.missingContext ?? []);
       setOrganizeReady(true);
 
       const recordId = activeConsultationId || (await saveDraftOnly(text, consultationName));
@@ -495,13 +507,12 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
       }
 
       setIsOrganizing(false);
-      const requiredErrors = Object.values(validation.errors).filter(Boolean);
-      const shouldBlock = requiredErrors.length > 0 || validation.blockedReasons.length > 0;
+      const shouldBlock = !validation.canProceed;
 
       if (shouldBlock) {
         setElapsedSeconds(Math.max(1, Math.floor((Date.now() - startedAt) / 1000)));
         setIsEditing(false);
-        showToast("资料已整理，建议先补充关键信息，再继续复核。", "info");
+        showToast("资料已整理，建议先补充基础信息，再继续临床复核。", "info");
         return;
       }
 
@@ -552,6 +563,7 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
         organizePromptVersion: organized.promptVersion,
       });
       setMissingContext(analyzed.validation?.missingContext ?? validation.missingContext);
+      setStageOneHints(analyzed.validation?.stageOneHints ?? validation.stageOneHints);
       setIsEditing(false);
       showToast("临床研判已完成。", "success");
     } catch (error) {
@@ -598,6 +610,7 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
           </a>
         </div>
         <div className="hero-meta-row">
+          <span>构建：{buildLabel}</span>
           <span>作者：Woo Chia Wei</span>
           <a href="https://github.com/chiaweiwoo/tcm-diagnosis" target="_blank" rel="noreferrer">
             <GitBranch size={14} />
@@ -612,6 +625,10 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
             <h2>临床记录</h2>
           </div>
           <div className="heading-actions">
+            <button type="button" className="secondary-button compact-button" onClick={() => setShowGuide(true)}>
+              <CircleHelp size={15} />
+              使用说明
+            </button>
             <button
               type="button"
               className="secondary-button compact-button"
@@ -641,14 +658,14 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
           </div>
         ) : null}
 
-        {blockedReasons.length ? (
-          <div className="blocked-box">
-            <strong>暂无法研判</strong>
-            {blockedReasons.map((reason) => (
-              <span key={reason}>{reason}</span>
-            ))}
-          </div>
-        ) : null}
+          {blockMessages.length ? (
+            <div className="blocked-box">
+              <strong>建议先补充后再复核</strong>
+              {blockMessages.map((reason) => (
+                <span key={reason}>{reason}</span>
+              ))}
+            </div>
+          ) : null}
 
         <div className="entry-layout">
           <div className="draft-panel compact-draft">
@@ -732,6 +749,7 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
             elapsedSeconds={elapsedSeconds}
             analysisReady={analysisReady}
             organizeReady={organizeReady}
+            stageOneHints={stageOneHints}
             organizeNotes={organizeNotes}
             organizeSuggestions={organizeSuggestions}
             missingContext={missingContext}
@@ -739,6 +757,25 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
           />
         </div>
       </section>
+
+      {organizeReady && !analysisReady ? (
+        <section className="panel result-panel-full organize-preview-panel">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">资料整理</p>
+              <h2>{blockMessages.length ? "建议先补充后再复核" : isAnalyzing ? "资料已整理，正在进入临床复核" : "资料整理结果"}</h2>
+            </div>
+            <span className="pill">{form.caseType}</span>
+          </div>
+          <OrganizeReviewPanel
+            stageOneHints={stageOneHints}
+            missingContext={missingContext}
+            organizeNotes={organizeNotes}
+            organizeSuggestions={organizeSuggestions}
+            blockedReasons={blockedReasons}
+          />
+        </section>
+      ) : null}
 
       {result ? (
         <section className="panel result-panel-full">
@@ -766,7 +803,15 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
               <AnalysisBoard result={result} qualityWarnings={qualityWarnings} />
             </div>
           </div>
-        </section>
+          </section>
+        ) : null}
+      {showGuide ? (
+        <GuideModal
+          buildLabel={buildLabel}
+          caseType={form.caseType}
+          requirements={stageOneRequirements}
+          onClose={() => setShowGuide(false)}
+        />
       ) : null}
     </main>
   );
@@ -809,6 +854,77 @@ function ToastBanner({
   );
 }
 
+function GuideModal({
+  buildLabel,
+  caseType,
+  requirements,
+  onClose,
+}: {
+  buildLabel: string;
+  caseType: CaseForm["caseType"];
+  requirements: Array<{ key: string; label: string; description: string }>;
+  onClose: () => void;
+}) {
+  return (
+    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="系统说明">
+      <div className="modal-card">
+        <div className="modal-header">
+          <div>
+            <p className="eyebrow">系统说明</p>
+            <h3>这套工作台如何协助临床复核</h3>
+          </div>
+          <button type="button" className="secondary-button compact-button" onClick={onClose}>
+            <X size={15} />
+            关闭
+          </button>
+        </div>
+        <div className="modal-body">
+          <section className="guide-section">
+            <h4>系统如何工作</h4>
+            <ol>
+              <li>先按你的习惯写下病案重点、当前方案，以及这次想确认的问题。</li>
+              <li>系统先整理资料脉络，提示值得补充与值得留意的地方。</li>
+              <li>基础信息足够时，系统才继续进入临床复核，给出判断、优化与随访提醒。</li>
+            </ol>
+          </section>
+          <section className="guide-section">
+            <h4>系统默认假设</h4>
+            <ul>
+              <li>仅供注册中医师内部参考，不替代面诊、查体与专业评估。</li>
+              <li>系统会优先保留当前方案里合理的部分，再提示可优化之处。</li>
+              <li>若内容像患者自用、保证疗效、或问题过于笼统，系统会停在资料整理阶段。</li>
+            </ul>
+          </section>
+          <section className="guide-section">
+            <h4>本阶段建议至少写到这些</h4>
+            <ul>
+              {requirements.map((item) => (
+                <li key={item.key}>
+                  <strong>{item.label}：</strong>
+                  {item.description}
+                </li>
+              ))}
+            </ul>
+            <p className="guide-footnote">当前病案类型：{caseType}</p>
+          </section>
+          <section className="guide-section">
+            <h4>什么时候会先停下来</h4>
+            <ul>
+              <li>主诉、当前方案、医生问题、病程线索不足时。</li>
+              <li>方药分析缺少方药内容，或针灸方案缺少穴位与操作时。</li>
+              <li>出现患者自用、保证疗效、或“帮我看看”这类过于笼统的问题时。</li>
+            </ul>
+          </section>
+        </div>
+        <div className="modal-footer">
+          <span>构建：{buildLabel}</span>
+          <span>这份说明会随产品行为一起更新。</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MergedStatusPanel({
   apiError,
   draft,
@@ -818,6 +934,7 @@ function MergedStatusPanel({
   elapsedSeconds,
   analysisReady,
   organizeReady,
+  stageOneHints,
   organizeNotes,
   organizeSuggestions,
   missingContext,
@@ -831,6 +948,7 @@ function MergedStatusPanel({
   elapsedSeconds: number;
   analysisReady: boolean;
   organizeReady: boolean;
+  stageOneHints: string[];
   organizeNotes: string[];
   organizeSuggestions: string[];
   missingContext: string[];
@@ -838,7 +956,7 @@ function MergedStatusPanel({
 }) {
   const isRunning = isOrganizing || isAnalyzing;
   const draftChars = draft.trim().length;
-  const organizeHighlights = [...missingContext, ...organizeSuggestions].filter(Boolean);
+  const organizeHighlights = [...stageOneHints, ...missingContext, ...organizeSuggestions].filter(Boolean);
   const hasBlocked = blockedReasons.length > 0;
 
   let stageTitle = "可开始记录";
@@ -930,6 +1048,53 @@ function MergedStatusPanel({
         </article>
       )}
     </aside>
+  );
+}
+
+function OrganizeReviewPanel({
+  stageOneHints,
+  missingContext,
+  organizeNotes,
+  organizeSuggestions,
+  blockedReasons,
+}: {
+  stageOneHints: string[];
+  missingContext: string[];
+  organizeNotes: string[];
+  organizeSuggestions: string[];
+  blockedReasons: string[];
+}) {
+  const sections = [
+    {
+      title: "建议先补充",
+      items: [...stageOneHints, ...blockedReasons],
+      tone: "warn",
+    },
+    {
+      title: "值得留意",
+      items: [...missingContext, ...organizeSuggestions],
+      tone: "soft",
+    },
+    {
+      title: "系统整理到的线索",
+      items: organizeNotes,
+      tone: "default",
+    },
+  ].filter((section) => section.items.length > 0);
+
+  return (
+    <div className="organize-review-grid">
+      {sections.map((section) => (
+        <section key={section.title} className={`organize-review-card tone-${section.tone}`}>
+          <h3>{section.title}</h3>
+          <ul>
+            {section.items.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </section>
+      ))}
+    </div>
   );
 }
 

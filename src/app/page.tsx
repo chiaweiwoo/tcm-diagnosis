@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { isAllowedDoctorEmail } from "@/lib/auth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import packageJson from "../../package.json";
 import Workbench from "./workbench";
 
 export default async function Home() {
@@ -17,5 +18,8 @@ export default async function Home() {
     redirect("/auth/signout?reason=unauthorized");
   }
 
-  return <Workbench userEmail={user.email ?? "已登录账号"} />;
+  const revision = (process.env.VERCEL_GIT_COMMIT_SHA ?? "local").slice(0, 7);
+  const buildLabel = `v${packageJson.version} · ${revision}`;
+
+  return <Workbench userEmail={user.email ?? "已登录账号"} buildLabel={buildLabel} />;
 }

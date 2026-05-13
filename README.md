@@ -70,6 +70,8 @@ flowchart LR
 ## Current Workflow Notes
 
 - The product uses a two-step AI pipeline: `organize -> analyze`.
-- Organize-stage output is used to surface completeness reminders early and to stop before analysis when hard guardrails fail.
+- Organize-stage output is surfaced immediately in the workbench and can stop before analysis when hard guardrails fail.
+- The dashboard includes an in-app help surface so doctors can review assumptions, minimum input expectations, and workflow behavior without leaving the page.
+- A build label is shown in the workbench so deployment status can be checked visually after release.
 - Token usage, estimated cost, model metadata, and latency stay internal and are stored for traceability rather than shown in the doctor-facing UI.
 - Doctor allowlist is now read from Supabase when the `doctor_allowlist` table is available, with environment-variable fallback during transition.
