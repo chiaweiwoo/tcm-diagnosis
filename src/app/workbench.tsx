@@ -519,14 +519,14 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
       <section className="hero-panel">
         <div className="hero-head">
           <div className="hero-main">
-            <p className="eyebrow">临床参考</p>
-            <h1>病案研判工作台</h1>
+            <p className="eyebrow">临床复核伙伴</p>
+            <h1>临床复核工作台</h1>
             <p className="hero-copy">
-              从病案记录中提炼关键信息，标出影响判断的资料缺口，并输出可复核的中医临床参考。
+              把自由病案整理成清晰脉络，先提示值得补充的关键信息，再陪你复核思路与后续重点。
             </p>
             <p className="hero-note">
               <AlertTriangle size={15} />
-              仅供注册中医师临床参考，最终判断以医生面诊与专业评估为准。
+              仅供注册中医师临床参考；最终判断仍以医生面诊与专业评估为准。
             </p>
           </div>
           <a className="secondary-button hero-action" href="/auth/signout">
