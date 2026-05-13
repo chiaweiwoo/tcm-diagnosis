@@ -3,6 +3,7 @@
 Doctor-facing TCM clinical workbench for organizing case notes, identifying missing clinical context, generating structured Chinese clinical references, and saving consultation review history.
 
 The product is designed for practical Singapore clinic use: concise case review, realistic treatment adjustments, safety reminders, and repeatable clinical reasoning without guaranteed claims.
+The backend uses a defensive two-step AI pipeline (`organize -> analyze`) with JSON repair fallback, schema normalization, and stage-based API logging for traceability.
 
 ---
 
@@ -35,6 +36,7 @@ flowchart LR
 | Auth | Supabase Google OAuth + email allowlist |
 | Data | Supabase JSONB consultation records + API logs |
 | Validation | Zod + focused clinical guardrails |
+| Reliability | JSON repair fallback + defensive mapping + stage metadata logging |
 | Checks | Vitest + production build |
 
 ```mermaid
