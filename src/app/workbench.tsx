@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  Activity,
   AlertTriangle,
   Brain,
   ClipboardCheck,
@@ -140,6 +139,7 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
     .find((group) => group.title === "建议优化")
     ?.sections.find((section) => section.title === "主要建议")
     ?.items ?? [];
+  const keyPointPreview = result?.keyPoints.slice(0, 2) ?? [];
 
   useEffect(() => {
     void loadConsultations();
@@ -526,7 +526,7 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
 
       <section className="hero-panel">
         <div className="hero-head">
-          <div>
+          <div className="hero-main">
             <p className="eyebrow">临床参考</p>
             <h1>病案研判工作台</h1>
             <p className="hero-copy">
@@ -536,17 +536,17 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
               <AlertTriangle size={15} />
               仅供注册中医师临床参考，最终判断以医生面诊与专业评估为准。
             </p>
-            <div className="hero-meta">
-              <span>作者：Woo Chia Wei</span>
-              <a href="https://github.com/chiaweiwoo/tcm-diagnosis" target="_blank" rel="noreferrer">
-                <GitBranch size={15} />
-                GitHub 仓库
-              </a>
-            </div>
           </div>
           <a className="secondary-button hero-action" href="/auth/signout">
             <LogOut size={15} />
             {userEmail}
+          </a>
+        </div>
+        <div className="hero-meta-row">
+          <span>作者：Woo Chia Wei</span>
+          <a href="https://github.com/chiaweiwoo/tcm-diagnosis" target="_blank" rel="noreferrer">
+            <GitBranch size={14} />
+            GitHub 仓库
           </a>
         </div>
       </section>
@@ -595,7 +595,8 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
           </div>
         ) : null}
 
-        <div className="draft-panel compact-draft">
+        <div className="entry-layout">
+          <div className="draft-panel compact-draft">
           <div className="history-row">
             <label className="field-block name-field">
               <span>
@@ -667,6 +668,16 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
               资料将先结构化，再进入临床研判；可按Ctrl+Enter提交。
             </p>
           </div>
+          </div>
+          <EntryStatusPanel
+            apiError={apiError}
+            draft={draft}
+            hasSavedRecord={hasSavedRecord}
+            isAnalyzing={isAnalyzing}
+            isOrganizing={isOrganizing}
+            elapsedSeconds={elapsedSeconds}
+            keyPointPreview={keyPointPreview}
+          />
         </div>
       </section>
 
@@ -700,41 +711,7 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
                 </article>
               </section>
 
-              {qualityWarnings.length ? (
-                <article className="warning-card" id="completeness">
-                  <SectionTitle icon={<AlertTriangle size={18} />}>资料完整性</SectionTitle>
-                  <ul>
-                    {qualityWarnings.map((item) => (
-                      <li key={item}>{item}</li>
-                    ))}
-                  </ul>
-                </article>
-              ) : null}
-
-              <section className="result-group" id="summary">
-                <SectionTitle icon={<Sparkles size={18} />}>病案摘要</SectionTitle>
-                <p className="result-summary">{result.summary}</p>
-              </section>
-
-              <GroupedResults groups={result.groups} />
-
-              <article className="caution-card" id="risk">
-                <SectionTitle icon={<AlertTriangle size={18} />}>风险与提醒</SectionTitle>
-                {result.cautions.map((item) => (
-                  <p key={item}>{item}</p>
-                ))}
-              </article>
-
-              <section className="result-group" id="evidence">
-                <SectionTitle icon={<ClipboardCheck size={18} />}>证据状态</SectionTitle>
-                <article className="result-card">
-                  <ul>
-                    {result.evidence.map((item) => (
-                      <li key={item}>{item}</li>
-                    ))}
-                  </ul>
-                </article>
-              </section>
+              <AnalysisBoard result={result} qualityWarnings={qualityWarnings} />
             </div>
           </div>
         </section>
@@ -772,51 +749,144 @@ function MetricCard({
   );
 }
 
-function GroupedResults({ groups }: { groups: AnalysisResult["groups"] }) {
+function EntryStatusPanel({
+  apiError,
+  draft,
+  hasSavedRecord,
+  isAnalyzing,
+  isOrganizing,
+  elapsedSeconds,
+  keyPointPreview,
+}: {
+  apiError: string;
+  draft: string;
+  hasSavedRecord: boolean;
+  isAnalyzing: boolean;
+  isOrganizing: boolean;
+  elapsedSeconds: number;
+  keyPointPreview: string[];
+}) {
+  const isRunning = isOrganizing || isAnalyzing;
+  const draftChars = draft.trim().length;
+
   return (
-    <>
-      {groups.map((group) => (
-        <ResultGroup key={group.title} title={group.title} sections={group.sections} />
-      ))}
-    </>
+    <aside className="entry-status-panel">
+      <p className="eyebrow">研判状态</p>
+      {apiError ? (
+        <article className="status-card status-error">
+          <h4>请求失败</h4>
+          <p>{apiError}</p>
+        </article>
+      ) : null}
+      {!apiError && !draftChars ? (
+        <article className="status-card">
+          <h4>待输入</h4>
+          <p>请先录入病案内容，系统会在提交后生成结构化临床参考。</p>
+        </article>
+      ) : null}
+      {!apiError && draftChars > 0 && !isRunning && keyPointPreview.length === 0 ? (
+        <article className="status-card">
+          <h4>待研判</h4>
+          <ul>
+            <li>字数：{draftChars}</li>
+            <li>记录状态：{hasSavedRecord ? "已保存" : "新建"}</li>
+            <li>尚未生成临床参考</li>
+          </ul>
+        </article>
+      ) : null}
+      {!apiError && isRunning ? (
+        <article className="status-card status-running">
+          <h4>{isOrganizing ? "资料整理中" : "临床研判中"}</h4>
+          <p>已用时：{elapsedSeconds} 秒</p>
+        </article>
+      ) : null}
+      {!apiError && keyPointPreview.length > 0 && !isRunning ? (
+        <article className="status-card status-ready">
+          <h4>最新重点结论</h4>
+          <ul>
+            {keyPointPreview.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+          <p>生成用时：{elapsedSeconds} 秒</p>
+        </article>
+      ) : null}
+    </aside>
   );
 }
 
-function ResultGroup({
-  id,
-  title,
-  sections,
+function AnalysisBoard({
+  result,
+  qualityWarnings,
 }: {
-  id?: string;
-  title: string;
-  sections: AnalysisResult["groups"][number]["sections"];
+  result: AnalysisResult;
+  qualityWarnings: string[];
 }) {
-  if (!sections.length) return null;
+  const currentThinking = result.groups.find((group) => group.title === "当前思路");
+  const suggestions = result.groups.find((group) => group.title === "建议优化");
+  const alternatives = result.groups.find((group) => group.title === "可选思路");
+  const followUp = result.groups.find((group) => group.title === "随访监测");
+
+  const dataSections = [
+    qualityWarnings.length ? { title: "资料完整性", items: qualityWarnings } : null,
+    result.summary ? { title: "病案摘要", items: [result.summary] } : null,
+  ].filter((section): section is { title: string; items: string[] } => Boolean(section));
+
+  const judgementSections = currentThinking?.sections ?? [];
+  const planSections = [...(suggestions?.sections ?? []), ...(alternatives?.sections ?? [])];
+  const followSafetySections = [
+    ...(followUp?.sections ?? []),
+    ...(result.cautions.length ? [{ title: "风险与提醒", items: result.cautions }] : []),
+    ...(result.evidence.length ? [{ title: "证据状态", items: result.evidence }] : []),
+  ];
 
   return (
-    <section className="result-group" id={id}>
-      <SectionTitle icon={getResultIcon(title)}>{title}</SectionTitle>
-      <div className="result-sections">
-        {sections.map((section) => (
-          <article className="result-card" key={section.title}>
+    <section className="analysis-board">
+      <AnalysisColumn title="资料" icon={<FileText size={16} />} sections={dataSections} tone="warn" />
+      <AnalysisColumn title="判断" icon={<Brain size={16} />} sections={judgementSections} />
+      <AnalysisColumn title="方案" icon={<ListChecks size={16} />} sections={planSections} />
+      <AnalysisColumn title="随访安全" icon={<ClipboardCheck size={16} />} sections={followSafetySections} tone="caution" />
+    </section>
+  );
+}
+
+function AnalysisColumn({
+  title,
+  icon,
+  sections,
+  tone = "default",
+}: {
+  title: string;
+  icon: ReactNode;
+  sections: Array<{ title: string; items: string[] }>;
+  tone?: "default" | "warn" | "caution";
+}) {
+  const visibleSections = sections
+    .map((section) => ({ ...section, items: section.items.filter(Boolean) }))
+    .filter((section) => section.items.length > 0);
+
+  if (!visibleSections.length) return null;
+
+  return (
+    <article className={`analysis-column tone-${tone}`}>
+      <h3 className="analysis-column-title">
+        <span>{icon}</span>
+        {title}
+      </h3>
+      <div className="analysis-column-sections">
+        {visibleSections.map((section) => (
+          <section className="analysis-section" key={`${title}-${section.title}`}>
             <h4>{section.title}</h4>
             <ul>
               {section.items.map((item) => (
                 <li key={item}>{item}</li>
               ))}
             </ul>
-          </article>
+          </section>
         ))}
       </div>
-    </section>
+    </article>
   );
-}
-
-function getResultIcon(title: string) {
-  if (title === "临床判断") return <Brain size={18} />;
-  if (title === "建议方案") return <ListChecks size={18} />;
-  if (title === "复核与随访") return <ClipboardCheck size={18} />;
-  return <Activity size={18} />;
 }
 
 
