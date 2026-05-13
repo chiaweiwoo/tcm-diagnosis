@@ -686,7 +686,7 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
                 <MetricCard title="资料完整性" value={qualityWarnings.length} detail="项提醒" tone={qualityWarnings.length ? "warn" : "ok"} />
                 <MetricCard title="临床风险" value={result.cautions.length} detail="项需注意" tone={result.cautions.length ? "warn" : "ok"} />
                 <MetricCard title="需要复核" value={reviewItems.length} detail="项待确认" tone={reviewItems.length ? "warn" : "ok"} />
-                <MetricCard title="建议重点" value={recommendationItems.length} detail="项调整" tone={recommendationItems.length ? "focus" : "ok"} />
+                <MetricCard title="建议重点" value={recommendationItems.length} detail="项建议" tone={recommendationItems.length ? "focus" : "ok"} />
               </div>
 
               <section className="result-group" id="key-points">
