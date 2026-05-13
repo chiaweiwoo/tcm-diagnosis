@@ -344,6 +344,18 @@
   gap: 3px;
 }
 
+.status-inline-section {
+  display: grid;
+  gap: 6px;
+  padding-top: 4px;
+  border-top: 1px solid #eadfd9;
+}
+
+.status-inline-section strong {
+  color: #4a3732;
+  font-size: 13px;
+}
+
 .status-error {
   border-color: #f1b8ad;
   background: var(--danger-bg);

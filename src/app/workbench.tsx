@@ -6,6 +6,7 @@ import {
   ClipboardCheck,
   FileText,
   GitBranch,
+  LoaderCircle,
   ListChecks,
   LogOut,
   Pencil,
@@ -39,6 +40,9 @@ type ApiMeta = {
   costUsd?: number;
   model?: string;
   promptVersion?: string;
+  durationSeconds?: number;
+  organizeModel?: string;
+  organizePromptVersion?: string;
 };
 
 type ConsultationSummary = {
@@ -126,6 +130,7 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [runStartedAt, setRunStartedAt] = useState<number | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
+  const [organizeReady, setOrganizeReady] = useState(false);
 
   const isBusy = isOrganizing || isAnalyzing || isSaving;
   const isLocked = isBusy || (Boolean(result) && !isEditing);
@@ -192,6 +197,7 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
     setIsAnalyzing(false);
     setIsSaving(false);
     setIsEditing(false);
+    setOrganizeReady(false);
     showToast("已建立新的病案记录。", "info");
   }
 
@@ -202,6 +208,8 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
     setMissingContext([]);
     setOrganizeNotes([]);
     setOrganizeSuggestions([]);
+    setBlockedReasons([]);
+    setOrganizeReady(false);
     if (activeConsultationId && nextDraft !== undefined) {
       void saveDraftOnly(nextDraft, consultationName, activeConsultationId);
     }
@@ -263,6 +271,9 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
       model?: string;
       promptVersion?: string;
       validation?: ReturnType<typeof validateCaseForm>;
+      durationSeconds: number;
+      organizeModel?: string;
+      organizePromptVersion?: string;
     };
   }) {
     const modelMeta = {
@@ -270,6 +281,9 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
       costUsd: input.analyzed.costUsd,
       model: input.analyzed.model,
       promptVersion: input.analyzed.promptVersion,
+      durationSeconds: input.analyzed.durationSeconds,
+      organizeModel: input.analyzed.organizeModel,
+      organizePromptVersion: input.analyzed.organizePromptVersion,
     };
 
     const response = await fetch(`/api/consultations/${input.recordId}`, {
@@ -314,7 +328,15 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
       model?: string;
       promptVersion?: string;
     };
+    validation: ReturnType<typeof validateCaseForm>;
   }) {
+    const modelMeta = {
+      organizeModel: input.organized.model,
+      organizePromptVersion: input.organized.promptVersion,
+      usage: input.organized.usage,
+      costUsd: input.organized.costUsd,
+    };
+
     const response = await fetch(`/api/consultations/${input.recordId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -325,6 +347,8 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
           organize_input: { draft: input.draftText },
           organize_output: input.organized,
         },
+        validationResult: input.validation,
+        modelMeta,
         analysisStatus: "draft",
       }),
     });
@@ -356,13 +380,18 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
       setResult(record.analysis_result ?? null);
       setMeta(record.model_meta ?? null);
       setMissingContext(record.validation_result?.missingContext ?? []);
-      setOrganizeNotes([]);
-      setOrganizeSuggestions([]);
-      setBlockedReasons([]);
+      setBlockedReasons(record.validation_result?.blockedReasons ?? []);
+      setOrganizeNotes(
+        (record.organized_case as { organize_output?: { notes?: string[] } } | null)?.organize_output?.notes ?? [],
+      );
+      setOrganizeSuggestions(
+        (record.organized_case as { organize_output?: { suggestions?: string[] } } | null)?.organize_output?.suggestions ?? [],
+      );
       setApiError("");
-      setElapsedSeconds(0);
+      setElapsedSeconds(record.model_meta?.durationSeconds ?? 0);
       setRunStartedAt(null);
       setIsEditing(false);
+      setOrganizeReady(Boolean(record.organized_case));
       showToast("已载入历史病案。", "success");
     } catch (error) {
       const message = error instanceof Error ? error.message : "读取病案记录失败。";
@@ -412,6 +441,7 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
     setMeta(null);
     setElapsedSeconds(0);
     setRunStartedAt(startedAt);
+    setOrganizeReady(false);
     setIsOrganizing(true);
     setIsAnalyzing(false);
 
@@ -442,11 +472,13 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
       setForm(nextForm);
       setOrganizeNotes(organized.notes ?? []);
       setOrganizeSuggestions(organized.suggestions ?? []);
+      setBlockedReasons(validation.blockedReasons);
       setMissingContext([
         ...validation.missingContext,
         ...Object.values(validation.errors),
         ...validation.blockedReasons,
       ].filter(Boolean));
+      setOrganizeReady(true);
 
       const recordId = activeConsultationId || (await saveDraftOnly(text, consultationName));
       if (recordId) {
@@ -454,10 +486,21 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
           recordId,
           draftText: text,
           organized,
+          validation,
         });
       }
 
       setIsOrganizing(false);
+      const requiredErrors = Object.values(validation.errors).filter(Boolean);
+      const shouldBlock = requiredErrors.length > 0 || validation.blockedReasons.length > 0;
+
+      if (shouldBlock) {
+        setElapsedSeconds(Math.max(1, Math.floor((Date.now() - startedAt) / 1000)));
+        setIsEditing(false);
+        showToast("资料已整理，建议先补充关键信息，再继续复核。", "info");
+        return;
+      }
+
       setIsAnalyzing(true);
 
       const analyzeResponse = await fetch("/api/analyze", {
@@ -481,7 +524,16 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
       };
 
       if (recordId) {
-        await saveAnalysisResult({ recordId, organized, analyzed });
+        await saveAnalysisResult({
+          recordId,
+          organized,
+          analyzed: {
+            ...analyzed,
+            durationSeconds: Math.max(1, Math.floor((Date.now() - startedAt) / 1000)),
+            organizeModel: organized.model,
+            organizePromptVersion: organized.promptVersion,
+          },
+        });
       }
 
       setResult(analyzed.result);
@@ -491,6 +543,9 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
         costUsd: analyzed.costUsd,
         model: analyzed.model,
         promptVersion: analyzed.promptVersion,
+        durationSeconds: Math.max(1, Math.floor((Date.now() - startedAt) / 1000)),
+        organizeModel: organized.model,
+        organizePromptVersion: organized.promptVersion,
       });
       setMissingContext(analyzed.validation?.missingContext ?? validation.missingContext);
       setIsEditing(false);
@@ -660,7 +715,7 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
             </p>
           </div>
           </div>
-          <EntryStatusPanel
+          <MergedStatusPanel
             apiError={apiError}
             draft={draft}
             hasSavedRecord={hasSavedRecord}
@@ -668,6 +723,11 @@ export default function Workbench({ userEmail }: { userEmail: string }) {
             isOrganizing={isOrganizing}
             elapsedSeconds={elapsedSeconds}
             analysisReady={analysisReady}
+            organizeReady={organizeReady}
+            organizeNotes={organizeNotes}
+            organizeSuggestions={organizeSuggestions}
+            missingContext={missingContext}
+            blockedReasons={blockedReasons}
           />
         </div>
       </section>
@@ -710,6 +770,114 @@ function SectionTitle({ icon, children }: { icon: ReactNode; children: ReactNode
       <span>{icon}</span>
       {children}
     </h3>
+  );
+}
+
+function MergedStatusPanel({
+  apiError,
+  draft,
+  hasSavedRecord,
+  isAnalyzing,
+  isOrganizing,
+  elapsedSeconds,
+  analysisReady,
+  organizeReady,
+  organizeNotes,
+  organizeSuggestions,
+  missingContext,
+  blockedReasons,
+}: {
+  apiError: string;
+  draft: string;
+  hasSavedRecord: boolean;
+  isAnalyzing: boolean;
+  isOrganizing: boolean;
+  elapsedSeconds: number;
+  analysisReady: boolean;
+  organizeReady: boolean;
+  organizeNotes: string[];
+  organizeSuggestions: string[];
+  missingContext: string[];
+  blockedReasons: string[];
+}) {
+  const isRunning = isOrganizing || isAnalyzing;
+  const draftChars = draft.trim().length;
+  const organizeItems = [...missingContext, ...organizeNotes, ...organizeSuggestions].filter(Boolean);
+  const hasBlocked = blockedReasons.length > 0;
+
+  let stageTitle = "可开始记录";
+  let stageBody = "请先录入病案内容，系统会先整理重点，再给出临床复核建议。";
+
+  if (draftChars > 0) {
+    stageTitle = "可进入复核";
+    stageBody = "准备好后即可进入临床复核。";
+  }
+  if (organizeReady) {
+    stageTitle = "资料完整性";
+    stageBody = "系统已先整理出资料重点，你可以先看这些提醒。";
+  }
+  if (isAnalyzing) {
+    stageTitle = "临床研判中";
+    stageBody = "资料已整理完成，系统正在复核当前思路、方案与后续重点。";
+  }
+  if (isOrganizing) {
+    stageTitle = "资料整理中";
+    stageBody = "系统正在提炼病案脉络，并整理值得留意的资料提示。";
+  }
+  if (hasBlocked) {
+    stageTitle = "建议先补充后再复核";
+    stageBody = "当前资料已经整理完毕，建议先补充这些关键信息，再继续往下复核。";
+  }
+  if (analysisReady && !isRunning && !hasBlocked) {
+    stageTitle = "研判完成";
+    stageBody = "已生成临床参考。";
+  }
+
+  return (
+    <aside className="entry-status-panel">
+      <p className="eyebrow">研判状态</p>
+      {apiError ? (
+        <article className="status-card status-error">
+          <h4>本次未完成</h4>
+          <p>{apiError}</p>
+        </article>
+      ) : (
+        <article
+          className={`status-card ${
+            hasBlocked
+              ? "status-blocked"
+              : isRunning
+                ? "status-running"
+                : analysisReady
+                  ? "status-ready"
+                  : organizeReady
+                    ? "status-organized"
+                    : ""
+          }`}
+        >
+          <h4 className={isRunning ? "status-active" : undefined}>
+            {isRunning ? <LoaderCircle size={14} className="status-rotating" /> : null}
+            {stageTitle}
+          </h4>
+          <p>{stageBody}</p>
+          {draftChars ? <p>字数：{draftChars} · 记录状态：{hasSavedRecord ? "已保存" : "新建"}</p> : null}
+          {draftChars && (isRunning || analysisReady || organizeReady || hasBlocked) ? (
+            <p>已用时：{elapsedSeconds} 秒</p>
+          ) : null}
+          {organizeItems.length ? (
+            <div className="status-inline-section">
+              <strong>资料完整性</strong>
+              <ul>
+                {organizeItems.slice(0, 6).map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {analysisReady && !hasBlocked ? <p>可在下方查看完整研判。</p> : null}
+        </article>
+      )}
+    </aside>
   );
 }
 
