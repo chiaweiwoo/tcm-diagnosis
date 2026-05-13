@@ -665,6 +665,12 @@
   box-shadow: 0 0 0 3px rgba(180, 35, 24, 0.13);
 }
 
+.name-field input::placeholder {
+  color: #a7928b;
+  font-size: 14px;
+  font-style: italic;
+}
+
 .field-error {
   color: var(--danger);
   font-size: 13px;

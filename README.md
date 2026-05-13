@@ -78,6 +78,7 @@ flowchart LR
 - Token usage, estimated cost, model metadata, and latency stay internal and are stored for traceability rather than shown in the doctor-facing UI.
 - Doctor allowlist is now read from Supabase when the `doctor_allowlist` table is available, with environment-variable fallback during transition.
 - Local development can optionally use a strict dev-only auth bypass with `DEV_AUTH_BYPASS=true` and `DEV_AUTH_EMAIL=...`; it is ignored outside `NODE_ENV=development`.
+- Internal agent discipline follows a release-path audit: fresh run, saved-history reload, stage-one block, partial organize, final analysis, docs sync, and build marker verification.
 
 ---
 

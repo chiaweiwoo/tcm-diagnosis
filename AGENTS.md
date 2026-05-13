@@ -1,4 +1,4 @@
-# TCM Diagnosis - AI Session Memory
+# TCM Diagnosis — AI Session Memory
 
 This file records durable product and engineering rules for future coding agents.
 Keep it aligned with shipped behavior.
@@ -114,6 +114,8 @@ Recommended-but-not-hard-block fields:
 - Prompt contract is strict JSON.
 - If DeepSeek returns malformed JSON, use syntax-only repair before failing.
 - Prefer defensive normalization over brittle shape assumptions.
+- Core analysis sections should remain structurally stable; avoid a doctor seeing major sections appear in one case and disappear in another just because the model returned fewer bullets.
+- Saved history must be normalized through the same result-shaping path as fresh analysis.
 
 ## Model And Latency Rules
 
@@ -148,6 +150,7 @@ Logging should not block doctor-facing responses.
 - History is scoped by logged-in doctor email.
 - `consultations` uses JSONB for flexible evolving payloads.
 - Optional `consultation_name` displays as timestamp + name; unnamed records show timestamp only.
+- The consultation-name placeholder must read like a placeholder, not a real patient record.
 - Doctors can save, reopen, rename, edit, regenerate, and delete records.
 - Editing a draft clears the current analysis and requires regeneration.
 
@@ -160,15 +163,30 @@ Logging should not block doctor-facing responses.
 - Prefer kanban/dashboard-style analysis grouping over document-style sprawl.
 - Keep a visible help surface in the dashboard so doctors can understand workflow assumptions without reading external docs.
 - Show a visible build label in the UI so deployed-version checks are easy.
-- Core analysis sections should remain structurally stable; avoid a doctor seeing major sections appear in one case and disappear in another just because the model returned fewer bullets.
 - When local dev bypass is active, show a clear in-product indicator such as `本地开发模式`.
+
+## Audit Checklist Before Saying “Done”
+
+Always check all applicable paths after meaningful changes:
+
+1. fresh run path
+2. load saved history path
+3. blocked stage-one path
+4. partial organize path
+5. final analysis path
+6. docs sync
+7. deploy/build marker visible when relevant
+
+Do not say “done” until the changed path is verified, not merely coded.
+Use [docs/agent-audit-checklist.md](C:\Users\chiaw\OneDrive\Desktop\playground\tcm-diagnosis\docs\agent-audit-checklist.md) as the concrete release-path checklist.
+Project-local reusable workflow notes also live in [codex-skills/tcm-workbench-audit/SKILL.md](C:\Users\chiaw\OneDrive\Desktop\playground\tcm-diagnosis\codex-skills\tcm-workbench-audit\SKILL.md).
 
 ## Documentation Direction
 
 - `README.md` is product-facing.
 - Explain what the tool helps doctors do.
 - Keep setup and operational notes concise.
-- Mention the two-step pipeline, organize-stage stop behavior, internal-only token/cost tracking, and allowlist source.
+- Mention the two-step pipeline, organize-stage stop behavior, internal-only token/cost tracking, allowlist source, and review-mode selector.
 - Document the local dev auth bypass in `.env.local.example` and keep the explanation brief and explicit.
 
 ## Deferred Scope

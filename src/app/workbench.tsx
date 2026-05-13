@@ -723,7 +723,7 @@ export default function Workbench({
                   value={consultationName}
                   onChange={(event) => handleNameChange(event.target.value)}
                   disabled={isLocked}
-                  placeholder="例如：患者代号 A-01、PCOS 复诊（请勿填写真实姓名）"
+                  placeholder="例如：患者代号 A-01（勿填真实姓名）"
                 />
               </label>
             <label className="field-block history-field">
