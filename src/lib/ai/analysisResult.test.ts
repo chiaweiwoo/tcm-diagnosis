@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildAnalysisResult } from "./analysisResult";
+import { buildAnalysisResult, normalizeStringList } from "./analysisResult";
 
 describe("buildAnalysisResult", () => {
   it("maps grouped analysis fields to UI contract", () => {
@@ -39,5 +39,42 @@ describe("buildAnalysisResult", () => {
     expect(result.keyPoints.length).toBeGreaterThan(0);
     expect(result.cautions.length).toBeGreaterThan(0);
     expect(result.evidence.length).toBeGreaterThan(0);
+  });
+
+  it("normalizes wrong-shaped fields without throwing", () => {
+    const result = buildAnalysisResult(
+      {
+        重点结论: "先复核，再调整",
+        病案摘要: 1234,
+        资料完整性: {
+          已提供: "主诉已给",
+          建议补充: null,
+        },
+        当前思路: {
+          可取之处: ["方向可保留", 7],
+          需要复核: { note: "剂量单位需确认" },
+        },
+        建议优化: "",
+        可选思路: ["可选A"],
+        风险与提醒: false,
+        随访监测: "复诊观察周期",
+        证据状态: "",
+      },
+      "方药分析",
+    );
+
+    expect(result.keyPoints).toEqual(["先复核，再调整"]);
+    expect(result.summary).toBe("1234");
+    expect(result.groups.length).toBeGreaterThan(0);
+    expect(result.cautions.length).toBeGreaterThan(0);
+    expect(result.evidence.length).toBeGreaterThan(0);
+  });
+});
+
+describe("normalizeStringList", () => {
+  it("coerces array and scalar values into clean string arrays", () => {
+    expect(normalizeStringList(["A", " ", 2, false])).toEqual(["A", "2", "false"]);
+    expect(normalizeStringList("单条")).toEqual(["单条"]);
+    expect(normalizeStringList(null)).toEqual([]);
   });
 });

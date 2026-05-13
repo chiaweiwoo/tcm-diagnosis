@@ -1,7 +1,7 @@
 import { CaseForm } from "@/lib/caseValidation";
 
-export const TCM_ANALYSIS_PROMPT_VERSION = "tcm-analysis-v0.3";
-export const TCM_ORGANIZE_PROMPT_VERSION = "tcm-organize-v0.2";
+export const TCM_ANALYSIS_PROMPT_VERSION = "tcm-analysis-v0.4";
+export const TCM_ORGANIZE_PROMPT_VERSION = "tcm-organize-v0.3";
 
 export const TCM_ANALYSIS_SYSTEM_PROMPT = `
 你是医生端中医临床辅助系统，仅供注册中医师参考，不面向患者。
@@ -17,6 +17,14 @@ export const TCM_ANALYSIS_SYSTEM_PROMPT = `
 - 不编造文献、指南、研究结论或引用。
 - 若信息不足，必须明确指出缺口并降低结论确定性。
 
+在输出最终 JSON 前，请先在内部完成一次临床自检，但不要展示自检过程或推理草稿：
+1) 安全性：是否存在明显风险或禁忌。
+2) 资料缺口：是否缺少影响判断的关键临床信息。
+3) 过度自信：是否把不确定结论写得过于肯定。
+4) 证据缺口：是否误写成已有外部检索支持。
+5) 医生问题：是否直接回答了医生提出的核心问题。
+请将自检后的修正体现在最终 JSON 里。
+
 分析顺序（必须遵守）：
 1) 重点结论
 2) 病案摘要
@@ -28,11 +36,18 @@ export const TCM_ANALYSIS_SYSTEM_PROMPT = `
 8) 随访监测
 9) 证据状态
 
-输出要求：
-- 必须输出合法 JSON。
-- 只输出 JSON，不要 Markdown，不要额外解释。
-- 字段名必须使用简体中文。
-- 每个数组尽量 2 到 4 条，优先短句、可执行建议。
+输出契约（必须遵守）：
+- 只能输出一个 JSON 对象，不要 Markdown 代码块，不要 JSON 前后解释文字。
+- 所有字段名必须使用简体中文，并与下方结构完全一致。
+- 所有列表字段必须是数组类型；没有内容时必须返回 []。
+- 所有文本字段必须是字符串类型；没有内容时必须返回 ""。
+- 严禁把整段说明文字填入应为数组的字段。
+
+严禁输出模式：
+- \`\`\`json 或其他代码围栏
+- “说明如下”“补充解释”等 JSON 外文字
+- “保证”“治愈”“包好”“一定好”等保证疗效措辞
+- 虚构文献、虚构指南、虚构研究编号
 
 必须输出以下 JSON 结构：
 {
@@ -52,6 +67,8 @@ export const TCM_ANALYSIS_SYSTEM_PROMPT = `
   "随访监测": ["string"],
   "证据状态": ["string"]
 }
+
+结构提醒：列表字段一律返回数组；无内容返回 []；文本字段无内容返回 ""。
 `.trim();
 
 export const TCM_ORGANIZE_SYSTEM_PROMPT = `
@@ -63,10 +80,11 @@ export const TCM_ORGANIZE_SYSTEM_PROMPT = `
 - 能明确提取的内容写入对应字段。
 - 给出“整理备注”和“建议补充”，帮助医生完善下一次记录。
 
-语言与格式：
-- 必须使用简体中文。
-- 必须输出合法 JSON。
-- 只输出 JSON，不要 Markdown，不要额外说明。
+输出契约（必须遵守）：
+- 只能输出一个 JSON 对象，不要 Markdown 代码块，不要 JSON 前后解释文字。
+- 字段名必须使用简体中文，并与下方结构一致。
+- 所有列表字段必须是数组类型；没有内容时必须返回 []。
+- 所有文本字段必须是字符串类型；没有内容时必须返回 ""。
 
 病案类型规则：
 - 以方药为主：方药分析
@@ -89,6 +107,8 @@ export const TCM_ORGANIZE_SYSTEM_PROMPT = `
   "整理备注": ["string"],
   "建议补充": ["string"]
 }
+
+结构提醒：列表字段一律返回数组；无内容返回 []；文本字段无内容返回 ""。
 `.trim();
 
 export function buildTcmAnalysisUserPrompt(form: CaseForm) {
@@ -107,7 +127,7 @@ export function buildTcmAnalysisUserPrompt(form: CaseForm) {
 穴位与操作：${form.acupoints || "未提供"}
 医生问题：${form.doctorQuestion}
 
-请优先回答医生问题，先写可取之处，再给改进建议。若缺乏检索证据，请在“证据状态”中明确“基于临床经验与通用知识，尚未接入外部文献检索”。
+请优先回答医生问题，先写可取之处，再给改进建议。若缺乏外部检索证据，请在“证据状态”中明确“基于临床经验与通用知识，尚未接入外部文献检索”。
 `.trim();
 }
 

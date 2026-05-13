@@ -34,21 +34,26 @@ export async function POST(request: NextRequest) {
       repairJson: true,
     });
 
+    const data = result.data;
+    const output = buildAnalysisResult(data, parsed.data.caseType);
+    const latencyMs = Date.now() - startedAt;
+
     after(() =>
       logApiCall({
         route: "api/analyze",
         success: true,
         model: result.model,
-        latencyMs: Date.now() - startedAt,
+        latencyMs,
         usage: result.usage,
         costUsd: result.costUsd,
         promptVersion: TCM_ANALYSIS_PROMPT_VERSION,
-        metadata: { caseType: parsed.data.caseType, repairedJson: result.repairedJson ?? false },
+        metadata: {
+          stage: "completed",
+          caseType: parsed.data.caseType,
+          repairedJson: result.repairedJson ?? false,
+        },
       }),
     );
-
-    const data = result.data;
-    const output = buildAnalysisResult(data, parsed.data.caseType);
 
     return NextResponse.json({
       result: output,
@@ -68,13 +73,14 @@ export async function POST(request: NextRequest) {
           latencyMs: Date.now() - startedAt,
           errorMessage: error.message,
           promptVersion: TCM_ANALYSIS_PROMPT_VERSION,
+          metadata: { stage: "failed", reason: "deepseek_call" },
         }),
       );
       after(() =>
         logServerEvent({
           source: "api/analyze",
           message: error.message,
-          details: { status: error.status },
+          details: { status: error.status, stage: "deepseek_call" },
         }),
       );
       return NextResponse.json({ error: error.message }, { status: error.status });
@@ -87,13 +93,14 @@ export async function POST(request: NextRequest) {
         latencyMs: Date.now() - startedAt,
         errorMessage: error instanceof Error ? error.message : String(error),
         promptVersion: TCM_ANALYSIS_PROMPT_VERSION,
+        metadata: { stage: "failed", reason: "normalize_or_map" },
       }),
     );
     after(() =>
       logServerEvent({
         source: "api/analyze",
         message: "生成分析失败，请稍后重试。",
-        details: { error: error instanceof Error ? error.message : String(error) },
+        details: { error: error instanceof Error ? error.message : String(error), stage: "normalize_or_map" },
       }),
     );
     return NextResponse.json({ error: "生成分析失败，请稍后重试。" }, { status: 500 });
