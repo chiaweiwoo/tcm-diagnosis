@@ -606,8 +606,7 @@ export default function Workbench({
       <section className="hero-panel">
         <div className="hero-head">
           <div className="hero-main">
-            <p className="eyebrow">临床复核伙伴</p>
-            <h1>临床复核工作台</h1>
+            <h1>临床复核伙伴</h1>
             <p className="hero-copy">
               把自由病案整理成清晰脉络，先提示值得补充的关键信息，再陪你复核思路与后续重点。
             </p>
@@ -735,7 +734,7 @@ export default function Workbench({
               onChange={(event) => handleDraftChange(event.target.value)}
               onKeyDown={handleDraftKeyDown}
               disabled={isLocked}
-              rows={8}
+              rows={10}
               placeholder="先按你的习惯写下病情、当前处理与想确认的问题；系统会先帮你整理重点，再给出临床复核建议。"
             />
           </label>
