@@ -48,37 +48,20 @@ export async function POST(request: NextRequest) {
     const output = buildAnalysisResult(data, parsed.data.caseType);
     const latencyMs = Date.now() - startedAt;
 
-    if (result.repairedJson) {
-      after(() =>
-        logApiCall({
-          route: "api/analyze",
-          success: true,
-          model: result.model,
-          latencyMs,
-          usage: result.usage,
-          costUsd: result.costUsd,
-          promptVersion: TCM_ANALYSIS_PROMPT_VERSION,
-          metadata: {
-            stage: "repair",
-            caseType: parsed.data.caseType,
-            repairedJson: true,
-            reviewMode,
-          },
-        }),
-      );
-    }
-
     after(() =>
       logApiCall({
         route: "api/analyze",
+        callName: reviewMode === "normal" ? "analyze-normal" : "analyze-smart",
         success: true,
         model: result.model,
         latencyMs,
         usage: result.usage,
         costUsd: result.costUsd,
+        inputRatePer1m: result.costDetail.rates.inputCacheMissPer1M,
+        outputRatePer1m: result.costDetail.rates.outputPer1M,
+        cacheHitRatePer1m: result.costDetail.rates.inputCacheHitPer1M,
         promptVersion: TCM_ANALYSIS_PROMPT_VERSION,
         metadata: {
-          stage: "completed",
           caseType: parsed.data.caseType,
           repairedJson: result.repairedJson ?? false,
           reviewMode,
