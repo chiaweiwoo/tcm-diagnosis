@@ -1,6 +1,6 @@
-import { loadEnv } from "../env.mjs";
+import { loadLocalEnv } from "../env.mjs";
 
-loadEnv();
+loadLocalEnv(process.cwd());
 
 export async function logApiCallUsage({
   route,
