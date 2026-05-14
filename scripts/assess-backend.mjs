@@ -4,6 +4,7 @@ import { loadAssessmentExamples } from "./lib/assessment/examples.mjs";
 import { createAssessmentOutput } from "./lib/assessment/output.mjs";
 import { startAssessmentServer } from "./lib/assessment/server.mjs";
 import { runBackendAssessment } from "./lib/assessment/backend.mjs";
+import { saveAssessmentRun } from "./lib/assessment/db.mjs";
 
 const rootDir = process.cwd();
 loadLocalEnv(rootDir);
@@ -28,6 +29,12 @@ async function main() {
       runId: output.runId,
     });
 
+    const savedToDb = await saveAssessmentRun({
+      results: report.results,
+      aggregate: report.aggregate,
+      reviewer: report.reviewer,
+    });
+
     console.log(
       JSON.stringify(
         {
@@ -39,6 +46,7 @@ async function main() {
           markdownReport: path.join(output.outputDir, "backend-report.md"),
           jsonReport: path.join(output.outputDir, "backend-report.json"),
           reviewerModel: report.reviewer.model,
+          savedToDb,
         },
         null,
         2,
