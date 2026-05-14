@@ -2,26 +2,26 @@
 
 Doctor-facing TCM clinical workbench for turning rough case notes into structured clinical context, supportive review guidance, and reusable consultation history.
 
-The product is designed for practical outpatient use: help doctors capture what matters, surface what is worth keeping in mind, and review treatment thinking in a calm, repeatable way.
+The product is built for practical outpatient use: help doctors see more completely, remember more accurately, and feel less alone when working through difficult cases.
 
-让医生看得更全，记得更准，面对难题时不再孤单。
+> 让医生看得更全，记得更准，面对难题时不再孤单。
 
 ---
 
-## What It Helps With
+## What It Helps Doctors Do
 
-1. Doctors sign in with Google and enter the protected workbench.
-2. A case draft is pasted or edited in free form.
-3. The system organizes the draft into structured clinical context.
-4. The system highlights completeness guidance before or alongside analysis.
-5. DeepSeek generates a simplified-Chinese clinical reference.
-6. Consultation history can be saved, renamed, reopened, edited, regenerated, and deleted.
+1. Sign in with Google and enter the protected workbench.
+2. Paste or type a free-form clinical draft.
+3. Let the system organize the draft into structured clinical context.
+4. See completeness guidance before analysis goes too far.
+5. Receive simplified-Chinese clinical review output.
+6. Save, reopen, edit, regenerate, rename, and delete consultation records.
 
 ```mermaid
 flowchart LR
-    D["Doctor case draft"] --> O["Structured case context"]
-    O --> R["Clinical reference"]
+    D["Doctor draft"] --> O["Structured case context"]
     O --> G["Completeness guidance"]
+    O --> R["Clinical review"]
     R --> H["Consultation history"]
 ```
 
@@ -32,19 +32,19 @@ flowchart LR
 | Layer | Technology |
 |---|---|
 | Web app | Next.js + TypeScript on Vercel |
-| UI | Custom CSS + lucide-react |
+| UI | Focused CSS + lucide-react |
 | AI | DeepSeek via server routes |
 | Auth | Supabase Google OAuth + doctor allowlist |
 | Data | Supabase JSONB consultation records + API/error logs |
 | Validation | Zod + focused clinical guardrails |
-| Reliability | Two-step pipeline, JSON repair fallback, defensive mapping |
+| Reliability | Two-step pipeline, JSON repair fallback, defensive result shaping |
 | Checks | Vitest + production build |
 
 ```mermaid
 flowchart LR
     LOGIN["Google OAuth"] --> WEB["Next.js workbench"]
-    WEB --> ORG["/api/organize"]
-    ORG --> AN["/api/analyze"]
+    WEB --> ORG["POST /api/organize"]
+    ORG --> AN["POST /api/analyze"]
     WEB --> CASES[("Supabase consultations")]
     WEB --> ALLOW[("Supabase doctor_allowlist")]
     ORG --> LOGS[("Supabase logs")]
@@ -58,13 +58,13 @@ flowchart LR
 | Route | Purpose |
 |---|---|
 | `POST /api/organize` | Organize a doctor draft into structured case data and completeness guidance. |
-| `POST /api/analyze` | Generate structured clinical reference output. |
+| `POST /api/analyze` | Generate structured clinical review output. |
 | `GET /api/consultations` | List consultation history for the logged-in doctor. |
 | `POST /api/consultations` | Create a consultation record. |
 | `GET /api/consultations/[id]` | Read one owned consultation record. |
 | `PATCH /api/consultations/[id]` | Rename, edit, store organized/analyzed JSON, and update status. |
 | `DELETE /api/consultations/[id]` | Delete one owned consultation record. |
-| `GET /auth/callback` | Complete Google OAuth and doctor allowlist check. |
+| `GET /auth/callback` | Complete Google OAuth and allowlist check. |
 | `GET /auth/signout` | Sign out and return to login. |
 
 ---
@@ -72,30 +72,81 @@ flowchart LR
 ## Current Workflow Notes
 
 - The product uses a two-step AI pipeline: `organize -> analyze`.
-- Organize-stage output is surfaced immediately in the workbench and can stop before analysis when hard guardrails fail.
-- `POST /api/organize` rejects drafts above 8000 characters before any AI call is made.
-- `舌脉与四诊要点` is treated as first-class clinical context in organize and review flows.
-- A draft can still proceed without an explicit `医生问题` when the current treatment plan is already clear enough to imply a review intent.
-- While the second-stage analysis is running, the lower workspace shows a loading shell so progress remains visible beyond the status panel.
-- The dashboard includes an in-app help surface so doctors can review assumptions, minimum input expectations, and workflow behavior without leaving the page.
-- A build label is shown in the workbench so deployment status can be checked visually after release.
-- Doctors can switch between `智能` and `常规` review modes in the workbench; the preference is stored in local browser storage and defaults to `智能`.
+- Organize-stage output appears immediately and can stop before analysis when hard guardrails fail.
+- `POST /api/organize` rejects drafts above `8000` characters before any AI call is made.
+- `舌脉与四诊要点` is treated as first-class clinical context in organize, validation, and prompts.
+- A draft can still proceed without an explicit `医生问题` when the current treatment plan clearly implies a review intent.
+- While the second-stage analysis is running, the lower workspace shows a visible loading shell.
+- The right-side panel is workflow-focused; after completion, detailed clinical content stays in the main board.
+- The workbench includes an in-app help surface for assumptions, minimum input expectations, and workflow behavior.
+- A visible build label helps confirm whether a deployment has landed.
+- Doctors can switch between `智能` and `常规`; the preference is stored in local browser storage and defaults to `智能`.
 - `智能` favors fuller review depth, while `常规` favors faster stable output.
-- When a doctor asks for literature or clinical research support, the current system degrades honestly to经验性复核 and states that external retrieval is not yet connected.
-- The analysis dashboard keeps its core section structure stable even when a model returns fewer suggestions, so clinicians do not see key sections randomly disappear.
+- When a doctor asks for literature support, the system degrades honestly to experiential review and states that external retrieval is not yet connected.
 - Token usage, estimated cost, model metadata, and latency stay internal and are stored for traceability rather than shown in the doctor-facing UI.
-- Cost logging follows the actual model tier used for the request so smart/normal comparisons stay trustworthy.
-- Doctor allowlist is now read from Supabase when the `doctor_allowlist` table is available, with environment-variable fallback during transition.
-- Local development can optionally use a strict dev-only auth bypass with `DEV_AUTH_BYPASS=true` and `DEV_AUTH_EMAIL=...`; the app now hard-fails if that bypass is enabled outside `NODE_ENV=development`.
-- Internal agent discipline follows a release-path audit: fresh run, saved-history reload, stage-one block, partial organize, final analysis, docs sync, and build marker verification.
-- Local real-doctor draft examples are kept in markdown as a single source of truth for manual copy/paste and future local assessment runs.
+- Cost logging is model-aware, and pricing can be updated through environment overrides when DeepSeek changes its rates.
+- Doctor allowlist is read from Supabase when the `doctor_allowlist` table is available, with environment fallback during transition.
+- Local development can optionally use a strict dev-only auth bypass with `DEV_AUTH_BYPASS=true` and `DEV_AUTH_EMAIL=...`. The app hard-fails if that bypass is enabled outside `NODE_ENV=development`.
+- Local real-doctor draft examples are stored in Markdown as a single source of truth for manual testing and backend assessment.
 
 ---
 
-## Local Development Notes
+## Local Development
 
-- Keep Google OAuth for normal usage.
-- For local UI iteration only, you may enable:
-  - `DEV_AUTH_BYPASS=true`
-  - `DEV_AUTH_EMAIL=<allowed doctor email>`
-- The bypass still checks the allowlist and never applies in production.
+Normal development still uses Google OAuth.
+
+For local UI iteration only, you may enable:
+
+```env
+DEV_AUTH_BYPASS=true
+DEV_AUTH_EMAIL=chiaweiwoo123@gmail.com
+```
+
+The bypass still respects the doctor allowlist and is never honored outside local development.
+
+### Optional pricing overrides
+
+When DeepSeek changes pricing, update logging without changing code by setting any of these in `.env.local`:
+
+```env
+DEEPSEEK_FLASH_INPUT_CACHE_HIT_PER_1M=
+DEEPSEEK_FLASH_INPUT_CACHE_MISS_PER_1M=
+DEEPSEEK_FLASH_OUTPUT_PER_1M=
+DEEPSEEK_PRO_INPUT_CACHE_HIT_PER_1M=
+DEEPSEEK_PRO_INPUT_CACHE_MISS_PER_1M=
+DEEPSEEK_PRO_OUTPUT_PER_1M=
+```
+
+---
+
+## Assessment CLI
+
+Backend assessment is now available locally:
+
+```bash
+npm.cmd run assess:backend
+```
+
+What it does:
+
+1. Loads the local real-doctor examples from `local-data/real-doctor-examples.md`
+2. Reuses an existing local dev server when possible, or starts one with dev bypass
+3. Runs the backend pipeline on every example for both `智能` and `常规`
+4. Calls DeepSeek to review the backend results from multiple professional perspectives
+5. Writes a Markdown and JSON report into `output/assessment/<run-id>/`
+
+Current scope:
+
+- Backend assessment: implemented
+- Frontend automation assessment: intentionally deferred and kept in backlog until explicitly resumed
+
+---
+
+## Checks
+
+Run these before push when relevant:
+
+```bash
+npm.cmd run test
+npm.cmd run build
+```

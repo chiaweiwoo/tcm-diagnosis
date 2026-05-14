@@ -22,13 +22,15 @@ The tool helps registered TCM doctors:
 - Favor practical, compact workflows over broad setup complexity.
 - Think from the doctor's reading flow first; usability matters as much as model quality.
 - Default to a continuous workbench: draft on top, organized or analyzed output below.
+- Use smaller commits when making larger changes so debugging and review stay tractable.
 
 ## Branch And Delivery Rules
 
 - Use a single-branch workflow on `main` unless the user explicitly asks otherwise.
-- Do not describe a feature as done unless it is committed, pushed, and reflected in the running UI.
+- Do not describe a feature as done unless it is committed, pushed, and reflected in the running UI or CLI behavior.
 - Update `AGENTS.md` and `README.md` when product behavior meaningfully changes.
-- After significant UI changes, run `npm.cmd run build` and verify the local dashboard in-browser when feasible.
+- After significant UI or route changes, run `npm.cmd run build`.
+- Run `npm.cmd run test` when validation, parsing, or state flow changes.
 
 ## Stack
 
@@ -107,7 +109,7 @@ Recommended-but-not-hard-block fields:
   - show a visible `智能 / 常规` switch in the workbench
   - store the preference in local browser storage
   - default to `智能`
-  - `智能` should use the deeper analysis model path, while `常规` uses the faster default analyze path
+  - `智能` uses the deeper analysis model path, while `常规` uses the faster default analyze path
 - Analyze output should follow this reading order:
   1. `重点结论`
   2. `病案摘要`
@@ -121,7 +123,7 @@ Recommended-but-not-hard-block fields:
 - Prompt contract is strict JSON.
 - `舌脉与四诊要点` is a first-class field in organize, validation, and prompt construction.
 - Organize prompt should preserve an empty `医生问题` when the draft did not explicitly ask one; do not auto-fill a fake generic question.
-- When doctors ask for research or literature support and retrieval is unavailable, respond as经验性复核 and say external retrieval is not connected.
+- When doctors ask for research or literature support and retrieval is unavailable, respond as experiential review and state that external retrieval is not yet connected.
 - If DeepSeek returns malformed JSON, use syntax-only repair before failing.
 - Prefer defensive normalization over brittle shape assumptions.
 - Core analysis sections should remain structurally stable; avoid a doctor seeing major sections appear in one case and disappear in another just because the model returned fewer bullets.
@@ -132,7 +134,8 @@ Recommended-but-not-hard-block fields:
 - Organize call should use the fast model path.
 - Analyze call should default to `DEEPSEEK_MODEL_ANALYZE`, then fall back to `DEEPSEEK_MODEL_FAST`, not the deep model by default.
 - Deep model can still be used for repair fallback when fast repair fails.
-- Cost logging must reflect the actual model tier used for the call; do not apply pro pricing to flash-mode runs.
+- Cost logging must reflect the actual model tier used for the call.
+- DeepSeek pricing changes over time, so pricing should be overridable through environment configuration rather than treated as permanently fixed.
 - Keep analyze outputs concise; long completions are a common latency problem.
 - Show elapsed time during runs and on loaded history.
 - Token usage and estimated cost must stay internal only.
@@ -172,6 +175,19 @@ Logging should not block doctor-facing responses.
 - Supporting local note file: `local-data/real-doctor-examples-notes.md`
 - If future scripts need these examples, parse the markdown source directly instead of maintaining a second serialized copy that can drift.
 
+## Assessment Workflow
+
+- Assessment is CLI-first, not a doctor-facing feature.
+- Current active assessment path is backend-only:
+  - `npm.cmd run assess:backend`
+- Backend assessment should:
+  - load local real-doctor examples
+  - reuse an existing local dev server when possible, or start one with dev bypass
+  - run organize/analyze for both `智能` and `常规`
+  - generate Markdown + JSON reports under `output/assessment/<run-id>/`
+  - use DeepSeek to produce backend review commentary and prompt-improvement suggestions
+- Frontend automation assessment is explicitly deferred to backlog until the user says to resume it.
+
 ## Design Direction
 
 - Warm clinic red and off-white palette.
@@ -182,6 +198,8 @@ Logging should not block doctor-facing responses.
 - Keep a visible help surface in the dashboard so doctors can understand workflow assumptions without reading external docs.
 - Show a visible build label in the UI so deployed-version checks are easy.
 - When local dev bypass is active, show a clear in-product indicator such as `本地开发模式`.
+- The mission line is part of the product identity:
+  - `让医生看得更全，记得更准，面对难题时不再孤单。`
 
 ## Audit Checklist Before Saying "Done"
 
@@ -198,17 +216,19 @@ Always check all applicable paths after meaningful changes:
 Do not say "done" until the changed path is verified, not merely coded.
 Use [docs/agent-audit-checklist.md](docs/agent-audit-checklist.md) as the concrete release-path checklist.
 Project-local reusable workflow notes also live in [codex-skills/tcm-workbench-audit/SKILL.md](codex-skills/tcm-workbench-audit/SKILL.md).
+Batch C recovery notes live in [docs/batch-c-handoff.md](docs/batch-c-handoff.md).
 
 ## Documentation Direction
 
 - `README.md` is product-facing.
 - Explain what the tool helps doctors do.
 - Keep setup and operational notes concise.
-- Mention the two-step pipeline, organize-stage stop behavior, internal-only token/cost tracking, allowlist source, and review-mode selector.
+- Mention the two-step pipeline, organize-stage stop behavior, internal-only token/cost tracking, allowlist source, review-mode selector, and backend assessment CLI.
 - Document the local dev auth bypass in `.env.local.example` and keep the explanation brief and explicit.
 
 ## Deferred Scope
 
-1. Doctor feedback capture and accepted/rejected suggestion tracking
-2. External citation retrieval layer
-3. Regression comparison dashboard across prompt/model versions
+1. Frontend automation assessment CLI
+2. Doctor feedback capture and accepted/rejected suggestion tracking
+3. External citation retrieval layer
+4. Regression comparison dashboard across prompt/model versions

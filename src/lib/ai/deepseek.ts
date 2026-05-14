@@ -51,6 +51,29 @@ const MODEL_RATES = {
 } as const;
 const DEFAULT_TIMEOUT_MS = 45_000;
 
+function getRateOverride(name: string, fallback: number) {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+
+  const value = Number(raw);
+  return Number.isFinite(value) && value >= 0 ? value : fallback;
+}
+
+function getModelRates() {
+  return {
+    flash: {
+      inputCacheHitPer1M: getRateOverride("DEEPSEEK_FLASH_INPUT_CACHE_HIT_PER_1M", MODEL_RATES.flash.inputCacheHitPer1M),
+      inputCacheMissPer1M: getRateOverride("DEEPSEEK_FLASH_INPUT_CACHE_MISS_PER_1M", MODEL_RATES.flash.inputCacheMissPer1M),
+      outputPer1M: getRateOverride("DEEPSEEK_FLASH_OUTPUT_PER_1M", MODEL_RATES.flash.outputPer1M),
+    },
+    pro: {
+      inputCacheHitPer1M: getRateOverride("DEEPSEEK_PRO_INPUT_CACHE_HIT_PER_1M", MODEL_RATES.pro.inputCacheHitPer1M),
+      inputCacheMissPer1M: getRateOverride("DEEPSEEK_PRO_INPUT_CACHE_MISS_PER_1M", MODEL_RATES.pro.inputCacheMissPer1M),
+      outputPer1M: getRateOverride("DEEPSEEK_PRO_OUTPUT_PER_1M", MODEL_RATES.pro.outputPer1M),
+    },
+  };
+}
+
 export class DeepSeekError extends Error {
   status: number;
   details?: DeepSeekErrorDetails;
@@ -91,7 +114,7 @@ function getPricingTier(model?: string) {
 }
 
 export function estimateDeepSeekCost(usage?: DeepSeekUsage, model?: string) {
-  const tier = MODEL_RATES[getPricingTier(model)];
+  const tier = getModelRates()[getPricingTier(model)];
   const promptTokens = usage?.prompt_tokens ?? 0;
   const cacheHitTokens = usage?.prompt_cache_hit_tokens ?? 0;
   const cacheMissTokens = usage?.prompt_cache_miss_tokens ?? Math.max(0, promptTokens - cacheHitTokens);
