@@ -55,7 +55,7 @@ const DEFAULT_TIMEOUT_MS = 45_000;
 const RATE_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 // Fallback rates used when no env overrides and remote fetch unavailable.
-// Update DEEPSEEK_RATES_URL in env to pick up price changes without a redeploy.
+// Set AI_RATES_URL in env to pick up price changes without a redeploy.
 const HARDCODED_RATES = {
   flash: {
     inputCacheHitPer1M: 0.0028,

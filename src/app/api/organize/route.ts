@@ -66,10 +66,10 @@ export async function POST(request: NextRequest) {
       }),
     );
 
-      return NextResponse.json({
-        form: mapped.form,
-        notes: mapped.notes,
-        suggestions: mapped.suggestions,
+    return NextResponse.json({
+      form: mapped.form,
+      notes: mapped.notes,
+      suggestions: mapped.suggestions,
       usage: result.usage,
       costUsd: result.costUsd,
       model: result.model,
