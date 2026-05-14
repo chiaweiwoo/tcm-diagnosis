@@ -176,6 +176,31 @@ Logging should not block doctor-facing responses.
 - Supporting local note file: `local-data/real-doctor-examples-notes.md`
 - If future scripts need these examples, parse the markdown source directly instead of maintaining a second serialized copy that can drift.
 
+## Database Schema
+
+Migration files live in `supabase/migrations/` (numbered, idempotent SQL). Apply them manually in the Supabase SQL editor. See `supabase/README.md` for the full convention.
+
+Tables:
+- `consultations` — doctor consultation history, JSONB payload, RLS service_role only
+- `api_call_logs` — per-call logging (model, tokens, cost, latency), service_role only
+- `error_logs` — pipeline errors, service_role only
+- `doctor_allowlist` — `email`, `is_active`, `is_admin`. Source of truth for access control.
+  - `is_active = false` blocks login even if in the table
+  - `is_admin = true` grants access to `/admin/*` routes
+  - Falls back to `ALLOWED_DOCTOR_EMAILS` env var only when Supabase is unreachable
+- `assessment_runs` — assessment CLI execution records; stored by the CLI after each run
+
+All tables use service_role key only (no anon/user RLS policies). Never expose service_role key to the browser.
+
+## Admin Role
+
+- There are two roles: user and admin. Admin is a boolean `is_admin` column on `doctor_allowlist`.
+- Admin check: `isAdminDoctorEmail()` in `src/lib/auth.ts` — returns true only when both `is_active` and `is_admin` are true.
+- Admin guard: `src/app/admin/layout.tsx` — server-side check; redirects to `/?reason=not_admin` for non-admins.
+- Admin pages live under `/admin/*`. Currently: `/admin/assessments` (list) and `/admin/assessments/[runId]` (detail).
+- Admin pages use service_role key through `src/lib/assessmentRuns.ts` — never anon key.
+- Only `chiaweiwoo123@gmail.com` is seeded as admin.
+
 ## Assessment Workflow
 
 - Assessment is CLI-first, not a doctor-facing feature.
@@ -187,8 +212,10 @@ Logging should not block doctor-facing responses.
   - run organize/analyze for both `智能` and `常规`
   - generate Markdown + JSON reports under `output/assessment/<run-id>/`
   - use DeepSeek to produce backend review commentary and prompt-improvement suggestions
+  - save the run record to the `assessment_runs` Supabase table via `scripts/lib/assessment/db.mjs`
   - report includes: organize success rate, per-mode success/blocked/failed/repair counts, blocked reason groups, per-example `repairedJson` flag
 - `智能` mode is preserved in assessment to track reliability vs `常规`; assessment is the primary tool for observing mode tradeoffs
+- Assessment runs are viewable from the admin UI at `/admin/assessments`
 - Frontend automation assessment is explicitly deferred to backlog until the user says to resume it.
 
 ## Design Direction

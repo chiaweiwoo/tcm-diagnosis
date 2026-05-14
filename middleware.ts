@@ -31,6 +31,9 @@ export async function middleware(request: NextRequest) {
 
   await supabase.auth.getUser();
 
+  // /admin/* is further guarded by src/app/admin/layout.tsx (server-side isAdminDoctorEmail check)
+  // Dev bypass also passes through layout; no additional middleware logic needed here.
+
   return response;
 }
 
