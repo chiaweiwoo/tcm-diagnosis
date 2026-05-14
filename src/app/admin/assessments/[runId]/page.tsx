@@ -79,7 +79,14 @@ export default async function AssessmentRunPage({
             {run.example_count ?? 0} 个样本 · 触发方式：{run.triggered_by}
           </p>
         </div>
-        <Link href="/admin/assessments" className="secondary-button compact-button">← 返回列表</Link>
+        <div style={{ display: "flex", gap: 8 }}>
+          {run.report_url && (
+            <a href={run.report_url} target="_blank" rel="noreferrer" className="secondary-button compact-button">
+              查看 HTML 报告 ↗
+            </a>
+          )}
+          <Link href="/admin/assessments" className="secondary-button compact-button">← 返回列表</Link>
+        </div>
       </div>
 
       <section className="admin-section">

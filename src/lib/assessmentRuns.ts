@@ -21,6 +21,7 @@ export type AssessmentRunDetail = AssessmentRunSummary & {
   blocked_reason_groups: Record<string, number> | null;
   reviewer_text: string | null;
   reviewer_model: string | null;
+  report_url: string | null;
   full_report: unknown | null;
 };
 
