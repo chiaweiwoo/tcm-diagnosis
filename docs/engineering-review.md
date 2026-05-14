@@ -347,3 +347,47 @@ Codex reads the entire project context on each task. The fastest way to reduce c
 | Auth | Good | Add production guard for `DEV_AUTH_BYPASS` |
 | Type safety | Mostly strong | Document `AnalysisJson: unknown` as intentional |
 | Test coverage | Needs work | Add unit tests for pure functions |
+
+---
+
+## Tips for Codex — How to Work Well in This Codebase
+
+These are not general coding rules. They are specific to how this project is structured and where AI-assisted edits commonly go wrong.
+
+### Before you start any task
+
+- **Read AGENTS.md first, every time.** It encodes invariants that are not obvious from the code. Violating them (wrong model path, wrong pipeline order, exposing cost data to frontend) will break the product in ways that are hard to debug.
+- **Run `npm run build` before and after non-trivial changes.** TypeScript errors only surface at build time in Next.js. Do not declare a task done without a clean build.
+- **Check the audit checklist in `docs/agent-audit-checklist.md`** before saying done on any UI or pipeline change. The checklist covers paths (fresh run, load history, blocked stage, partial organize) that are easy to accidentally break.
+
+### How this codebase is wired — things that are not obvious
+
+- **Two AI calls per analysis, not one.** Organize runs first (`/api/organize`), then analyze (`/api/analyze`). They use different models and different prompts. Do not merge them or reorder them.
+- **`after()` is intentional everywhere.** All `logApiCall` and `logServerEvent` calls are wrapped in `after()` so logging never delays the doctor-facing response. Do not move logging calls outside of `after()`.
+- **`buildAnalysisResult` is the canonical path for fresh AI output. `ensureAnalysisResult` is only for loading saved history.** Do not use `ensureAnalysisResult` for new analysis output — it exists only to normalize old stored records that may have a different shape.
+- **DeepSeek models are controlled by env vars, not by editing `deepseek.ts`.** The defaults in `getDeepSeekFastModel()` and `getDeepSeekSmartModel()` are fallbacks only. If the model needs to change, set `DEEPSEEK_MODEL_FAST` or `DEEPSEEK_MODEL_DEEP` in the environment — do not hardcode a model string.
+- **`response_format: { type: "json_object" }` is already set on all DeepSeek calls.** You do not need to add JSON mode instructions to prompts. The prompt only needs to specify the schema.
+
+### Where to be careful
+
+- **Do not raise `maxTokens` on organize or analyze calls without testing with a complex case.** Higher limits increase latency and cost. The current limits are intentionally tight; the repair chain handles truncation.
+- **Do not change the analyze output section order** (`重点结论` → `病案摘要` → ... → `证据状态`). The UI renders sections in a fixed order and AGENTS.md encodes it as an invariant.
+- **Do not add new fields to `CaseForm` without updating `caseSchema` in `caseValidation.ts` and the prompt builder in `prompts.ts`.** The form, schema, and prompt are coupled — updating only one will cause silent data loss or validation errors.
+- **Do not touch auth middleware without testing all three paths:** logged-out, logged-in + allowlisted, logged-in + not allowlisted. It is easy to accidentally allow one of these through.
+
+### How to write a good task prompt for this project
+
+Be specific about the file and the exact behavior. Vague prompts cause Codex to explore many files and produce inconsistent output.
+
+| Instead of | Write |
+|---|---|
+| "improve validation" | "Add a max-length check of 8000 characters to the `draft` field in `src/app/api/organize/route.ts`, and add `maxLength={8000}` to the draft textarea in the workbench UI" |
+| "fix the cost logging" | "In `src/lib/ai/deepseek.ts`, update `estimateDeepSeekCost` to accept a model name parameter and return 0 for unknown models rather than using PRO pricing as a universal fallback" |
+| "add tests" | "Create `src/lib/caseValidation.test.ts` with unit tests for `validateCaseForm`, `getBlockedReasons`, and `hasImpliedReviewIntent` using vitest — no mocking needed, these are pure functions" |
+
+### What to always do after a change
+
+1. `npm run build` — catches TypeScript errors
+2. Manually test the affected path from the audit checklist
+3. Update `AGENTS.md` if any pipeline rule, invariant, or model behavior changed
+4. Update `README.md` if any doctor-facing behavior changed
