@@ -122,24 +122,41 @@ DEEPSEEK_PRO_OUTPUT_PER_1M=
 
 ## Assessment CLI
 
-Backend assessment is now available locally:
+Two independent evaluation tracks, both CLI-only and local-only.
+
+### Backend assessment
 
 ```bash
 npm.cmd run assess:backend
 ```
 
-What it does:
-
-1. Loads the local real-doctor examples from `local-data/real-doctor-examples.md`
-2. Reuses an existing local dev server when possible, or starts one with dev bypass
+1. Loads real-doctor examples from `local-data/real-doctor-examples.md`
+2. Reuses an existing local dev server or starts one with dev bypass
 3. Runs the backend pipeline on every example for both `智能` and `常规`
-4. Calls DeepSeek to review the backend results from multiple professional perspectives
-5. Writes a Markdown and JSON report into `output/assessment/<run-id>/`
+4. Calls DeepSeek to review results from multiple professional perspectives
+5. Writes Markdown + JSON reports to `output/assessment/<run-id>/`
+6. Saves run record to Supabase `assessment_runs` table (viewable at `/admin/assessments`)
 
-Current scope:
+### Frontend assessment
 
-- Backend assessment: implemented
-- Frontend automation assessment: intentionally deferred and kept in backlog until explicitly resumed
+```bash
+npm.cmd run assess:frontend
+```
+
+Requires `ANTHROPIC_API_KEY` in `.env.local` for the visual reviewer.
+
+1. Picks 3 random examples from `local-data/real-doctor-examples.md`
+2. Opens a real browser (Playwright/Chromium) against the local dev server
+3. Runs Scenario A (3× success flow), Scenario B (intentional block), Scenario C (history reload)
+4. Captures screenshots at each stage as human-audit artifacts
+5. Runs three reviewers in parallel:
+   - DeepSeek: UX/product flow analysis (text-based)
+   - DeepSeek: TCM practitioner clinical output review (text-based, from extracted section text)
+   - Claude: visual review (reads screenshots directly)
+6. Generates a self-contained `frontend-report.html` with embedded screenshots, reviewer comments, and scenario detail
+7. Also writes Markdown + JSON reports and saves to Supabase
+
+Screenshots stay local. The HTML report is the primary artifact for human review.
 
 ---
 

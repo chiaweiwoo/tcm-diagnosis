@@ -203,20 +203,36 @@ All tables use service_role key only (no anon/user RLS policies). Never expose s
 
 ## Assessment Workflow
 
-- Assessment is CLI-first, not a doctor-facing feature.
-- Current active assessment path is backend-only:
-  - `npm.cmd run assess:backend`
-- Backend assessment should:
-  - load local real-doctor examples
-  - reuse an existing local dev server when possible, or start one with dev bypass
-  - run organize/analyze for both `智能` and `常规`
-  - generate Markdown + JSON reports under `output/assessment/<run-id>/`
-  - use DeepSeek to produce backend review commentary and prompt-improvement suggestions
-  - save the run record to the `assessment_runs` Supabase table via `scripts/lib/assessment/db.mjs`
-  - report includes: organize success rate, per-mode success/blocked/failed/repair counts, blocked reason groups, per-example `repairedJson` flag
-- `智能` mode is preserved in assessment to track reliability vs `常规`; assessment is the primary tool for observing mode tradeoffs
-- Assessment runs are viewable from the admin UI at `/admin/assessments`
-- Frontend automation assessment is explicitly deferred to backlog until the user says to resume it.
+- Assessment is CLI-first and local-only. Not a doctor-facing feature.
+- Two independent evaluation tracks:
+
+### Backend assessment (`assess:backend`)
+  - Loads real-doctor examples from `local-data/real-doctor-examples.md`
+  - Reuses an existing local dev server when possible, or starts one with dev bypass
+  - Runs organize/analyze for both `智能` and `常规` on every example
+  - Generates Markdown + JSON reports under `output/assessment/<run-id>/`
+  - Uses DeepSeek to produce reviewer commentary and prompt-improvement suggestions
+  - Saves run record to `assessment_runs` Supabase table via `scripts/lib/assessment/db.mjs`
+  - Report includes: organize success rate, per-mode success/blocked/failed/repair counts, blocked reason groups, per-example `repairedJson` flag
+  - `智能` mode is preserved to track reliability vs `常规`
+
+### Frontend assessment (`assess:frontend`)
+  - Picks 3 random eligible examples (draft length > 100 chars) from real-doctor examples
+  - Opens real Chromium browser (Playwright) against the local dev server with dev bypass
+  - Runs Scenario A (success flow, ×3 examples), Scenario B (intentional block), Scenario C (history reload)
+  - Captures structured DOM observations + screenshots at each stage
+  - Three reviewers run in parallel after all scenarios complete:
+    1. DeepSeek: UX/product flow reviewer (text-based observations)
+    2. DeepSeek: TCM practitioner reviewer (extracted section text from successful runs)
+    3. Claude (`ANTHROPIC_API_KEY`): visual reviewer (up to 6 screenshots as base64)
+  - Generates `frontend-report.html` (self-contained, screenshots embedded as base64, lightbox on click)
+  - Also writes Markdown + JSON reports and saves to Supabase `assessment_runs`
+  - Cleans up assessment-created consultation records by default
+  - Screenshots stay local; HTML report is the primary human-audit artifact
+  - `ANTHROPIC_API_KEY` + `ANTHROPIC_MODEL` (default: `claude-sonnet-4-6`) are required for visual reviewer; set in `.env.local` only, never Vercel
+
+- Both tracks are viewable from the admin UI at `/admin/assessments`
+- `triggered_by` field distinguishes: `"cli"` (backend) vs `"assess:frontend"` (frontend)
 
 ## Design Direction
 
