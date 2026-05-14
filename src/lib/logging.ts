@@ -7,6 +7,8 @@ type ErrorLogInput = {
 
 type ApiCallLogInput = {
   route: string;
+  callName?: string;
+  provider?: "deepseek" | "anthropic";
   success: boolean;
   model?: string;
   latencyMs?: number;
@@ -14,8 +16,13 @@ type ApiCallLogInput = {
     prompt_tokens?: number;
     completion_tokens?: number;
     total_tokens?: number;
+    prompt_cache_hit_tokens?: number;
+    prompt_cache_miss_tokens?: number;
   };
   costUsd?: number;
+  inputRatePer1m?: number;
+  outputRatePer1m?: number;
+  cacheHitRatePer1m?: number;
   promptVersion?: string;
   errorMessage?: string;
   metadata?: Record<string, unknown>;
@@ -71,14 +78,20 @@ export async function logApiCall(input: ApiCallLogInput) {
       },
       body: JSON.stringify({
         route: input.route,
-        provider: "deepseek",
+        call_name: input.callName ?? null,
+        provider: input.provider ?? "deepseek",
         model: input.model ?? null,
         success: input.success,
         latency_ms: input.latencyMs ?? null,
         prompt_tokens: input.usage?.prompt_tokens ?? null,
         completion_tokens: input.usage?.completion_tokens ?? null,
         total_tokens: input.usage?.total_tokens ?? null,
+        input_cache_hit_tokens: input.usage?.prompt_cache_hit_tokens ?? null,
+        input_cache_miss_tokens: input.usage?.prompt_cache_miss_tokens ?? null,
         cost_usd: input.costUsd ?? null,
+        input_rate_per_1m: input.inputRatePer1m ?? null,
+        output_rate_per_1m: input.outputRatePer1m ?? null,
+        cache_hit_rate_per_1m: input.cacheHitRatePer1m ?? null,
         prompt_version: input.promptVersion ?? null,
         error_message: input.errorMessage ?? null,
         metadata: input.metadata ?? null,
