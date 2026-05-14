@@ -49,34 +49,25 @@ export type AnalysisResult = {
 
 type GroupSpec = {
   title: string;
-  sections: Array<{ title: string; fallback: string }>;
+  sections: Array<{ title: string }>;
 };
 
 const GROUP_SPECS: GroupSpec[] = [
   {
     title: "资料完整性",
-    sections: [
-      { title: "已提供", fallback: "当前未额外归纳已提供信息，可继续结合原始病案核对。" },
-      { title: "建议补充", fallback: "本次未形成新的补充提示，可继续结合面诊补全。" },
-    ],
+    sections: [{ title: "已提供" }, { title: "建议补充" }],
   },
   {
     title: "当前思路",
-    sections: [
-      { title: "可取之处", fallback: "本次未额外提炼明确保留点，可继续结合面诊判断。" },
-      { title: "需要复核", fallback: "当前未识别出必须立即调整的复核点，仍建议结合面诊核对。" },
-    ],
+    sections: [{ title: "可取之处" }, { title: "需要复核" }],
   },
   {
     title: "建议优化",
-    sections: [
-      { title: "主要建议", fallback: "本次未形成新的优化建议，可先结合当前方案继续观察。" },
-      { title: "可选思路", fallback: "本次未提出额外备选思路。" },
-    ],
+    sections: [{ title: "主要建议" }, { title: "可选思路" }],
   },
   {
     title: "随访监测",
-    sections: [{ title: "监测建议", fallback: "可按常规复诊节奏结合症状变化继续观察。" }],
+    sections: [{ title: "监测建议" }],
   },
 ];
 
@@ -100,10 +91,10 @@ function withFallback(items: unknown, fallback: string): string[] {
   return normalized.length ? normalized : [fallback];
 }
 
-function createSection(title: string, items: unknown, fallback: string): ResultSection {
+function createSection(title: string, items: unknown): ResultSection {
   return {
     title,
-    items: withFallback(items, fallback),
+    items: normalizeStringList(items),
   };
 }
 
@@ -146,7 +137,7 @@ function normalizeStoredGroups(groups: unknown): ResultGroup[] {
       title: spec.title,
       sections: spec.sections.map((sectionSpec) => {
         const section = sectionMap.get(sectionSpec.title);
-        return createSection(sectionSpec.title, section?.items, sectionSpec.fallback);
+        return createSection(sectionSpec.title, section?.items);
       }),
     };
   });
@@ -161,27 +152,27 @@ export function buildAnalysisResult(data: AnalysisJson, caseType: CaseForm["case
     {
       title: "资料完整性",
       sections: [
-        createSection("已提供", data.资料完整性?.已提供, "当前未额外归纳已提供信息，可继续结合原始病案核对。"),
-        createSection("建议补充", data.资料完整性?.建议补充, "本次未形成新的补充提示，可继续结合面诊补全。"),
+        createSection("已提供", data.资料完整性?.已提供),
+        createSection("建议补充", data.资料完整性?.建议补充),
       ],
     },
     {
       title: "当前思路",
       sections: [
-        createSection("可取之处", data.当前思路?.可取之处, "本次未额外提炼明确保留点，可继续结合面诊判断。"),
-        createSection("需要复核", data.当前思路?.需要复核, "当前未识别出必须立即调整的复核点，仍建议结合面诊核对。"),
+        createSection("可取之处", data.当前思路?.可取之处),
+        createSection("需要复核", data.当前思路?.需要复核),
       ],
     },
     {
       title: "建议优化",
       sections: [
-        createSection("主要建议", data.建议优化, "本次未形成新的优化建议，可先结合当前方案继续观察。"),
-        createSection("可选思路", data.可选思路, "本次未提出额外备选思路。"),
+        createSection("主要建议", data.建议优化),
+        createSection("可选思路", data.可选思路),
       ],
     },
     {
       title: "随访监测",
-      sections: [createSection("监测建议", data.随访监测, "可按常规复诊节奏结合症状变化继续观察。")],
+      sections: [createSection("监测建议", data.随访监测)],
     },
   ];
 

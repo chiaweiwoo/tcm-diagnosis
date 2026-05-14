@@ -59,7 +59,7 @@ export function mapOrganizedCaseToForm(data: OrganizedCaseRaw, draft: string) {
     herbs: normalizeText(data.方药内容),
     acupoints: normalizeText(data.穴位与操作),
     doctorQuestion: normalizeText(data.医生问题),
-    modelMode: "深度模式",
+    modelMode: "快速模式",
   };
 
   return {

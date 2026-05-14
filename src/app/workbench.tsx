@@ -89,7 +89,7 @@ const initialForm: CaseForm = {
   herbs: "",
   acupoints: "",
   doctorQuestion: "",
-  modelMode: "深度模式",
+  modelMode: "快速模式",
 };
 
 async function readApiError(response: Response) {
@@ -122,10 +122,12 @@ export default function Workbench({
   userEmail,
   buildLabel,
   isDevBypass,
+  activeModel,
 }: {
   userEmail: string;
   buildLabel: string;
   isDevBypass: boolean;
+  activeModel: string;
 }) {
   const [consultationName, setConsultationName] = useState("");
   const [activeConsultationId, setActiveConsultationId] = useState("");
@@ -150,7 +152,7 @@ export default function Workbench({
   const [toast, setToast] = useState<ToastState | null>(null);
   const [organizeReady, setOrganizeReady] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
-  const [reviewMode, setReviewMode] = useState<ReviewMode>("smart");
+  const [reviewMode] = useState<ReviewMode>("normal");
 
   const isBusy = isOrganizing || isAnalyzing || isSaving;
   const isLocked = isBusy || (Boolean(result) && !isEditing);
@@ -162,17 +164,6 @@ export default function Workbench({
 
   useEffect(() => {
     void loadConsultations();
-  }, []);
-
-  useEffect(() => {
-    const savedMode = window.localStorage.getItem("tcm-review-mode");
-    if (savedMode === "smart" || savedMode === "normal") {
-      setReviewMode(savedMode);
-      setForm((current) => ({
-        ...current,
-        modelMode: savedMode === "smart" ? "深度模式" : "快速模式",
-      }));
-    }
   }, []);
 
   useEffect(() => {
@@ -210,16 +201,6 @@ export default function Workbench({
 
   function showToast(message: string, tone: ToastState["tone"] = "info") {
     setToast({ message, tone });
-  }
-
-  function handleReviewModeChange(nextMode: ReviewMode) {
-    setReviewMode(nextMode);
-    window.localStorage.setItem("tcm-review-mode", nextMode);
-    setForm((current) => ({
-      ...current,
-      modelMode: nextMode === "smart" ? "深度模式" : "快速模式",
-    }));
-    showToast(nextMode === "smart" ? "已切换为智能模式。" : "已切换为常规模式。", "info");
   }
 
   function resetSession() {
@@ -644,6 +625,7 @@ export default function Workbench({
         <div className="hero-meta-row">
           {isDevBypass ? <span className="dev-bypass-badge">本地开发模式</span> : null}
           <span>构建：{buildLabel}</span>
+          <span className="model-label">当前模型：{activeModel}</span>
           <span>作者：Woo Chia Wei</span>
           <a href="https://github.com/chiaweiwoo/tcm-diagnosis" target="_blank" rel="noreferrer">
             <GitBranch size={14} />
@@ -662,25 +644,6 @@ export default function Workbench({
                 <CircleHelp size={15} />
                 使用说明
               </button>
-              <div className="mode-switch" role="group" aria-label="复核模式">
-                <button
-                  type="button"
-                  className={`mode-option ${reviewMode === "smart" ? "active" : ""}`}
-                  onClick={() => handleReviewModeChange("smart")}
-                  disabled={isBusy}
-                >
-                  智能
-                </button>
-                <button
-                  type="button"
-                  className={`mode-option ${reviewMode === "normal" ? "active" : ""}`}
-                  onClick={() => handleReviewModeChange("normal")}
-                  disabled={isBusy}
-                >
-                  常规
-                </button>
-              </div>
-              <span className="mode-hint">智能更全面，常规更快</span>
               <button
                 type="button"
                 className="secondary-button compact-button"
@@ -951,7 +914,7 @@ function GuideModal({
               <li>系统会优先保留当前方案里合理的部分，再提示可优化之处。</li>
               <li>若未直接写医生问题，但现行方案已足够明确，系统仍可先按默认复核意图继续判断。</li>
               <li>若内容像患者自用、保证疗效、或连复核意图都不清楚，系统会停在资料整理阶段。</li>
-              <li>智能模式偏向更完整的复核；常规模式偏向更快给出稳定结果。</li>
+              <li>系统当前走稳定快速的复核路径；更深层的内部对比仍在后台评估系统中持续运行。</li>
             </ul>
           </section>
           <section className="guide-section">
@@ -970,7 +933,7 @@ function GuideModal({
             <h4>什么时候会先停下来</h4>
             <ul>
               <li>主诉、当前方案、病程线索不足，且无法看出清晰复核意图时。</li>
-              <li>方药分析缺少方药内容，或针灸方案缺少穴位与操作时。</li>
+              <li>方药分析缺少方药内容，或针灸/推拿类方案缺少穴位、手法或具体治疗描述时。</li>
               <li>出现患者自用、保证疗效、或“帮我看看”这类过于笼统的问题时。</li>
             </ul>
           </section>

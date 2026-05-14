@@ -34,9 +34,11 @@ function summarizeAnalysis(result) {
 
 function buildAggregateSummary(results) {
   const modeStats = {
-    smart: { count: 0, success: 0, blocked: 0, averageLatencyMs: 0, averageCostUsd: 0 },
-    normal: { count: 0, success: 0, blocked: 0, averageLatencyMs: 0, averageCostUsd: 0 },
+    smart: { count: 0, success: 0, blocked: 0, failed: 0, repairTriggered: 0, averageLatencyMs: 0, averageCostUsd: 0 },
+    normal: { count: 0, success: 0, blocked: 0, failed: 0, repairTriggered: 0, averageLatencyMs: 0, averageCostUsd: 0 },
   };
+
+  const blockedReasonGroups = {};
 
   for (const item of results.examples) {
     for (const mode of REVIEW_MODES) {
@@ -44,11 +46,24 @@ function buildAggregateSummary(results) {
       if (!run) continue;
       modeStats[mode].count += 1;
       if (run.status === "success") modeStats[mode].success += 1;
-      if (run.status === "blocked") modeStats[mode].blocked += 1;
+      if (run.status === "blocked") {
+        modeStats[mode].blocked += 1;
+        for (const reason of (run.blockedReasons ?? [])) {
+          blockedReasonGroups[reason] = (blockedReasonGroups[reason] ?? 0) + 1;
+        }
+      }
+      if (run.status === "failed") modeStats[mode].failed += 1;
+      if (run.repairedJson) modeStats[mode].repairTriggered += 1;
       modeStats[mode].averageLatencyMs += run.latencyMs ?? 0;
       modeStats[mode].averageCostUsd += run.costUsd ?? 0;
     }
   }
+
+  const organizeStats = {
+    success: results.examples.filter((e) => e.organize.status === "success").length,
+    failed: results.examples.filter((e) => e.organize.status === "failed").length,
+    total: results.examples.length,
+  };
 
   for (const mode of REVIEW_MODES) {
     if (modeStats[mode].count > 0) {
@@ -61,7 +76,9 @@ function buildAggregateSummary(results) {
     runId: results.runId,
     generatedAt: results.generatedAt,
     exampleCount: results.examples.length,
+    organizeStats,
     modeStats,
+    blockedReasonGroups,
     examples: results.examples.map((item) => ({
       id: item.id,
       caseTypeGuess: item.caseTypeGuess,
@@ -83,6 +100,7 @@ function buildAggregateSummary(results) {
                 latencyMs: item.modes[mode].latencyMs,
                 model: item.modes[mode].model,
                 costUsd: item.modes[mode].costUsd,
+                repairedJson: item.modes[mode].repairedJson,
                 error: item.modes[mode].error,
                 blockedReasons: trimList(item.modes[mode].blockedReasons, 3),
                 result: summarizeAnalysis(item.modes[mode].result),
@@ -102,15 +120,31 @@ function renderBackendMarkdown(results, aggregate, reviewer) {
   lines.push(`- Base URL: ${results.baseUrl}`);
   lines.push(`- Example count: ${results.examples.length}`, "");
 
+  lines.push("## Stability Summary", "");
+  const org = aggregate.organizeStats;
+  lines.push(`- Organize success: ${org.success}/${org.total} (${Math.round((org.success / org.total) * 100)}%)`);
+  lines.push("");
+
   lines.push("## Mode Comparison", "");
   for (const mode of REVIEW_MODES) {
     const stats = aggregate.modeStats[mode];
+    const successRate = stats.count > 0 ? Math.round((stats.success / stats.count) * 100) : 0;
     lines.push(`### ${mode === "smart" ? "智能" : "常规"}`);
     lines.push(`- Runs: ${stats.count}`);
-    lines.push(`- Success: ${stats.success}`);
+    lines.push(`- Success: ${stats.success} (${successRate}%)`);
     lines.push(`- Blocked: ${stats.blocked}`);
+    lines.push(`- Failed: ${stats.failed}`);
+    lines.push(`- Repair triggered: ${stats.repairTriggered}`);
     lines.push(`- Avg latency: ${stats.averageLatencyMs} ms`);
     lines.push(`- Avg cost: US$${stats.averageCostUsd}`, "");
+  }
+
+  if (Object.keys(aggregate.blockedReasonGroups ?? {}).length) {
+    lines.push("## Blocked Case Reasons", "");
+    for (const [reason, count] of Object.entries(aggregate.blockedReasonGroups)) {
+      lines.push(`- (×${count}) ${reason}`);
+    }
+    lines.push("");
   }
 
   lines.push("## Example Outcomes", "");
@@ -125,8 +159,9 @@ function renderBackendMarkdown(results, aggregate, reviewer) {
     for (const mode of REVIEW_MODES) {
       const run = item.modes[mode];
       if (!run) continue;
+      const repairFlag = run.repairedJson ? " · repaired" : "";
       lines.push(
-        `- ${mode === "smart" ? "智能" : "常规"}: ${run.status} · ${run.latencyMs} ms · ${run.model ?? "n/a"} · US$${run.costUsd ?? 0}`,
+        `- ${mode === "smart" ? "智能" : "常规"}: ${run.status} · ${run.latencyMs} ms · ${run.model ?? "n/a"} · US$${run.costUsd ?? 0}${repairFlag}`,
       );
       if (run.error) {
         lines.push(`  - Error: ${run.error}`);
@@ -204,6 +239,7 @@ export async function runBackendAssessment({
           latencyMs: analyze.latencyMs,
           model: analyze.payload?.model ?? null,
           costUsd: analyze.payload?.costUsd ?? 0,
+          repairedJson: analyze.payload?.repairedJson ?? false,
           error: analyze.ok ? null : analyze.payload?.error ?? "Unknown error",
           blockedReasons: analyze.payload?.details?.blockedReasons ?? [],
           result: analyze.ok ? analyze.payload.result : null,

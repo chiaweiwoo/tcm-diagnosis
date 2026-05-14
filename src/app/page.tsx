@@ -33,6 +33,14 @@ export default async function Home() {
 
   const revision = (process.env.VERCEL_GIT_COMMIT_SHA ?? "local").slice(0, 7);
   const buildLabel = `v${packageJson.version} · ${revision}`;
+  const activeModel = process.env.DEEPSEEK_MODEL_ANALYZE || process.env.DEEPSEEK_MODEL_FAST || "deepseek-v4-flash";
 
-  return <Workbench userEmail={userEmail || "已登录账号"} buildLabel={buildLabel} isDevBypass={isDevBypass} />;
+  return (
+    <Workbench
+      userEmail={userEmail || "已登录账号"}
+      buildLabel={buildLabel}
+      isDevBypass={isDevBypass}
+      activeModel={activeModel}
+    />
+  );
 }

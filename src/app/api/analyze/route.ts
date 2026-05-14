@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
         { role: "system", content: TCM_ANALYSIS_SYSTEM_PROMPT },
         { role: "user", content: buildTcmAnalysisUserPrompt(parsed.data) },
       ],
-      maxTokens: 1400,
+      maxTokens: reviewMode === "smart" ? 1100 : 1400,
       model: reviewMode === "smart" ? getDeepSeekSmartModel() : getDeepSeekAnalyzeModel(),
       timeoutMs: 45_000,
       repairJson: true,
@@ -95,6 +95,7 @@ export async function POST(request: NextRequest) {
       reviewMode,
       promptVersion: TCM_ANALYSIS_PROMPT_VERSION,
       validation,
+      repairedJson: result.repairedJson ?? false,
     });
   } catch (error) {
     if (error instanceof DeepSeekError) {

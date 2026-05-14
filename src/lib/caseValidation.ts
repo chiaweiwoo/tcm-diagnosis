@@ -43,15 +43,15 @@ const typeSpecificRequirements: Record<(typeof caseTypes)[number], StageOneRequi
   "针灸方案": [
     {
       key: "acupoints",
-      label: "穴位与操作",
-      description: "需有穴位、手法或治疗方式，才可复核配穴与操作思路。",
+      label: "穴位与操作或具体手法",
+      description: "需有穴位、手法、推拿或其他具体治疗方式，才可复核配穴与操作思路。",
     },
   ],
   "综合调理": [
     {
       key: "treatmentDetail",
       label: "主要处理细节",
-      description: "若涉及方药或针灸，至少要有一项具体内容，才能继续复核。",
+      description: "至少提供方药、穴位、推拿，或在当前方案中描述具体处理方式，才能继续复核。",
     },
   ],
 };
@@ -95,19 +95,19 @@ export const caseSchema = z
       });
     }
 
-    if (value.caseType === "针灸方案" && !value.acupoints.trim()) {
+    if (value.caseType === "针灸方案" && !value.acupoints.trim() && !hasConcreteManualTreatment(value.currentPlan)) {
       context.addIssue({
         code: "custom",
         path: ["acupoints"],
-        message: "针灸方案至少需要填写穴位与操作。",
+        message: "针灸方案至少需要填写穴位与操作，或在当前方案中描述具体手法/治疗方式。",
       });
     }
 
-    if (value.caseType === "综合调理" && !value.herbs.trim() && !value.acupoints.trim()) {
+    if (value.caseType === "综合调理" && !value.herbs.trim() && !value.acupoints.trim() && !hasConcreteManualTreatment(value.currentPlan)) {
       context.addIssue({
         code: "custom",
         path: ["currentPlan"],
-        message: "综合调理至少需要补充方药内容或穴位与操作中的一项。",
+        message: "综合调理至少需要补充方药内容、穴位与操作，或在当前方案中描述具体处理方式（如推拿、手法等）。",
       });
     }
 
@@ -146,6 +146,10 @@ function isVagueQuestion(question: string) {
 
 function hasTreatmentDetail(form: CaseForm) {
   return Boolean(form.currentPlan.trim() || form.herbs.trim() || form.acupoints.trim());
+}
+
+function hasConcreteManualTreatment(plan: string) {
+  return /推拿|按摩|正骨|整脊|手法|艾灸|拔罐|刮痧|针灸/.test(plan);
 }
 
 export function hasImpliedReviewIntent(form: CaseForm) {
@@ -222,12 +226,12 @@ function getStageOneBlockingHints(form: CaseForm) {
     hints.push("请补充方药内容，至少给出主要药物与剂量。");
   }
 
-  if (form.caseType === "针灸方案" && !form.acupoints.trim()) {
-    hints.push("请补充穴位与操作，至少说明主要配穴或治疗方式。");
+  if (form.caseType === "针灸方案" && !form.acupoints.trim() && !hasConcreteManualTreatment(form.currentPlan)) {
+    hints.push("请补充穴位与操作，或在当前方案中写明具体手法或治疗方式（如推拿、艾灸等）。");
   }
 
-  if (form.caseType === "综合调理" && !form.herbs.trim() && !form.acupoints.trim()) {
-    hints.push("请至少补充方药内容或穴位与操作中的一项。");
+  if (form.caseType === "综合调理" && !form.herbs.trim() && !form.acupoints.trim() && !hasConcreteManualTreatment(form.currentPlan)) {
+    hints.push("请至少补充方药内容、穴位与操作，或在当前方案中描述具体处理方式（如推拿、手法等）。");
   }
 
   return hints;

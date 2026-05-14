@@ -67,8 +67,8 @@ Hard-block minimum before analysis:
 
 Type-specific:
 - `方药分析`: must include `方药内容`
-- `针灸方案`: must include `穴位与操作`
-- `综合调理`: must include at least one concrete treatment detail such as herbs or acupoints
+- `针灸方案`: must include `穴位与操作` OR concrete manual treatment in `当前方案` (e.g., 推拿, 按摩, 正骨, 手法, 艾灸)
+- `综合调理`: must include herbs, acupoints, OR concrete manual/physical treatment described in `当前方案`
 
 Block patterns:
 - vague prompt with no implied review intent, such as `帮我看看`
@@ -105,11 +105,12 @@ Recommended-but-not-hard-block fields:
   - when organize is ready but analysis is not yet available, show an intermediate organize result panel in the main workspace
   - while analyze is running, show a visible loading shell in the main lower workspace so doctors can tell the second stage is still progressing
   - after analysis completes, the right-side panel should return to workflow summary only and should not duplicate the main `资料完整性` content
-- Review mode selector:
-  - show a visible `智能 / 常规` switch in the workbench
-  - store the preference in local browser storage
-  - default to `智能`
-  - `智能` uses the deeper analysis model path, while `常规` uses the faster default analyze path
+- Review mode:
+  - doctor-facing UI does NOT show a `智能 / 常规` switch; it is hidden
+  - doctor-facing runs always use `常规` (normal) as the default internal mode
+  - `智能` mode is preserved in code but is internal-only: used by backend assessment and future admin workflows
+  - do not expose the mode selector to doctors or restore it from localStorage
+  - header shows the active doctor-facing model as a subtle meta label (e.g., `当前模型：deepseek-v4-flash`)
 - Analyze output should follow this reading order:
   1. `重点结论`
   2. `病案摘要`
@@ -186,6 +187,8 @@ Logging should not block doctor-facing responses.
   - run organize/analyze for both `智能` and `常规`
   - generate Markdown + JSON reports under `output/assessment/<run-id>/`
   - use DeepSeek to produce backend review commentary and prompt-improvement suggestions
+  - report includes: organize success rate, per-mode success/blocked/failed/repair counts, blocked reason groups, per-example `repairedJson` flag
+- `智能` mode is preserved in assessment to track reliability vs `常规`; assessment is the primary tool for observing mode tradeoffs
 - Frontend automation assessment is explicitly deferred to backlog until the user says to resume it.
 
 ## Design Direction

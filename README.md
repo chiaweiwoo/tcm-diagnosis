@@ -80,8 +80,9 @@ flowchart LR
 - The right-side panel is workflow-focused; after completion, detailed clinical content stays in the main board.
 - The workbench includes an in-app help surface for assumptions, minimum input expectations, and workflow behavior.
 - A visible build label helps confirm whether a deployment has landed.
-- Doctors can switch between `智能` and `常规`; the preference is stored in local browser storage and defaults to `智能`.
-- `智能` favors fuller review depth, while `常规` favors faster stable output.
+- The doctor-facing workbench always uses the stable `常规` review path by default; there is no visible mode switch.
+- The header shows the active backend model name so deployed-version checks are easy.
+- `智能` mode is available internally for backend assessment to compare reliability and output quality across model tiers.
 - When a doctor asks for literature support, the system degrades honestly to experiential review and states that external retrieval is not yet connected.
 - Token usage, estimated cost, model metadata, and latency stay internal and are stored for traceability rather than shown in the doctor-facing UI.
 - Cost logging is model-aware, and pricing can be updated through environment overrides when DeepSeek changes its rates.

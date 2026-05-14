@@ -71,7 +71,7 @@ describe("病案校验", () => {
     });
 
     expect(result.errors.currentPlan).toBe("请填写当前方案。");
-    expect(result.errors.acupoints).toBe("针灸方案至少需要填写穴位与操作。");
+    expect(result.errors.acupoints).toBe("针灸方案至少需要填写穴位与操作，或在当前方案中描述具体手法/治疗方式。");
   });
 
   it("拦截过于笼统的医生问题", () => {
