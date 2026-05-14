@@ -98,21 +98,21 @@ function applyEnvOverrides(base: RateTier): RateTier {
 
 // Fire-and-forget: fetch remote rates once per 24h, update cache in background.
 // Does not block the caller — always returns synchronously from cached/env values.
+// AI_RATES_URL JSON shape: { deepseek: { flash: {...}, pro: {...} }, anthropic: { ... } }
+// Only the deepseek section is consumed here; anthropic rates are used by CLI scripts.
 function triggerRateFetch() {
-  const url = process.env.DEEPSEEK_RATES_URL;
+  const url = process.env.AI_RATES_URL;
   if (!url || _isFetching) return;
 
   _isFetching = true;
   fetch(url, { signal: AbortSignal.timeout(5_000) })
     .then((res) => (res.ok ? (res.json() as Promise<unknown>) : null))
     .then((data) => {
-      if (
-        data &&
-        typeof data === "object" &&
-        "flash" in data &&
-        "pro" in data
-      ) {
-        _rateCache = { rates: applyEnvOverrides(data as RateTier), fetchedAt: Date.now() };
+      const deepseek = data && typeof data === "object" && "deepseek" in data
+        ? (data as Record<string, unknown>).deepseek as RateTier
+        : (data && typeof data === "object" && "flash" in data ? data as RateTier : null);
+      if (deepseek && "flash" in deepseek && "pro" in deepseek) {
+        _rateCache = { rates: applyEnvOverrides(deepseek), fetchedAt: Date.now() };
       }
     })
     .catch(() => undefined)

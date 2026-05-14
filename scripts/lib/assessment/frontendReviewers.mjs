@@ -235,7 +235,7 @@ export async function reviewFrontendVisual(imageUrls) {
   const content = payload.content?.[0]?.text;
   if (!content) throw new Error("Claude returned empty content");
 
-  const rates = getAnthropicSonnetRates();
+  const rates = await getAnthropicSonnetRates();
   const anthropicUsage = payload.usage
     ? {
         prompt_tokens: payload.usage.input_tokens,
