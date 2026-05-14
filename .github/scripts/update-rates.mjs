@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Fetches DeepSeek and Anthropic pricing pages, uses Claude to extract
- * current rates, and updates config/rates.json if anything changed.
+ * Uses Claude with web search to look up current DeepSeek and Anthropic
+ * pricing and updates config/rates.json if anything changed.
  * Runs daily via GitHub Actions — only commits when prices actually change.
  */
 
@@ -18,22 +18,23 @@ if (!ANTHROPIC_API_KEY) {
   process.exit(1);
 }
 
-const PRICING_URLS = {
-  deepseek: "https://api-docs.deepseek.com/quick_start/pricing",
-  anthropic: "https://www.anthropic.com/pricing",
-};
-
-async function fetchPage(url) {
-  const res = await fetch(url, {
-    headers: { "User-Agent": "Mozilla/5.0 (compatible; price-checker/1.0)" },
-    signal: AbortSignal.timeout(15_000),
-  });
-  if (!res.ok) throw new Error(`Failed to fetch ${url}: ${res.status}`);
-  return res.text();
-}
-
-async function extractRatesWithClaude(deepseekHtml, anthropicHtml) {
-  const prompt = `Extract current AI API pricing from these two pricing pages and return ONLY a JSON object — no explanation, no markdown.
+async function fetchRatesWithClaude() {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
+      "anthropic-beta": "web-search-2025-03-05",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 1024,
+      tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 4 }],
+      messages: [
+        {
+          role: "user",
+          content: `Search for the current API pricing for DeepSeek and Anthropic Claude models, then return ONLY a JSON object — no explanation, no markdown.
 
 The JSON must match this exact shape:
 {
@@ -50,33 +51,17 @@ The JSON must match this exact shape:
 
 Rules:
 - All prices are USD per 1 million tokens
-- DeepSeek "flash" = deepseek-chat or their fastest/cheapest model tier
-- DeepSeek "pro" = deepseek-reasoner or their most capable model tier
+- DeepSeek "flash" = deepseek-chat (their fastest/cheapest tier)
+- DeepSeek "pro" = deepseek-reasoner (their most capable tier)
 - Anthropic "haiku" = Claude Haiku (latest), "sonnet" = Claude Sonnet (latest), "opus" = Claude Opus (latest)
 - inputCacheHitPer1M = cache read / cache hit input price
 - inputCacheMissPer1M = regular input / cache miss input price
-- outputPer1M = output price
-- If a value is not found, keep the existing value (do not guess)
-
---- DEEPSEEK PRICING PAGE ---
-${deepseekHtml.slice(0, 8000)}
-
---- ANTHROPIC PRICING PAGE ---
-${anthropicHtml.slice(0, 8000)}`;
-
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "x-api-key": ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 512,
-      messages: [{ role: "user", content: prompt }],
+- outputPer1M = output token price
+- Only return numbers you found from the search — do not guess`,
+        },
+      ],
     }),
-    signal: AbortSignal.timeout(30_000),
+    signal: AbortSignal.timeout(60_000),
   });
 
   if (!res.ok) {
@@ -85,7 +70,7 @@ ${anthropicHtml.slice(0, 8000)}`;
   }
 
   const payload = await res.json();
-  const text = payload.content?.[0]?.text ?? "";
+  const text = payload.content?.findLast((b) => b.type === "text")?.text ?? "";
 
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error(`Claude did not return JSON. Got: ${text.slice(0, 300)}`);
@@ -98,14 +83,8 @@ function ratesEqual(a, b) {
 }
 
 async function main() {
-  console.log("Fetching pricing pages...");
-  const [deepseekHtml, anthropicHtml] = await Promise.all([
-    fetchPage(PRICING_URLS.deepseek),
-    fetchPage(PRICING_URLS.anthropic),
-  ]);
-
-  console.log("Extracting rates with Claude...");
-  const extracted = await extractRatesWithClaude(deepseekHtml, anthropicHtml);
+  console.log("Searching for current AI provider pricing...");
+  const extracted = await fetchRatesWithClaude();
 
   const current = JSON.parse(readFileSync(RATES_PATH, "utf8"));
 
