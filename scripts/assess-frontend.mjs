@@ -4,17 +4,14 @@ import { loadLocalEnv } from "./lib/env.mjs";
 import { loadAssessmentExamples } from "./lib/assessment/examples.mjs";
 import { startAssessmentServer } from "./lib/assessment/server.mjs";
 import { runFrontendAssessment } from "./lib/assessment/frontend.mjs";
+import { uploadScreenshots } from "./lib/assessment/storage.mjs";
 import { saveAssessmentRun } from "./lib/assessment/db.mjs";
 
 const rootDir = process.cwd();
 loadLocalEnv(rootDir);
 
 function stampForPath(date = new Date()) {
-  return date
-    .toISOString()
-    .replace(/:/g, "-")
-    .replace(/\..+$/, "")
-    .replace("T", "_");
+  return date.toISOString().replace(/:/g, "-").replace(/\..+$/, "").replace("T", "_");
 }
 
 async function main() {
@@ -37,7 +34,8 @@ async function main() {
   });
 
   try {
-    const { reportData, markdownReport } = await runFrontendAssessment({
+    // Step 1: browser automation only
+    const runData = await runFrontendAssessment({
       baseUrl: server.baseUrl,
       examples,
       screenshotDir,
@@ -45,56 +43,55 @@ async function main() {
       exampleCount: 3,
     });
 
-    const markdownPath = path.join(outputDir, "frontend-report.md");
-    const jsonPath = path.join(outputDir, "frontend-report.json");
-    const htmlPath = path.join(outputDir, "frontend-report.html");
+    // Upload screenshots to Supabase Storage
+    console.error("[frontend] Uploading screenshots...");
+    const screenshotUrls = await uploadScreenshots(runId, runData.screenshots);
 
-    await fs.writeFile(markdownPath, markdownReport, "utf8");
-    await fs.writeFile(jsonPath, JSON.stringify(reportData, null, 2), "utf8");
-    await fs.writeFile(htmlPath, htmlReport, "utf8");
-
-    // Save to Supabase using the same pattern as backend assessment
+    // Save run record to DB (full_report includes scenarios + screenshotUrls for step 2)
     const savedToDb = await saveAssessmentRun({
       results: {
         runId,
-        generatedAt: reportData.generatedAt,
+        generatedAt: runData.generatedAt,
         baseUrl: server.baseUrl,
-        examples: reportData.selectedExamples.map((e) => ({ id: e.id })),
+        examples: runData.selectedExamples.map((e) => ({ id: e.id })),
       },
       aggregate: {
         organizeStats: null,
         modeStats: null,
         blockedReasonGroups: Object.fromEntries(
-          reportData.scenarios
+          runData.scenarios
             .filter((s) => s.blockedReason)
             .map((s) => [s.blockedReason, 1]),
         ),
       },
       reviewer: {
-        text: [
-          "## UX 评审\n" + reportData.reviewers.ux.text,
-          "## 临床评审\n" + reportData.reviewers.tcm.text,
-          "## 视觉评审\n" + reportData.reviewers.visual.text,
-        ].join("\n\n---\n\n"),
-        model: `ux:${reportData.reviewers.ux.model} tcm:${reportData.reviewers.tcm.model} visual:${reportData.reviewers.visual.model}`,
+        // No reviewer yet — report generation is step 2
+        text: null,
+        model: null,
+      },
+      extra: {
+        triggered_by: "assess:frontend",
+        full_report: {
+          ...runData,
+          screenshotUrls,
+          screenshots: undefined, // don't store local paths in DB
+        },
       },
     });
 
     console.log(
       JSON.stringify(
         {
-          status: "completed",
+          status: "run-complete",
           runId,
           reusedServer: server.reused,
           baseUrl: server.baseUrl,
-          exampleCount: reportData.selectedExamples.length,
-          scenarioCount: reportData.scenarios.length,
-          aggregate: reportData.aggregate,
-          markdownReport: markdownPath,
-          jsonReport: jsonPath,
-          htmlReport: htmlPath,
-          screenshots: reportData.screenshots.length,
+          exampleCount: runData.selectedExamples.length,
+          scenarioCount: runData.scenarios.length,
+          aggregate: runData.aggregate,
+          screenshotsUploaded: Object.values(screenshotUrls).filter(Boolean).length,
           savedToDb,
+          next: `npm run report:frontend -- ${runId}`,
         },
         null,
         2,

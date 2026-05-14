@@ -11,7 +11,8 @@
     "check:deepseek": "node scripts/check-deepseek.mjs",
     "assess:local": "node scripts/assess-backend.mjs",
     "assess:backend": "node scripts/assess-backend.mjs",
-    "assess:frontend": "node scripts/assess-frontend.mjs"
+    "assess:frontend": "node scripts/assess-frontend.mjs",
+    "report:frontend": "node scripts/report-frontend.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",
