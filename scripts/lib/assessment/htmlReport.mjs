@@ -1,14 +1,4 @@
-import fs from "node:fs/promises";
 import path from "node:path";
-
-async function loadImageAsDataUri(filePath) {
-  try {
-    const data = await fs.readFile(filePath);
-    return `data:image/png;base64,${data.toString("base64")}`;
-  } catch {
-    return null;
-  }
-}
 
 function statusBadge(status) {
   const map = {
@@ -68,15 +58,15 @@ function renderMarkdownToHtml(text) {
   return out.join("\n");
 }
 
-async function buildScenarioCard(scenario) {
-  const images = [];
-  for (const p of scenario.screenshots ?? []) {
-    const uri = await loadImageAsDataUri(p);
-    if (uri) {
+// screenshotUrls: { "basename.png": "https://..." }
+function buildScenarioCard(scenario, screenshotUrls) {
+  const images = (scenario.screenshots ?? [])
+    .map((p) => {
       const name = path.basename(p);
-      images.push({ name, uri });
-    }
-  }
+      const url = screenshotUrls?.[name];
+      return url ? { name, url } : null;
+    })
+    .filter(Boolean);
 
   const sections = scenario.sectionsVisible?.length
     ? scenario.sectionsVisible.map((s) => `<span style="display:inline-block;margin:2px 3px;padding:2px 8px;background:#f7e7e3;border-radius:10px;font-size:12px">${escapeHtml(s)}</span>`).join("")
@@ -87,7 +77,7 @@ async function buildScenarioCard(scenario) {
         ${images.map((img) => `
           <div>
             <div style="font-size:11px;color:#66736e;margin-bottom:3px">${escapeHtml(img.name)}</div>
-            <img src="${img.uri}" alt="${escapeHtml(img.name)}"
+            <img src="${escapeHtml(img.url)}" alt="${escapeHtml(img.name)}"
               style="height:160px;width:auto;border:1px solid #dbe5df;border-radius:6px;cursor:pointer;object-fit:cover"
               onclick="showLightbox(this.src)"
             />
@@ -139,10 +129,11 @@ function reviewerSection(title, reviewer) {
     </section>`;
 }
 
-export async function buildHtmlReport(reportData) {
+// screenshotUrls: { "basename.png": "https://..." }
+export function buildHtmlReport(reportData, screenshotUrls = {}) {
   const { runId, generatedAt, baseUrl, scenarios, aggregate, reviewers, cleanup, selectedExamples } = reportData;
 
-  const scenarioCards = await Promise.all(scenarios.map(buildScenarioCard));
+  const scenarioCards = scenarios.map((s) => buildScenarioCard(s, screenshotUrls));
 
   const summaryBadges = [
     `<span style="background:#d1fae5;color:#065f46;padding:3px 12px;border-radius:12px;font-weight:700;font-size:13px">成功 ${aggregate.success}</span>`,
@@ -209,7 +200,7 @@ export async function buildHtmlReport(reportData) {
       <p style="font-size:14px">
         尝试删除 ${cleanup?.attempted ?? 0} 条 &nbsp;·&nbsp;
         成功 ${cleanup?.succeeded ?? 0} 条
-        ${cleanup?.failed?.length ? `&nbsp;·&nbsp;<span style="color:#b42318">失败：${cleanup.failed.map((f) => f.id).join(", ")}</span>` : ""}
+        ${cleanup?.failed?.length ? `&nbsp;·&nbsp;<span style="color:#b42318">失败：${cleanup.failed.map((f) => escapeHtml(f.id)).join(", ")}</span>` : ""}
       </p>
     </section>
 

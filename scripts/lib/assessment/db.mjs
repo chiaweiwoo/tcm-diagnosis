@@ -7,7 +7,7 @@ function getSupabaseConfig() {
   return { supabaseUrl, serviceKey };
 }
 
-export async function saveAssessmentRun({ results, aggregate, reviewer }) {
+export async function saveAssessmentRun({ results, aggregate, reviewer, extra = {} }) {
   const config = getSupabaseConfig();
 
   if (!config) {
@@ -17,7 +17,7 @@ export async function saveAssessmentRun({ results, aggregate, reviewer }) {
 
   const row = {
     run_id: results.runId,
-    triggered_by: "cli",
+    triggered_by: extra.triggered_by ?? "cli",
     created_at: results.generatedAt,
     example_count: results.examples.length,
     base_url: results.baseUrl,
@@ -26,7 +26,7 @@ export async function saveAssessmentRun({ results, aggregate, reviewer }) {
     blocked_reason_groups: aggregate.blockedReasonGroups ?? null,
     reviewer_text: reviewer.text ?? null,
     reviewer_model: reviewer.model ?? null,
-    full_report: { results, aggregate, reviewer },
+    full_report: extra.full_report ?? { results, aggregate, reviewer },
     status: "completed",
   };
 

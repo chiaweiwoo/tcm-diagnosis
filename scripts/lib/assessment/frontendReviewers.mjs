@@ -1,5 +1,3 @@
-import fs from "node:fs/promises";
-
 const DEEPSEEK_URL = "https://api.deepseek.com/chat/completions";
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 
@@ -131,30 +129,22 @@ export async function reviewFrontendTCM(observations) {
   return callDeepSeek(system, user, 2200);
 }
 
-// ── Reviewer 3: Visual reviewer (Claude, screenshot-based) ───────────────────
+// ── Reviewer 3: Visual reviewer (Claude, screenshot URLs from storage) ────────
 
-export async function reviewFrontendVisual(screenshotPaths) {
+// imageUrls: array of public https:// URLs
+export async function reviewFrontendVisual(imageUrls) {
   const apiKey = requireAnthropicKey();
   const model = getAnthropicModel();
 
-  // Load up to 6 key screenshots as base64
-  const loaded = [];
-  for (const p of screenshotPaths.slice(0, 6)) {
-    try {
-      const data = await fs.readFile(p);
-      loaded.push({ path: p, data: data.toString("base64") });
-    } catch {
-      // skip missing screenshots
-    }
-  }
+  const validUrls = (imageUrls ?? []).filter((u) => u && u.startsWith("http")).slice(0, 6);
 
-  if (loaded.length === 0) {
+  if (validUrls.length === 0) {
     return { model, usage: null, text: "（无截图可供分析）", skipped: true };
   }
 
-  const imageContent = loaded.map((img) => ({
+  const imageContent = validUrls.map((url) => ({
     type: "image",
-    source: { type: "base64", media_type: "image/png", data: img.data },
+    source: { type: "url", url },
   }));
 
   const promptText = {
