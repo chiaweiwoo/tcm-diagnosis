@@ -266,11 +266,11 @@ Batch C recovery notes live in [docs/batch-c-handoff.md](docs/batch-c-handoff.md
 
 ## Documentation Direction
 
-- `README.md` is product-facing.
-- Explain what the tool helps doctors do.
-- Keep setup and operational notes concise.
-- Mention the two-step pipeline, organize-stage stop behavior, internal-only token/cost tracking, allowlist source, review-mode selector, and backend assessment CLI.
-- Document the local dev auth bypass in `.env.local.example` and keep the explanation brief and explicit.
+- `README.md` is written in simplified Chinese. Technical terms (API routes, env var names, CLI commands, model names) stay in English.
+- Keep README minimal — workflow, API routes, local dev, assessment CLI, stack. No architecture diagrams, no marketing prose.
+- Do not add sections to README unless the user explicitly asks. Shorter is better.
+- The dev-only auth bypass must be documented in `.env.local.example` with a brief, explicit note.
+- Update README only when user-visible behavior meaningfully changes.
 
 ## Deferred Scope
 
