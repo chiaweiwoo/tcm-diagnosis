@@ -168,6 +168,10 @@ export default function Workbench({
     const savedMode = window.localStorage.getItem("tcm-review-mode");
     if (savedMode === "smart" || savedMode === "normal") {
       setReviewMode(savedMode);
+      setForm((current) => ({
+        ...current,
+        modelMode: savedMode === "smart" ? "深度模式" : "快速模式",
+      }));
     }
   }, []);
 
@@ -626,6 +630,7 @@ export default function Workbench({
             <p className="hero-copy">
               把自由病案整理成清晰脉络，先提示值得补充的关键信息，再陪你复核思路与后续重点。
             </p>
+            <p className="hero-mission">让医生看得更全，记得更准，面对难题时不再孤单。</p>
             <p className="hero-note">
               <AlertTriangle size={15} />
               仅供注册中医师临床参考；最终判断仍以医生面诊与专业评估为准。
@@ -675,6 +680,7 @@ export default function Workbench({
                   常规
                 </button>
               </div>
+              <span className="mode-hint">智能更全面，常规更快</span>
               <button
                 type="button"
                 className="secondary-button compact-button"
@@ -724,7 +730,7 @@ export default function Workbench({
                   value={consultationName}
                   onChange={(event) => handleNameChange(event.target.value)}
                   disabled={isLocked}
-                  placeholder="例如：患者代号 A-01（勿填真实姓名）"
+                  placeholder="例如：代号 A-01（勿填真实姓名）"
                 />
               </label>
             <label className="field-block history-field">
@@ -935,6 +941,7 @@ function GuideModal({
               <li>先按你的习惯写下病案重点、当前方案；若已见舌脉或四诊线索，也建议顺手写入。</li>
               <li>系统先整理资料脉络，提示值得补充与值得留意的地方。</li>
               <li>基础信息足够时，系统才继续进入临床复核，给出判断、优化与随访提醒。</li>
+              <li>单次草稿建议控制在 8000 字以内；过长内容会先请你精简，再进入整理。</li>
             </ol>
           </section>
           <section className="guide-section">
@@ -944,6 +951,7 @@ function GuideModal({
               <li>系统会优先保留当前方案里合理的部分，再提示可优化之处。</li>
               <li>若未直接写医生问题，但现行方案已足够明确，系统仍可先按默认复核意图继续判断。</li>
               <li>若内容像患者自用、保证疗效、或连复核意图都不清楚，系统会停在资料整理阶段。</li>
+              <li>智能模式偏向更完整的复核；常规模式偏向更快给出稳定结果。</li>
             </ul>
           </section>
           <section className="guide-section">

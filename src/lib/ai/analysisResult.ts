@@ -1,5 +1,15 @@
 import { CaseForm } from "@/lib/caseValidation";
 
+export type AnalysisSectionJson = {
+  title?: unknown;
+  items?: unknown;
+};
+
+export type AnalysisGroupJson = {
+  title?: unknown;
+  sections?: unknown;
+};
+
 export type AnalysisJson = {
   重点结论?: unknown;
   病案摘要?: unknown;
@@ -18,9 +28,14 @@ export type AnalysisJson = {
   证据状态?: unknown;
 };
 
+export type ResultSection = {
+  title: string;
+  items: string[];
+};
+
 export type ResultGroup = {
   title: string;
-  sections: Array<{ title: string; items: string[] }>;
+  sections: ResultSection[];
 };
 
 export type AnalysisResult = {
@@ -32,23 +47,38 @@ export type AnalysisResult = {
   evidence: string[];
 };
 
-function normalizeSection(section: unknown, fallbackTitle: string, fallbackItem: string) {
-  if (!section || typeof section !== "object") {
-    return {
-      title: fallbackTitle,
-      items: [fallbackItem],
-    };
-  }
+type GroupSpec = {
+  title: string;
+  sections: Array<{ title: string; fallback: string }>;
+};
 
-  const record = section as { title?: unknown; items?: unknown };
-  const title = normalizeText(record.title) || fallbackTitle;
-  const items = normalizeStringList(record.items);
-
-  return {
-    title,
-    items: items.length ? items : [fallbackItem],
-  };
-}
+const GROUP_SPECS: GroupSpec[] = [
+  {
+    title: "资料完整性",
+    sections: [
+      { title: "已提供", fallback: "当前未额外归纳已提供信息，可继续结合原始病案核对。" },
+      { title: "建议补充", fallback: "本次未形成新的补充提示，可继续结合面诊补全。" },
+    ],
+  },
+  {
+    title: "当前思路",
+    sections: [
+      { title: "可取之处", fallback: "本次未额外提炼明确保留点，可继续结合面诊判断。" },
+      { title: "需要复核", fallback: "当前未识别出必须立即调整的复核点，仍建议结合面诊核对。" },
+    ],
+  },
+  {
+    title: "建议优化",
+    sections: [
+      { title: "主要建议", fallback: "本次未形成新的优化建议，可先结合当前方案继续观察。" },
+      { title: "可选思路", fallback: "本次未提出额外备选思路。" },
+    ],
+  },
+  {
+    title: "随访监测",
+    sections: [{ title: "监测建议", fallback: "可按常规复诊节奏结合症状变化继续观察。" }],
+  },
+];
 
 function normalizeText(value: unknown) {
   if (typeof value === "string") return value.trim();
@@ -65,12 +95,61 @@ export function normalizeStringList(value: unknown): string[] {
   return single ? [single] : [];
 }
 
-function stableSection(title: string, items: unknown, fallback: string) {
+function withFallback(items: unknown, fallback: string): string[] {
   const normalized = normalizeStringList(items);
+  return normalized.length ? normalized : [fallback];
+}
+
+function createSection(title: string, items: unknown, fallback: string): ResultSection {
   return {
     title,
-    items: normalized.length ? normalized : [fallback],
+    items: withFallback(items, fallback),
   };
+}
+
+function normalizeGroupMap(groups: unknown): Map<string, AnalysisGroupJson> {
+  const map = new Map<string, AnalysisGroupJson>();
+  if (!Array.isArray(groups)) return map;
+
+  for (const group of groups) {
+    if (!group || typeof group !== "object") continue;
+    const title = normalizeText((group as AnalysisGroupJson).title);
+    if (title) {
+      map.set(title, group as AnalysisGroupJson);
+    }
+  }
+
+  return map;
+}
+
+function normalizeSectionMap(sections: unknown): Map<string, AnalysisSectionJson> {
+  const map = new Map<string, AnalysisSectionJson>();
+  if (!Array.isArray(sections)) return map;
+
+  for (const section of sections) {
+    if (!section || typeof section !== "object") continue;
+    const title = normalizeText((section as AnalysisSectionJson).title);
+    if (title) {
+      map.set(title, section as AnalysisSectionJson);
+    }
+  }
+
+  return map;
+}
+
+function normalizeStoredGroups(groups: unknown): ResultGroup[] {
+  const groupMap = normalizeGroupMap(groups);
+
+  return GROUP_SPECS.map((spec) => {
+    const sectionMap = normalizeSectionMap(groupMap.get(spec.title)?.sections);
+    return {
+      title: spec.title,
+      sections: spec.sections.map((sectionSpec) => {
+        const section = sectionMap.get(sectionSpec.title);
+        return createSection(sectionSpec.title, section?.items, sectionSpec.fallback);
+      }),
+    };
+  });
 }
 
 export function buildAnalysisResult(data: AnalysisJson, caseType: CaseForm["caseType"]): AnalysisResult {
@@ -82,27 +161,27 @@ export function buildAnalysisResult(data: AnalysisJson, caseType: CaseForm["case
     {
       title: "资料完整性",
       sections: [
-        stableSection("已提供", data.资料完整性?.已提供, "当前未额外归纳已提供信息，可继续结合原始病案核对。"),
-        stableSection("建议补充", data.资料完整性?.建议补充, "本次未形成新的补充提示，可继续结合面诊补全。"),
+        createSection("已提供", data.资料完整性?.已提供, "当前未额外归纳已提供信息，可继续结合原始病案核对。"),
+        createSection("建议补充", data.资料完整性?.建议补充, "本次未形成新的补充提示，可继续结合面诊补全。"),
       ],
     },
     {
       title: "当前思路",
       sections: [
-        stableSection("可取之处", data.当前思路?.可取之处, "本次未额外提炼明确保留点，可继续结合面诊判断。"),
-        stableSection("需要复核", data.当前思路?.需要复核, "当前未识别出必须立即调整的复核点，仍建议结合面诊核对。"),
+        createSection("可取之处", data.当前思路?.可取之处, "本次未额外提炼明确保留点，可继续结合面诊判断。"),
+        createSection("需要复核", data.当前思路?.需要复核, "当前未识别出必须立即调整的复核点，仍建议结合面诊核对。"),
       ],
     },
     {
       title: "建议优化",
       sections: [
-        stableSection("主要建议", data.建议优化, "本次未形成新的优化建议，可先结合当前方案继续观察。"),
-        stableSection("可选思路", data.可选思路, "本次未提出额外备选思路。"),
+        createSection("主要建议", data.建议优化, "本次未形成新的优化建议，可先结合当前方案继续观察。"),
+        createSection("可选思路", data.可选思路, "本次未提出额外备选思路。"),
       ],
     },
     {
       title: "随访监测",
-      sections: [stableSection("监测建议", data.随访监测, "可按常规复诊节奏结合症状变化继续观察。")],
+      sections: [createSection("监测建议", data.随访监测, "可按常规复诊节奏结合症状变化继续观察。")],
     },
   ];
 
@@ -132,147 +211,16 @@ export function ensureAnalysisResult(
   };
 
   if (Array.isArray(record.groups)) {
-    const normalizedGroups: ResultGroup[] = [
-      {
-        title: "资料完整性",
-        sections: [
-          normalizeSection(
-            record.groups.find(
-              (group) => typeof group === "object" && group && normalizeText((group as { title?: unknown }).title) === "资料完整性",
-            ) && (record.groups.find(
-              (group) => typeof group === "object" && group && normalizeText((group as { title?: unknown }).title) === "资料完整性",
-            ) as { sections?: unknown }).sections instanceof Array
-              ? ((record.groups.find(
-                  (group) => typeof group === "object" && group && normalizeText((group as { title?: unknown }).title) === "资料完整性",
-                ) as { sections?: unknown }).sections as unknown[]).find(
-                  (section) => typeof section === "object" && section && normalizeText((section as { title?: unknown }).title) === "已提供",
-                )
-              : null,
-            "已提供",
-            "当前未额外归纳已提供信息，可继续结合原始病案核对。",
-          ),
-          normalizeSection(
-            record.groups.find(
-              (group) => typeof group === "object" && group && normalizeText((group as { title?: unknown }).title) === "资料完整性",
-            ) && (record.groups.find(
-              (group) => typeof group === "object" && group && normalizeText((group as { title?: unknown }).title) === "资料完整性",
-            ) as { sections?: unknown }).sections instanceof Array
-              ? ((record.groups.find(
-                  (group) => typeof group === "object" && group && normalizeText((group as { title?: unknown }).title) === "资料完整性",
-                ) as { sections?: unknown }).sections as unknown[]).find(
-                  (section) => typeof section === "object" && section && normalizeText((section as { title?: unknown }).title) === "建议补充",
-                )
-              : null,
-            "建议补充",
-            "本次未形成新的补充提示，可继续结合面诊补全。",
-          ),
-        ],
-      },
-      {
-        title: "当前思路",
-        sections: [
-          normalizeSection(
-            record.groups.find(
-              (group) => typeof group === "object" && group && normalizeText((group as { title?: unknown }).title) === "当前思路",
-            ) && (record.groups.find(
-              (group) => typeof group === "object" && group && normalizeText((group as { title?: unknown }).title) === "当前思路",
-            ) as { sections?: unknown }).sections instanceof Array
-              ? ((record.groups.find(
-                  (group) => typeof group === "object" && group && normalizeText((group as { title?: unknown }).title) === "当前思路",
-                ) as { sections?: unknown }).sections as unknown[]).find(
-                  (section) => typeof section === "object" && section && normalizeText((section as { title?: unknown }).title) === "可取之处",
-                )
-              : null,
-            "可取之处",
-            "本次未额外提炼明确保留点，可继续结合面诊判断。",
-          ),
-          normalizeSection(
-            record.groups.find(
-              (group) => typeof group === "object" && group && normalizeText((group as { title?: unknown }).title) === "当前思路",
-            ) && (record.groups.find(
-              (group) => typeof group === "object" && group && normalizeText((group as { title?: unknown }).title) === "当前思路",
-            ) as { sections?: unknown }).sections instanceof Array
-              ? ((record.groups.find(
-                  (group) => typeof group === "object" && group && normalizeText((group as { title?: unknown }).title) === "当前思路",
-                ) as { sections?: unknown }).sections as unknown[]).find(
-                  (section) => typeof section === "object" && section && normalizeText((section as { title?: unknown }).title) === "需要复核",
-                )
-              : null,
-            "需要复核",
-            "当前未识别出必须立即调整的复核点，仍建议结合面诊核对。",
-          ),
-        ],
-      },
-      {
-        title: "建议优化",
-        sections: [
-          normalizeSection(
-            record.groups.find(
-              (group) => typeof group === "object" && group && normalizeText((group as { title?: unknown }).title) === "建议优化",
-            ) && (record.groups.find(
-              (group) => typeof group === "object" && group && normalizeText((group as { title?: unknown }).title) === "建议优化",
-            ) as { sections?: unknown }).sections instanceof Array
-              ? ((record.groups.find(
-                  (group) => typeof group === "object" && group && normalizeText((group as { title?: unknown }).title) === "建议优化",
-                ) as { sections?: unknown }).sections as unknown[]).find(
-                  (section) => typeof section === "object" && section && normalizeText((section as { title?: unknown }).title) === "主要建议",
-                )
-              : null,
-            "主要建议",
-            "本次未形成新的优化建议，可先结合当前方案继续观察。",
-          ),
-          normalizeSection(
-            record.groups.find(
-              (group) => typeof group === "object" && group && normalizeText((group as { title?: unknown }).title) === "建议优化",
-            ) && (record.groups.find(
-              (group) => typeof group === "object" && group && normalizeText((group as { title?: unknown }).title) === "建议优化",
-            ) as { sections?: unknown }).sections instanceof Array
-              ? ((record.groups.find(
-                  (group) => typeof group === "object" && group && normalizeText((group as { title?: unknown }).title) === "建议优化",
-                ) as { sections?: unknown }).sections as unknown[]).find(
-                  (section) => typeof section === "object" && section && normalizeText((section as { title?: unknown }).title) === "可选思路",
-                )
-              : null,
-            "可选思路",
-            "本次未提出额外备选思路。",
-          ),
-        ],
-      },
-      {
-        title: "随访监测",
-        sections: [
-          normalizeSection(
-            record.groups.find(
-              (group) => typeof group === "object" && group && normalizeText((group as { title?: unknown }).title) === "随访监测",
-            ) && (record.groups.find(
-              (group) => typeof group === "object" && group && normalizeText((group as { title?: unknown }).title) === "随访监测",
-            ) as { sections?: unknown }).sections instanceof Array
-              ? ((record.groups.find(
-                  (group) => typeof group === "object" && group && normalizeText((group as { title?: unknown }).title) === "随访监测",
-                ) as { sections?: unknown }).sections as unknown[]).find(
-                  (section) => typeof section === "object" && section && normalizeText((section as { title?: unknown }).title) === "监测建议",
-                )
-              : null,
-            "监测建议",
-            "可按常规复诊节奏结合症状变化继续观察。",
-          ),
-        ],
-      },
-    ];
-
     return {
       title: normalizeText(record.title) || `${caseType}研判`,
-      keyPoints: normalizeStringList(record.keyPoints).length
-        ? normalizeStringList(record.keyPoints)
-        : ["当前方案仍可继续结合面诊信息复核，系统未提炼出更高优先级的结论。"],
+      keyPoints: withFallback(
+        record.keyPoints,
+        "当前方案仍可继续结合面诊信息复核，系统未提炼出更高优先级的结论。",
+      ),
       summary: normalizeText(record.summary) || "已完成病案研判，请结合门诊面诊与复诊计划继续核对。",
-      groups: normalizedGroups,
-      cautions: normalizeStringList(record.cautions).length
-        ? normalizeStringList(record.cautions)
-        : ["请结合面诊与必要检查复核后执行。"],
-      evidence: normalizeStringList(record.evidence).length
-        ? normalizeStringList(record.evidence)
-        : ["基于临床经验与通用知识，尚未接入外部文献检索。"],
+      groups: normalizeStoredGroups(record.groups),
+      cautions: withFallback(record.cautions, "请结合面诊与必要检查复核后执行。"),
+      evidence: withFallback(record.evidence, "基于临床经验与通用知识，尚未接入外部文献检索。"),
     };
   }
 

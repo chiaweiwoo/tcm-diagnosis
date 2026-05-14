@@ -2,13 +2,39 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { callDeepSeekJson, DeepSeekError, estimateDeepSeekCost, extractJsonObject } from "./deepseek";
 
 describe("DeepSeek费用估算", () => {
-  it("根据输入和输出tokens估算美元成本", () => {
+  it("根据 Pro 模型输入和输出 tokens 估算美元成本", () => {
     expect(
       estimateDeepSeekCost({
         prompt_tokens: 3500,
         completion_tokens: 1800,
-      }),
+      }, "deepseek-v4-pro"),
     ).toBe(0.003089);
+  });
+
+  it("根据 Flash 模型输入和输出 tokens 估算美元成本", () => {
+    expect(
+      estimateDeepSeekCost(
+        {
+          prompt_tokens: 3500,
+          completion_tokens: 1800,
+        },
+        "deepseek-v4-flash",
+      ),
+    ).toBe(0.000994);
+  });
+
+  it("优先使用缓存命中与未命中 token 估算输入成本", () => {
+    expect(
+      estimateDeepSeekCost(
+        {
+          prompt_tokens: 5000,
+          prompt_cache_hit_tokens: 4000,
+          prompt_cache_miss_tokens: 1000,
+          completion_tokens: 1000,
+        },
+        "deepseek-v4-pro",
+      ),
+    ).toBe(0.001319);
   });
 
   it("缺少usage时返回0", () => {

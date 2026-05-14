@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { apiError } from "@/lib/apiResponses";
 import { deleteConsultation, getConsultation, updateConsultation } from "@/lib/consultations";
 import { getCurrentDoctorEmail } from "@/lib/currentDoctor";
 import { logServerEvent } from "@/lib/logging";
@@ -26,13 +27,13 @@ export async function GET(_request: Request, context: RouteContext) {
     const record = await getConsultation(id, doctorEmail);
 
     if (!record) {
-      return NextResponse.json({ error: "找不到病案记录。" }, { status: 404 });
+      return apiError(404, "NOT_FOUND", "找不到病案记录。");
     }
 
     return NextResponse.json({ record });
   } catch (error) {
     if (isUnauthorized(error)) {
-      return NextResponse.json({ error: "请先登录。" }, { status: 401 });
+      return apiError(401, "UNAUTHORIZED", "请先登录。");
     }
 
     await logServerEvent({
@@ -40,7 +41,7 @@ export async function GET(_request: Request, context: RouteContext) {
       message: "读取病案记录失败。",
       details: { error: error instanceof Error ? error.message : String(error) },
     });
-    return NextResponse.json({ error: "读取病案记录失败。" }, { status: 500 });
+    return apiError(500, "INTERNAL_ERROR", "读取病案记录失败。");
   }
 }
 
@@ -51,7 +52,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     const existing = await getConsultation(id, doctorEmail);
 
     if (!existing) {
-      return NextResponse.json({ error: "找不到病案记录。" }, { status: 404 });
+      return apiError(404, "NOT_FOUND", "找不到病案记录。");
     }
 
     const body = (await request.json()) as {
@@ -100,7 +101,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ record });
   } catch (error) {
     if (isUnauthorized(error)) {
-      return NextResponse.json({ error: "请先登录。" }, { status: 401 });
+      return apiError(401, "UNAUTHORIZED", "请先登录。");
     }
 
     await logServerEvent({
@@ -108,7 +109,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       message: "更新病案记录失败。",
       details: { error: error instanceof Error ? error.message : String(error) },
     });
-    return NextResponse.json({ error: "更新病案记录失败。" }, { status: 500 });
+    return apiError(500, "INTERNAL_ERROR", "更新病案记录失败。");
   }
 }
 
@@ -120,7 +121,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
     return NextResponse.json({ ok: true });
   } catch (error) {
     if (isUnauthorized(error)) {
-      return NextResponse.json({ error: "请先登录。" }, { status: 401 });
+      return apiError(401, "UNAUTHORIZED", "请先登录。");
     }
 
     await logServerEvent({
@@ -128,6 +129,6 @@ export async function DELETE(_request: Request, context: RouteContext) {
       message: "删除病案记录失败。",
       details: { error: error instanceof Error ? error.message : String(error) },
     });
-    return NextResponse.json({ error: "删除病案记录失败。" }, { status: 500 });
+    return apiError(500, "INTERNAL_ERROR", "删除病案记录失败。");
   }
 }

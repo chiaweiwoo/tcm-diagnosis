@@ -168,6 +168,14 @@
   line-height: 1.6;
 }
 
+.hero-mission {
+  margin: 2px 0 0;
+  color: #ffe6db;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
 .hero-head {
   position: relative;
   z-index: 1;
@@ -337,6 +345,12 @@
   border: 1px solid #e3d6d0;
   border-radius: 999px;
   background: #fffaf7;
+}
+
+.mode-hint {
+  color: #7e6661;
+  font-size: 12px;
+  line-height: 1.3;
 }
 
 .mode-option {

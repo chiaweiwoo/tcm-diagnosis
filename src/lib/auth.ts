@@ -3,11 +3,20 @@ type DoctorAllowlistRecord = {
   is_active?: boolean | null;
 };
 
+function assertDevBypassIsLocalOnly() {
+  if (process.env.DEV_AUTH_BYPASS === "true" && process.env.NODE_ENV !== "development") {
+    throw new Error("DEV_AUTH_BYPASS must not be enabled outside local development.");
+  }
+}
+
 export function normalizeDoctorEmail(email?: string | null) {
+  assertDevBypassIsLocalOnly();
   return email?.trim().toLowerCase() ?? "";
 }
 
 export function getDevBypassDoctorEmail() {
+  assertDevBypassIsLocalOnly();
+
   if (process.env.NODE_ENV !== "development") {
     return "";
   }

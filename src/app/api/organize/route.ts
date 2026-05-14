@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { after } from "next/server";
 import { callDeepSeekJson, DeepSeekError, getDeepSeekFastModel } from "@/lib/ai/deepseek";
+import { apiError } from "@/lib/apiResponses";
 import {
   buildTcmOrganizeUserPrompt,
   TCM_ORGANIZE_PROMPT_VERSION,
@@ -8,6 +9,7 @@ import {
 } from "@/lib/ai/prompts";
 import { logApiCall, logServerEvent } from "@/lib/logging";
 import { mapOrganizedCaseToForm, OrganizedCaseRaw } from "@/lib/ai/organizeCase";
+import { MAX_ORGANIZE_DRAFT_CHARS, validateDraftLength } from "@/lib/inputLimits";
 
 export async function POST(request: NextRequest) {
   const startedAt = Date.now();
@@ -17,7 +19,17 @@ export async function POST(request: NextRequest) {
     const draft = body.draft?.trim();
 
     if (!draft) {
-      return NextResponse.json({ error: "请先输入医生草稿。" }, { status: 400 });
+      return apiError(400, "INVALID_INPUT", "请先输入医生草稿。");
+    }
+
+    const draftLength = validateDraftLength(draft);
+    if (draftLength.tooLong) {
+      return apiError(
+        400,
+        "DRAFT_TOO_LONG",
+        `草稿内容过长，请精简后重新提交（上限${MAX_ORGANIZE_DRAFT_CHARS}字符）。`,
+        { maxChars: MAX_ORGANIZE_DRAFT_CHARS, actualChars: draftLength.length },
+      );
     }
 
     const result = await callDeepSeekJson<OrganizedCaseRaw>({
@@ -70,10 +82,10 @@ export async function POST(request: NextRequest) {
       }),
     );
 
-    return NextResponse.json({
-      form: mapped.form,
-      notes: mapped.notes,
-      suggestions: mapped.suggestions,
+      return NextResponse.json({
+        form: mapped.form,
+        notes: mapped.notes,
+        suggestions: mapped.suggestions,
       usage: result.usage,
       costUsd: result.costUsd,
       model: result.model,
@@ -94,7 +106,7 @@ export async function POST(request: NextRequest) {
         message: error.message,
         details: { status: error.status, stage: "deepseek_call" },
       }));
-      return NextResponse.json({ error: error.message }, { status: error.status });
+      return apiError(error.status, "AI_REQUEST_FAILED", error.message, error.details);
     }
 
     after(() => logApiCall({
@@ -110,6 +122,6 @@ export async function POST(request: NextRequest) {
       message: "整理病案失败，请稍后重试。",
       details: { error: error instanceof Error ? error.message : String(error), stage: "normalize_or_map" },
     }));
-    return NextResponse.json({ error: "整理病案失败，请稍后重试。" }, { status: 500 });
+    return apiError(500, "INTERNAL_ERROR", "整理病案失败，请稍后重试。");
   }
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { apiError } from "@/lib/apiResponses";
 import { createConsultation, listConsultations, updateConsultation } from "@/lib/consultations";
 import { getCurrentDoctorEmail } from "@/lib/currentDoctor";
 import { logServerEvent } from "@/lib/logging";
@@ -14,7 +15,7 @@ export async function GET() {
     return NextResponse.json({ records });
   } catch (error) {
     if (error instanceof Error && error.message === "Unauthorized") {
-      return NextResponse.json({ error: "请先登录。" }, { status: 401 });
+      return apiError(401, "UNAUTHORIZED", "请先登录。");
     }
 
     await logServerEvent({
@@ -22,7 +23,7 @@ export async function GET() {
       message: "读取病案历史失败。",
       details: { error: error instanceof Error ? error.message : String(error) },
     });
-    return NextResponse.json({ error: "读取病案历史失败。" }, { status: 500 });
+    return apiError(500, "INTERNAL_ERROR", "读取病案历史失败。");
   }
 }
 
@@ -42,7 +43,7 @@ export async function POST(request: Request) {
     const draft = typeof body.draft === "string" ? body.draft.trim() : "";
 
     if (!draft) {
-      return NextResponse.json({ error: "请先输入病案记录。" }, { status: 400 });
+      return apiError(400, "INVALID_INPUT", "请先输入病案记录。");
     }
 
     const record = await createConsultation({
@@ -67,7 +68,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ record });
   } catch (error) {
     if (error instanceof Error && error.message === "Unauthorized") {
-      return NextResponse.json({ error: "请先登录。" }, { status: 401 });
+      return apiError(401, "UNAUTHORIZED", "请先登录。");
     }
 
     await logServerEvent({
@@ -75,6 +76,6 @@ export async function POST(request: Request) {
       message: "建立病案记录失败。",
       details: { error: error instanceof Error ? error.message : String(error) },
     });
-    return NextResponse.json({ error: "建立病案记录失败。" }, { status: 500 });
+    return apiError(500, "INTERNAL_ERROR", "建立病案记录失败。");
   }
 }

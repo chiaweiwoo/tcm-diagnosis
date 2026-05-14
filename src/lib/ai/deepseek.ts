@@ -7,6 +7,8 @@ type DeepSeekUsage = {
   prompt_tokens?: number;
   completion_tokens?: number;
   total_tokens?: number;
+  prompt_cache_hit_tokens?: number;
+  prompt_cache_miss_tokens?: number;
 };
 
 type DeepSeekResponse = {
@@ -35,8 +37,18 @@ type DeepSeekJsonResult<T> = {
 type DeepSeekErrorDetails = Record<string, unknown>;
 
 const DEEPSEEK_URL = "https://api.deepseek.com/chat/completions";
-const PRO_INPUT_PER_1M = 0.435;
-const PRO_OUTPUT_PER_1M = 0.87;
+const MODEL_RATES = {
+  flash: {
+    inputCacheHitPer1M: 0.0028,
+    inputCacheMissPer1M: 0.14,
+    outputPer1M: 0.28,
+  },
+  pro: {
+    inputCacheHitPer1M: 0.003625,
+    inputCacheMissPer1M: 0.435,
+    outputPer1M: 0.87,
+  },
+} as const;
 const DEFAULT_TIMEOUT_MS = 45_000;
 
 export class DeepSeekError extends Error {
@@ -67,11 +79,31 @@ export function getDeepSeekFastModel() {
   return process.env.DEEPSEEK_MODEL_FAST || "deepseek-v4-flash";
 }
 
-export function estimateDeepSeekCost(usage?: DeepSeekUsage) {
-  const input = usage?.prompt_tokens ?? 0;
+function getPricingTier(model?: string) {
+  if (!model) return "pro" as const;
+
+  const normalized = model.toLowerCase();
+  if (normalized.includes("flash") || normalized === "deepseek-chat" || normalized === "deepseek-reasoner") {
+    return "flash" as const;
+  }
+
+  return "pro" as const;
+}
+
+export function estimateDeepSeekCost(usage?: DeepSeekUsage, model?: string) {
+  const tier = MODEL_RATES[getPricingTier(model)];
+  const promptTokens = usage?.prompt_tokens ?? 0;
+  const cacheHitTokens = usage?.prompt_cache_hit_tokens ?? 0;
+  const cacheMissTokens = usage?.prompt_cache_miss_tokens ?? Math.max(0, promptTokens - cacheHitTokens);
   const output = usage?.completion_tokens ?? 0;
 
-  return Number(((input / 1_000_000) * PRO_INPUT_PER_1M + (output / 1_000_000) * PRO_OUTPUT_PER_1M).toFixed(6));
+  return Number(
+    (
+      (cacheHitTokens / 1_000_000) * tier.inputCacheHitPer1M +
+      (cacheMissTokens / 1_000_000) * tier.inputCacheMissPer1M +
+      (output / 1_000_000) * tier.outputPer1M
+    ).toFixed(6),
+  );
 }
 
 function combineUsage(...usages: Array<DeepSeekUsage | undefined>): DeepSeekUsage | undefined {
@@ -82,6 +114,8 @@ function combineUsage(...usages: Array<DeepSeekUsage | undefined>): DeepSeekUsag
       prompt_tokens: (acc.prompt_tokens ?? 0) + (usage?.prompt_tokens ?? 0),
       completion_tokens: (acc.completion_tokens ?? 0) + (usage?.completion_tokens ?? 0),
       total_tokens: (acc.total_tokens ?? 0) + (usage?.total_tokens ?? 0),
+      prompt_cache_hit_tokens: (acc.prompt_cache_hit_tokens ?? 0) + (usage?.prompt_cache_hit_tokens ?? 0),
+      prompt_cache_miss_tokens: (acc.prompt_cache_miss_tokens ?? 0) + (usage?.prompt_cache_miss_tokens ?? 0),
     }),
     {},
   );
@@ -239,7 +273,7 @@ export async function callDeepSeekJson<T>({
     maxTokens,
     model,
     timeoutMs,
-    temperature: 0.2,
+    temperature: 0.1,
   });
 
   try {
@@ -248,7 +282,7 @@ export async function callDeepSeekJson<T>({
     return {
       data,
       usage: first.usage,
-      costUsd: estimateDeepSeekCost(first.usage),
+      costUsd: estimateDeepSeekCost(first.usage, model),
       model,
     };
   } catch (error) {
@@ -273,7 +307,7 @@ export async function callDeepSeekJson<T>({
     return {
       data,
       usage,
-      costUsd: estimateDeepSeekCost(usage),
+      costUsd: estimateDeepSeekCost(usage, model),
       model,
       repairedJson: true,
     };
@@ -295,7 +329,7 @@ export async function callDeepSeekJson<T>({
     return {
       data,
       usage,
-      costUsd: estimateDeepSeekCost(usage),
+      costUsd: estimateDeepSeekCost(usage, model),
       model,
       repairedJson: true,
     };

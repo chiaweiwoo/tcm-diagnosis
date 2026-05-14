@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { after } from "next/server";
 import { callDeepSeekJson, DeepSeekError, getDeepSeekAnalyzeModel, getDeepSeekSmartModel } from "@/lib/ai/deepseek";
+import { apiError } from "@/lib/apiResponses";
 import {
   buildTcmAnalysisUserPrompt,
   TCM_ANALYSIS_PROMPT_VERSION,
@@ -19,12 +20,18 @@ export async function POST(request: NextRequest) {
     const parsed = caseSchema.safeParse(body.form);
 
     if (!parsed.success) {
-      return NextResponse.json({ error: "病案资料未通过校验，请先复核必填字段。" }, { status: 400 });
+      return apiError(400, "INVALID_INPUT", "病案资料未通过校验，请先复核必填字段。");
     }
 
     reviewMode = body.mode === "normal" ? "normal" : "smart";
 
     const validation = validateCaseForm(parsed.data);
+    if (!validation.canProceed) {
+      return apiError(400, "VALIDATION_BLOCKED", "病案资料未通过校验，请先根据资料整理提示补充后再复核。", {
+        stageOneHints: validation.stageOneHints,
+        blockedReasons: validation.blockedReasons,
+      });
+    }
 
     const result = await callDeepSeekJson<AnalysisJson>({
       messages: [
@@ -108,7 +115,7 @@ export async function POST(request: NextRequest) {
           details: { status: error.status, stage: "deepseek_call", reviewMode, ...(error.details ?? {}) },
         }),
       );
-      return NextResponse.json({ error: error.message }, { status: error.status });
+      return apiError(error.status, "AI_REQUEST_FAILED", error.message, error.details);
     }
 
     after(() =>
@@ -128,6 +135,6 @@ export async function POST(request: NextRequest) {
         details: { error: error instanceof Error ? error.message : String(error), stage: "normalize_or_map" },
       }),
     );
-    return NextResponse.json({ error: "生成分析失败，请稍后重试。" }, { status: 500 });
+    return apiError(500, "INTERNAL_ERROR", "生成分析失败，请稍后重试。");
   }
 }

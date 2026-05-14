@@ -51,6 +51,7 @@ The tool helps registered TCM doctors:
    - `DEV_AUTH_BYPASS === "true"`
    - `DEV_AUTH_EMAIL` is present and still passes the doctor allowlist check
 8. The dev-only bypass must never be honored in production or preview deployments.
+9. Server routes must reject overlong drafts before any AI call is made. The current organize draft ceiling is `8000` characters.
 
 ## Stage-One Clinical Guardrails
 
@@ -131,6 +132,7 @@ Recommended-but-not-hard-block fields:
 - Organize call should use the fast model path.
 - Analyze call should default to `DEEPSEEK_MODEL_ANALYZE`, then fall back to `DEEPSEEK_MODEL_FAST`, not the deep model by default.
 - Deep model can still be used for repair fallback when fast repair fails.
+- Cost logging must reflect the actual model tier used for the call; do not apply pro pricing to flash-mode runs.
 - Keep analyze outputs concise; long completions are a common latency problem.
 - Show elapsed time during runs and on loaded history.
 - Token usage and estimated cost must stay internal only.
@@ -194,8 +196,8 @@ Always check all applicable paths after meaningful changes:
 7. deploy/build marker visible when relevant
 
 Do not say "done" until the changed path is verified, not merely coded.
-Use [docs/agent-audit-checklist.md](C:\Users\chiaw\OneDrive\Desktop\playground\tcm-diagnosis\docs\agent-audit-checklist.md) as the concrete release-path checklist.
-Project-local reusable workflow notes also live in [codex-skills/tcm-workbench-audit/SKILL.md](C:\Users\chiaw\OneDrive\Desktop\playground\tcm-diagnosis\codex-skills\tcm-workbench-audit\SKILL.md).
+Use [docs/agent-audit-checklist.md](docs/agent-audit-checklist.md) as the concrete release-path checklist.
+Project-local reusable workflow notes also live in [codex-skills/tcm-workbench-audit/SKILL.md](codex-skills/tcm-workbench-audit/SKILL.md).
 
 ## Documentation Direction
 
