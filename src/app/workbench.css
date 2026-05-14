@@ -695,6 +695,24 @@
   margin-bottom: 8px;
 }
 
+.loading-review-panel {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.loading-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.loading-copy {
+  margin: 6px 0 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
 .organize-review-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -916,6 +934,59 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
+}
+
+.analysis-board-loading {
+  margin-top: 2px;
+}
+
+.loading-column,
+.loading-card {
+  overflow: hidden;
+}
+
+.loading-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #eeded8 0%, #f9f0eb 50%, #eeded8 100%);
+  background-size: 220% 100%;
+  animation: loading-shimmer 1.3s ease-in-out infinite;
+}
+
+.loading-lines {
+  display: grid;
+  gap: 8px;
+}
+
+.loading-line {
+  display: block;
+  height: 10px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #efe3de 0%, #fbf5f1 50%, #efe3de 100%);
+  background-size: 220% 100%;
+  animation: loading-shimmer 1.3s ease-in-out infinite;
+}
+
+.loading-card h4 .loading-line {
+  height: 12px;
+}
+
+.w-96 { width: 96%; }
+.w-92 { width: 92%; }
+.w-88 { width: 88%; }
+.w-84 { width: 84%; }
+.w-76 { width: 76%; }
+.w-72 { width: 72%; }
+.w-42 { width: 42%; }
+
+@keyframes loading-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
 }
 
 .modal-backdrop {

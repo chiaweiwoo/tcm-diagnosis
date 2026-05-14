@@ -96,6 +96,8 @@ Recommended-but-not-hard-block fields:
   - stop before analyze if validation hard-blocks the case
   - keep the right-side panel as a merged `研判状态 + 资料完整性` surface
   - when organize is ready but analysis is not yet available, show an intermediate organize result panel in the main workspace
+  - while analyze is running, show a visible loading shell in the main lower workspace so doctors can tell the second stage is still progressing
+  - after analysis completes, the right-side panel should return to workflow summary only and should not duplicate the main `资料完整性` content
 - Review mode selector:
   - show a visible `智能 / 常规` switch in the workbench
   - store the preference in local browser storage

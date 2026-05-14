@@ -803,12 +803,16 @@ export default function Workbench({
         </div>
       </section>
 
-      {organizeReady && !analysisReady ? (
+      {organizeReady && !analysisReady && isAnalyzing ? (
+        <AnalysisLoadingPanel caseType={form.caseType} />
+      ) : null}
+
+      {organizeReady && !analysisReady && !isAnalyzing ? (
         <section className="panel result-panel-full organize-preview-panel">
           <div className="section-heading">
             <div>
-              <p className="eyebrow">资料整理</p>
-              <h2>{blockMessages.length ? "建议先补充后再复核" : isAnalyzing ? "资料已整理，正在进入临床复核" : "资料整理结果"}</h2>
+              <p className="eyebrow">{"资料整理"}</p>
+              <h2>{blockMessages.length ? "建议先补充后再复核" : "资料整理结果"}</h2>
             </div>
             <span className="pill">{form.caseType}</span>
           </div>
@@ -1003,6 +1007,7 @@ function MergedStatusPanel({
   const draftChars = draft.trim().length;
   const organizeHighlights = [...stageOneHints, ...missingContext, ...organizeSuggestions].filter(Boolean);
   const hasBlocked = blockedReasons.length > 0;
+  const showInlineCompleteness = hasBlocked || isOrganizing || isAnalyzing || (organizeReady && !analysisReady);
 
   let stageTitle = "可开始记录";
   let stageBody = "先写下病案重点；系统会先整理资料脉络，再进入临床复核。";
@@ -1063,7 +1068,7 @@ function MergedStatusPanel({
           {draftChars && (isRunning || analysisReady || organizeReady || hasBlocked) ? (
             <p>已用时：{elapsedSeconds} 秒</p>
           ) : null}
-          {organizeHighlights.length || organizeNotes.length || blockedReasons.length ? (
+          {showInlineCompleteness && (organizeHighlights.length || organizeNotes.length || blockedReasons.length) ? (
             <div className="status-inline-section">
               <strong>资料完整性</strong>
               {organizeHighlights.length ? (
@@ -1093,6 +1098,60 @@ function MergedStatusPanel({
         </article>
       )}
     </aside>
+  );
+}
+
+function AnalysisLoadingPanel({ caseType }: { caseType: CaseForm["caseType"] }) {
+  return (
+    <section className="panel result-panel-full loading-review-panel" aria-live="polite" aria-busy="true">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">{"临床复核"}</p>
+          <h2 className="loading-heading">
+            <LoaderCircle size={18} className="status-rotating" />
+            {"正在生成临床复核建议"}
+          </h2>
+          <p className="loading-copy">{"资料已整理完成，系统正在形成判断、方案与随访重点，结果会显示在下方。"}</p>
+        </div>
+        <span className="pill">{caseType}</span>
+      </div>
+
+      <section className="result-group key-conclusion">
+        <SectionTitle icon={<Sparkles size={18} />}>{"重点结论"}</SectionTitle>
+        <article className="result-card loading-card">
+          <div className="loading-lines">
+            <span className="loading-line w-92" />
+            <span className="loading-line w-84" />
+            <span className="loading-line w-76" />
+          </div>
+        </article>
+      </section>
+
+      <section className="analysis-board analysis-board-loading">
+        {["资料", "判断", "方案", "随访安全"].map((title) => (
+          <article key={title} className="analysis-column loading-column">
+            <h3 className="analysis-column-title">
+              <span className="loading-dot" />
+              {title}
+            </h3>
+            <div className="analysis-column-sections">
+              {[0, 1].map((index) => (
+                <section className="analysis-section loading-card" key={`${title}-${index}`}>
+                  <h4>
+                    <span className="loading-line w-42" />
+                  </h4>
+                  <div className="loading-lines">
+                    <span className="loading-line w-96" />
+                    <span className="loading-line w-88" />
+                    <span className="loading-line w-72" />
+                  </div>
+                </section>
+              ))}
+            </div>
+          </article>
+        ))}
+      </section>
+    </section>
   );
 }
 
