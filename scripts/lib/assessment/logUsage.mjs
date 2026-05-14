@@ -71,19 +71,9 @@ export function estimateCostFromRates(usage, rates) {
   );
 }
 
-// AI provider pricing — USD per 1M tokens.
-// Update when provider announces price changes. Last verified: 2026-05.
-const RATES = {
-  deepseek: {
-    flash: { inputCacheHitPer1M: 0.0028, inputCacheMissPer1M: 0.14,   outputPer1M: 0.28 },
-    pro:   { inputCacheHitPer1M: 0.003625, inputCacheMissPer1M: 0.435, outputPer1M: 0.87 },
-  },
-  anthropic: {
-    haiku:  { inputCacheHitPer1M: 0.03, inputCacheMissPer1M: 0.25,  outputPer1M: 1.25 },
-    sonnet: { inputCacheHitPer1M: 0.3,  inputCacheMissPer1M: 3.0,   outputPer1M: 15.0 },
-    opus:   { inputCacheHitPer1M: 1.5,  inputCacheMissPer1M: 15.0,  outputPer1M: 75.0 },
-  },
-};
+import { createRequire } from "module";
+const _require = createRequire(import.meta.url);
+const RATES = _require("../../../config/rates.json");
 
 export function getDeepSeekProRates()     { return RATES.deepseek.pro; }
 export function getDeepSeekFlashRates()   { return RATES.deepseek.flash; }

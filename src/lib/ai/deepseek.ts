@@ -50,18 +50,13 @@ type DeepSeekJsonResult<T> = {
 
 type DeepSeekErrorDetails = Record<string, unknown>;
 
+import RATES from "../../../config/rates.json";
+
 const DEEPSEEK_URL = "https://api.deepseek.com/chat/completions";
 const DEFAULT_TIMEOUT_MS = 45_000;
 
-// DeepSeek pricing — USD per 1M tokens.
-// Update when DeepSeek announces price changes. Last verified: 2026-05.
-const MODEL_RATES = {
-  flash: { inputCacheHitPer1M: 0.0028, inputCacheMissPer1M: 0.14, outputPer1M: 0.28 },
-  pro:   { inputCacheHitPer1M: 0.003625, inputCacheMissPer1M: 0.435, outputPer1M: 0.87 },
-} as const;
-
 function getModelRates() {
-  return MODEL_RATES;
+  return RATES.deepseek;
 }
 
 export class DeepSeekError extends Error {
