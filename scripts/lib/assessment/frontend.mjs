@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { runBrowserScenarios } from "./browser.mjs";
 import { reviewFrontendUX, reviewFrontendTCM, reviewFrontendVisual } from "./frontendReviewers.mjs";
+import { buildHtmlReport } from "./htmlReport.mjs";
 
 function pickRandomExamples(examples, count) {
   const eligible = examples.filter((e) => e.draft && e.draft.trim().length > 100);
@@ -150,6 +151,8 @@ export async function runFrontendAssessment({ baseUrl, examples, screenshotDir, 
     screenshots,
   };
 
+  const htmlReport = await buildHtmlReport(reportData);
+
   const markdownReport = buildMarkdownReport({
     runId,
     generatedAt,
@@ -161,5 +164,5 @@ export async function runFrontendAssessment({ baseUrl, examples, screenshotDir, 
     selectedExamples,
   });
 
-  return { reportData, markdownReport };
+  return { reportData, markdownReport, htmlReport };
 }

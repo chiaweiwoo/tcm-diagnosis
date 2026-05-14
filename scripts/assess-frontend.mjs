@@ -47,9 +47,11 @@ async function main() {
 
     const markdownPath = path.join(outputDir, "frontend-report.md");
     const jsonPath = path.join(outputDir, "frontend-report.json");
+    const htmlPath = path.join(outputDir, "frontend-report.html");
 
     await fs.writeFile(markdownPath, markdownReport, "utf8");
     await fs.writeFile(jsonPath, JSON.stringify(reportData, null, 2), "utf8");
+    await fs.writeFile(htmlPath, htmlReport, "utf8");
 
     // Save to Supabase using the same pattern as backend assessment
     const savedToDb = await saveAssessmentRun({
@@ -90,6 +92,7 @@ async function main() {
           aggregate: reportData.aggregate,
           markdownReport: markdownPath,
           jsonReport: jsonPath,
+          htmlReport: htmlPath,
           screenshots: reportData.screenshots.length,
           savedToDb,
         },
