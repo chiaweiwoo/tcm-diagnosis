@@ -136,7 +136,7 @@ Recommended-but-not-hard-block fields:
 - Analyze call should default to `DEEPSEEK_MODEL_ANALYZE`, then fall back to `DEEPSEEK_MODEL_FAST`, not the deep model by default.
 - Deep model can still be used for repair fallback when fast repair fails.
 - Cost logging must reflect the actual model tier used for the call.
-- AI provider pricing (DeepSeek and Anthropic) changes over time. Rates use a stale-while-revalidate cache (24h TTL on server, once per CLI process). Set `AI_RATES_URL` to a JSON endpoint covering both providers: `{ deepseek: { flash, pro }, anthropic: { haiku, sonnet, opus } }` — each tier has `inputCacheHitPer1M`, `inputCacheMissPer1M`, `outputPer1M`. Individual env var overrides (`DEEPSEEK_*_PER_1M`, `ANTHROPIC_*_PER_1M`) are applied on top and take precedence. See `.env.local.example` for the full list.
+- AI provider pricing (DeepSeek and Anthropic) is hardcoded as constants in `src/lib/ai/deepseek.ts` and `scripts/lib/assessment/logUsage.mjs`. Both include a `Last verified: YYYY-MM` comment. When prices change, update those constants and push — no env vars or external URLs involved.
 - Keep analyze outputs concise; long completions are a common latency problem.
 - Show elapsed time during runs and on loaded history.
 - Token usage and estimated cost must stay internal only.

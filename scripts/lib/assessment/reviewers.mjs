@@ -84,7 +84,7 @@ export async function reviewBackendAssessment(summary) {
     }
 
     success = true;
-    const rates = await getDeepSeekProRates();
+    const rates = getDeepSeekProRates();
     const costUsd = estimateCostFromRates(payload.usage, rates);
     const result = { model: payload.model ?? model, usage: payload.usage ?? null, text: content.trim() };
 
