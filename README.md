@@ -83,6 +83,7 @@ flowchart LR
 - Doctor allowlist is now read from Supabase when the `doctor_allowlist` table is available, with environment-variable fallback during transition.
 - Local development can optionally use a strict dev-only auth bypass with `DEV_AUTH_BYPASS=true` and `DEV_AUTH_EMAIL=...`; it is ignored outside `NODE_ENV=development`.
 - Internal agent discipline follows a release-path audit: fresh run, saved-history reload, stage-one block, partial organize, final analysis, docs sync, and build marker verification.
+- Local real-doctor draft examples are kept in markdown as a single source of truth for manual copy/paste and future local assessment runs.
 
 ---
 

@@ -163,6 +163,13 @@ Logging should not block doctor-facing responses.
 - Doctors can save, reopen, rename, edit, regenerate, and delete records.
 - Editing a draft clears the current analysis and requires regeneration.
 
+## Local Working Data
+
+- Real doctor example drafts used for local prompt/guardrail review should live in markdown, not parallel JSON copies.
+- Canonical local example source: `local-data/real-doctor-examples.md`
+- Supporting local note file: `local-data/real-doctor-examples-notes.md`
+- If future scripts need these examples, parse the markdown source directly instead of maintaining a second serialized copy that can drift.
+
 ## Design Direction
 
 - Warm clinic red and off-white palette.
