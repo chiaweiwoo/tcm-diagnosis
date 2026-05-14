@@ -1,7 +1,4 @@
-import fs from "node:fs/promises";
-import path from "node:path";
 import { postJson } from "./http.mjs";
-import { reviewBackendAssessment } from "./reviewers.mjs";
 
 const REVIEW_MODES = ["smart", "normal"];
 
@@ -112,86 +109,8 @@ function buildAggregateSummary(results) {
   };
 }
 
-function renderBackendMarkdown(results, aggregate, reviewer) {
-  const lines = [];
-  lines.push("# Backend Assessment Report", "");
-  lines.push(`- Run ID: \`${results.runId}\``);
-  lines.push(`- Generated at: ${results.generatedAt}`);
-  lines.push(`- Base URL: ${results.baseUrl}`);
-  lines.push(`- Example count: ${results.examples.length}`, "");
 
-  lines.push("## Stability Summary", "");
-  const org = aggregate.organizeStats;
-  lines.push(`- Organize success: ${org.success}/${org.total} (${Math.round((org.success / org.total) * 100)}%)`);
-  lines.push("");
-
-  lines.push("## Mode Comparison", "");
-  for (const mode of REVIEW_MODES) {
-    const stats = aggregate.modeStats[mode];
-    const successRate = stats.count > 0 ? Math.round((stats.success / stats.count) * 100) : 0;
-    lines.push(`### ${mode === "smart" ? "智能" : "常规"}`);
-    lines.push(`- Runs: ${stats.count}`);
-    lines.push(`- Success: ${stats.success} (${successRate}%)`);
-    lines.push(`- Blocked: ${stats.blocked}`);
-    lines.push(`- Failed: ${stats.failed}`);
-    lines.push(`- Repair triggered: ${stats.repairTriggered}`);
-    lines.push(`- Avg latency: ${stats.averageLatencyMs} ms`);
-    lines.push(`- Avg cost: US$${stats.averageCostUsd}`, "");
-  }
-
-  if (Object.keys(aggregate.blockedReasonGroups ?? {}).length) {
-    lines.push("## Blocked Case Reasons", "");
-    for (const [reason, count] of Object.entries(aggregate.blockedReasonGroups)) {
-      lines.push(`- (×${count}) ${reason}`);
-    }
-    lines.push("");
-  }
-
-  lines.push("## Example Outcomes", "");
-  for (const item of results.examples) {
-    lines.push(`### ${item.id} · ${item.topicGuess}`);
-    lines.push(`- Case type guess: ${item.caseTypeGuess}`);
-    lines.push(`- Draft preview: ${item.draftPreview}`);
-    lines.push(`- Organize: ${item.organize.status} (${item.organize.latencyMs} ms)`);
-    if (item.organize.formSummary.length) {
-      lines.push(`- Organized fields: ${item.organize.formSummary.join(" / ")}`);
-    }
-    for (const mode of REVIEW_MODES) {
-      const run = item.modes[mode];
-      if (!run) continue;
-      const repairFlag = run.repairedJson ? " · repaired" : "";
-      lines.push(
-        `- ${mode === "smart" ? "智能" : "常规"}: ${run.status} · ${run.latencyMs} ms · ${run.model ?? "n/a"} · US$${run.costUsd ?? 0}${repairFlag}`,
-      );
-      if (run.error) {
-        lines.push(`  - Error: ${run.error}`);
-      }
-      if (run.blockedReasons?.length) {
-        for (const reason of run.blockedReasons) {
-          lines.push(`  - Blocked: ${reason}`);
-        }
-      }
-      if (run.result?.keyPoints?.length) {
-        for (const point of run.result.keyPoints.slice(0, 3)) {
-          lines.push(`  - Key point: ${point}`);
-        }
-      }
-    }
-    lines.push("");
-  }
-
-  lines.push("## DeepSeek Review", "");
-  lines.push(reviewer.text, "");
-
-  return lines.join("\n");
-}
-
-export async function runBackendAssessment({
-  baseUrl,
-  examples,
-  output,
-  runId,
-}) {
+export async function runBackendAssessment({ baseUrl, examples, runId }) {
   const generatedAt = new Date().toISOString();
   const results = {
     runId,
@@ -200,7 +119,7 @@ export async function runBackendAssessment({
     examples: [],
   };
 
-  for (const example of examples) {
+  async function runExample(example) {
     const organize = await postJson(`${baseUrl}/api/organize`, { draft: example.draft });
     const item = {
       id: example.id,
@@ -228,8 +147,14 @@ export async function runBackendAssessment({
         form.tonguePulse ? "舌脉与四诊" : "",
       ].filter(Boolean);
 
-      for (const mode of REVIEW_MODES) {
-        const analyze = await postJson(`${baseUrl}/api/analyze`, { form, mode });
+      // Run smart and normal in parallel — they're independent once organized
+      const modeResults = await Promise.all(
+        REVIEW_MODES.map((mode) => postJson(`${baseUrl}/api/analyze`, { form, mode })),
+      );
+
+      for (let i = 0; i < REVIEW_MODES.length; i++) {
+        const mode = REVIEW_MODES[i];
+        const analyze = modeResults[i];
         item.modes[mode] = {
           status: analyze.ok
             ? "success"
@@ -248,27 +173,12 @@ export async function runBackendAssessment({
       }
     }
 
-    results.examples.push(item);
+    return item;
   }
 
+  // Run all examples in parallel — independent of each other
+  results.examples = await Promise.all(examples.map(runExample));
+
   const aggregate = buildAggregateSummary(results);
-  await fs.writeFile(path.join(output.outputDir, "backend-results.json"), JSON.stringify(results, null, 2));
-
-  const reviewer = await reviewBackendAssessment(aggregate);
-  const markdown = renderBackendMarkdown(results, aggregate, reviewer);
-  const jsonReport = {
-    ...results,
-    aggregate,
-    reviewer,
-  };
-
-  await fs.writeFile(path.join(output.outputDir, "backend-report.json"), JSON.stringify(jsonReport, null, 2));
-  await fs.writeFile(path.join(output.outputDir, "backend-report.md"), markdown, "utf8");
-
-  return {
-    results,
-    aggregate,
-    reviewer,
-    markdown,
-  };
+  return { results, aggregate };
 }

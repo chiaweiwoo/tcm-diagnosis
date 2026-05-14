@@ -7,53 +7,122 @@ function getSupabaseConfig() {
   return { supabaseUrl, serviceKey };
 }
 
-export async function saveAssessmentRun({ results, aggregate, reviewer, extra = {} }) {
-  const config = getSupabaseConfig();
+function warnNoCredentials(caller) {
+  console.warn(`[db:${caller}] Supabase credentials not set — skipped.`);
+}
 
-  if (!config) {
-    console.warn("[db] Supabase credentials not set — assessment run not saved to database.");
-    return false;
+async function supabasePost(config, path, body) {
+  const response = await fetch(`${config.supabaseUrl}/rest/v1/${path}`, {
+    method: "POST",
+    headers: {
+      apikey: config.serviceKey,
+      Authorization: `Bearer ${config.serviceKey}`,
+      "Content-Type": "application/json",
+      Prefer: "return=minimal",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`${response.status} ${detail.slice(0, 300)}`);
   }
+}
+
+async function supabasePatch(config, path, body) {
+  const response = await fetch(`${config.supabaseUrl}/rest/v1/${path}`, {
+    method: "PATCH",
+    headers: {
+      apikey: config.serviceKey,
+      Authorization: `Bearer ${config.serviceKey}`,
+      "Content-Type": "application/json",
+      Prefer: "return=minimal",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`${response.status} ${detail.slice(0, 300)}`);
+  }
+}
+
+async function supabaseGet(config, path) {
+  const response = await fetch(`${config.supabaseUrl}/rest/v1/${path}`, {
+    headers: {
+      apikey: config.serviceKey,
+      Authorization: `Bearer ${config.serviceKey}`,
+      Accept: "application/json",
+    },
+  });
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`${response.status} ${detail.slice(0, 300)}`);
+  }
+  return response.json();
+}
+
+// assess:run — save raw results immediately after API calls, before reviewer
+export async function saveRawRun({ runId, results, aggregate, baseUrl }) {
+  const config = getSupabaseConfig();
+  if (!config) { warnNoCredentials("saveRawRun"); return false; }
 
   const row = {
-    run_id: results.runId,
-    triggered_by: extra.triggered_by ?? "cli",
+    run_id: runId,
+    triggered_by: "assess:run",
     created_at: results.generatedAt,
     example_count: results.examples.length,
-    base_url: results.baseUrl,
+    base_url: baseUrl,
     organize_stats: aggregate.organizeStats ?? null,
     mode_stats: aggregate.modeStats ?? null,
     blocked_reason_groups: aggregate.blockedReasonGroups ?? null,
-    reviewer_text: reviewer.text ?? null,
-    reviewer_model: reviewer.model ?? null,
-    full_report: extra.full_report ?? { results, aggregate, reviewer },
-    status: "completed",
+    raw_results: { results, aggregate },
+    status: "raw",
   };
 
   try {
-    const response = await fetch(
-      `${config.supabaseUrl}/rest/v1/${SUPABASE_TABLE}`,
+    await supabasePost(config, SUPABASE_TABLE, row);
+    return true;
+  } catch (err) {
+    console.error(`[db:saveRawRun] ${err.message}`);
+    return false;
+  }
+}
+
+// assess:review — fetch the raw run so the reviewer can read the aggregate
+export async function fetchRawRun(runId) {
+  const config = getSupabaseConfig();
+  if (!config) { warnNoCredentials("fetchRawRun"); return null; }
+
+  try {
+    const rows = await supabaseGet(
+      config,
+      `${SUPABASE_TABLE}?run_id=eq.${encodeURIComponent(runId)}&select=run_id,raw_results,organize_stats,mode_stats,blocked_reason_groups,example_count,base_url,created_at`,
+    );
+    if (!rows || rows.length === 0) throw new Error(`run_id not found: ${runId}`);
+    return rows[0];
+  } catch (err) {
+    console.error(`[db:fetchRawRun] ${err.message}`);
+    return null;
+  }
+}
+
+// assess:review — write reviewer output and mark the run as reviewed
+export async function updateReviewerOutput({ runId, reviewer }) {
+  const config = getSupabaseConfig();
+  if (!config) { warnNoCredentials("updateReviewerOutput"); return false; }
+
+  try {
+    await supabasePatch(
+      config,
+      `${SUPABASE_TABLE}?run_id=eq.${encodeURIComponent(runId)}`,
       {
-        method: "POST",
-        headers: {
-          apikey: config.serviceKey,
-          Authorization: `Bearer ${config.serviceKey}`,
-          "Content-Type": "application/json",
-          Prefer: "return=minimal",
-        },
-        body: JSON.stringify(row),
+        reviewer_text: reviewer.text ?? null,
+        reviewer_model: reviewer.model ?? null,
+        status: "reviewed",
       },
     );
-
-    if (!response.ok) {
-      const detail = await response.text();
-      console.error(`[db] Failed to save assessment run: ${response.status} ${detail.slice(0, 300)}`);
-      return false;
-    }
-
     return true;
-  } catch (error) {
-    console.error("[db] Error saving assessment run:", error instanceof Error ? error.message : String(error));
+  } catch (err) {
+    console.error(`[db:updateReviewerOutput] ${err.message}`);
     return false;
   }
 }
