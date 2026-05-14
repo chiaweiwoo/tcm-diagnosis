@@ -20,9 +20,11 @@ type ApiCallLogInput = {
     prompt_cache_miss_tokens?: number;
   };
   costUsd?: number;
-  cacheMissRatePer1m?: number;
-  outputRatePer1m?: number;
-  cacheHitRatePer1m?: number;
+  ratesSnapshot?: {
+    inputCacheHitPer1M: number;
+    inputCacheMissPer1M: number;
+    outputPer1M: number;
+  };
   promptVersion?: string;
   errorMessage?: string;
   metadata?: Record<string, unknown>;
@@ -89,9 +91,7 @@ export async function logApiCall(input: ApiCallLogInput) {
         input_cache_hit_tokens: input.usage?.prompt_cache_hit_tokens ?? null,
         input_cache_miss_tokens: input.usage?.prompt_cache_miss_tokens ?? null,
         cost_usd: input.costUsd ?? null,
-        input_rate_per_1m: input.cacheMissRatePer1m ?? null,
-        output_rate_per_1m: input.outputRatePer1m ?? null,
-        cache_hit_rate_per_1m: input.cacheHitRatePer1m ?? null,
+        rates_snapshot: input.ratesSnapshot ?? null,
         prompt_version: input.promptVersion ?? null,
         error_message: input.errorMessage ?? null,
         metadata: input.metadata ?? null,

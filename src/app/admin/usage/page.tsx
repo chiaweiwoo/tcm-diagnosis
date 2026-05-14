@@ -15,9 +15,9 @@ function fmtLatency(ms: number | null) {
   return ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`;
 }
 
-function fmtRate(rate: number | null) {
-  if (rate === null) return "—";
-  return `$${rate}`;
+function fmtRates(snapshot: { inputCacheHitPer1M: number; inputCacheMissPer1M: number; outputPer1M: number } | null) {
+  if (!snapshot) return "—";
+  return `$${snapshot.inputCacheMissPer1M} / $${snapshot.outputPer1M}`;
 }
 
 export default async function AdminUsagePage() {
@@ -74,9 +74,7 @@ export default async function AdminUsagePage() {
                 <th>缓存命中</th>
                 <th>缓存未命中</th>
                 <th>输出</th>
-                <th>缓存命中价/1M</th>
-                <th>输入价/1M</th>
-                <th>输出价/1M</th>
+                <th>价格快照 (输入/输出/1M)</th>
                 <th>费用</th>
               </tr>
             </thead>
@@ -102,15 +100,13 @@ export default async function AdminUsagePage() {
                   <td>{fmtTokens(row.input_cache_hit_tokens)}</td>
                   <td>{fmtTokens(row.input_cache_miss_tokens)}</td>
                   <td>{fmtTokens(row.completion_tokens)}</td>
-                  <td>{fmtRate(row.cache_hit_rate_per_1m)}</td>
-                  <td>{fmtRate(row.input_rate_per_1m)}</td>
-                  <td>{fmtRate(row.output_rate_per_1m)}</td>
+                  <td style={{ fontSize: "0.75rem" }}>{fmtRates(row.rates_snapshot)}</td>
                   <td>{row.cost_usd !== null ? fmtCost(row.cost_usd) : "—"}</td>
                 </tr>
               ))}
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={13} style={{ textAlign: "center", padding: "2rem", color: "var(--meta-color)" }}>
+                  <td colSpan={11} style={{ textAlign: "center", padding: "2rem", color: "var(--meta-color)" }}>
                     暂无记录
                   </td>
                 </tr>

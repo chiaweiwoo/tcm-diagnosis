@@ -13,9 +13,7 @@ export type ApiCallLogRow = {
   input_cache_hit_tokens: number | null;
   input_cache_miss_tokens: number | null;
   cost_usd: number | null;
-  input_rate_per_1m: number | null;
-  output_rate_per_1m: number | null;
-  cache_hit_rate_per_1m: number | null;
+  rates_snapshot: { inputCacheHitPer1M: number; inputCacheMissPer1M: number; outputPer1M: number } | null;
   prompt_version: string | null;
   error_message: string | null;
   metadata: Record<string, unknown> | null;

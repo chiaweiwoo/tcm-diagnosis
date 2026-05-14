@@ -44,9 +44,7 @@ export async function logApiCallUsage({
         input_cache_hit_tokens: usage?.prompt_cache_hit_tokens ?? null,
         input_cache_miss_tokens: usage?.prompt_cache_miss_tokens ?? null,
         cost_usd: costUsd ?? null,
-        input_rate_per_1m: rates?.inputCacheMissPer1M ?? null,
-        output_rate_per_1m: rates?.outputPer1M ?? null,
-        cache_hit_rate_per_1m: rates?.inputCacheHitPer1M ?? null,
+        rates_snapshot: rates ?? null,
         metadata: metadata ?? null,
       }),
     });
