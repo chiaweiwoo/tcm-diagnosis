@@ -1,6 +1,7 @@
 type DoctorAllowlistRecord = {
   email: string;
   is_active?: boolean | null;
+  is_admin?: boolean | null;
 };
 
 function assertDevBypassIsLocalOnly() {
@@ -58,7 +59,7 @@ async function fetchAllowlistRecord(email: string) {
 
   try {
     const url = new URL(config.baseUrl);
-    url.searchParams.set("select", "email,is_active");
+    url.searchParams.set("select", "email,is_active,is_admin");
     url.searchParams.set("email", `eq.${email}`);
     url.searchParams.set("limit", "1");
 
@@ -120,4 +121,12 @@ export async function isAllowedDoctorEmail(email?: string | null) {
   }
 
   return parseEnvAllowlist().includes(normalized);
+}
+
+export async function isAdminDoctorEmail(email?: string | null) {
+  const normalized = normalizeDoctorEmail(email);
+  if (!normalized) return false;
+
+  const record = await fetchAllowlistRecord(normalized);
+  return record?.is_active !== false && record?.is_admin === true;
 }
