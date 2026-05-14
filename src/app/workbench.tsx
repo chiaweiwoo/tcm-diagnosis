@@ -81,6 +81,7 @@ const initialForm: CaseForm = {
   age: "",
   sex: "",
   constitution: "",
+  tonguePulse: "",
   chiefComplaint: "",
   duration: "",
   history: "",
@@ -931,7 +932,7 @@ function GuideModal({
           <section className="guide-section">
             <h4>系统如何工作</h4>
             <ol>
-              <li>先按你的习惯写下病案重点、当前方案，以及这次想确认的问题。</li>
+              <li>先按你的习惯写下病案重点、当前方案；若已见舌脉或四诊线索，也建议顺手写入。</li>
               <li>系统先整理资料脉络，提示值得补充与值得留意的地方。</li>
               <li>基础信息足够时，系统才继续进入临床复核，给出判断、优化与随访提醒。</li>
             </ol>
@@ -941,7 +942,8 @@ function GuideModal({
             <ul>
               <li>仅供注册中医师内部参考，不替代面诊、查体与专业评估。</li>
               <li>系统会优先保留当前方案里合理的部分，再提示可优化之处。</li>
-              <li>若内容像患者自用、保证疗效、或问题过于笼统，系统会停在资料整理阶段。</li>
+              <li>若未直接写医生问题，但现行方案已足够明确，系统仍可先按默认复核意图继续判断。</li>
+              <li>若内容像患者自用、保证疗效、或连复核意图都不清楚，系统会停在资料整理阶段。</li>
             </ul>
           </section>
           <section className="guide-section">
@@ -959,7 +961,7 @@ function GuideModal({
           <section className="guide-section">
             <h4>什么时候会先停下来</h4>
             <ul>
-              <li>主诉、当前方案、医生问题、病程线索不足时。</li>
+              <li>主诉、当前方案、病程线索不足，且无法看出清晰复核意图时。</li>
               <li>方药分析缺少方药内容，或针灸方案缺少穴位与操作时。</li>
               <li>出现患者自用、保证疗效、或“帮我看看”这类过于笼统的问题时。</li>
             </ul>

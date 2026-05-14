@@ -71,10 +71,13 @@ flowchart LR
 
 - The product uses a two-step AI pipeline: `organize -> analyze`.
 - Organize-stage output is surfaced immediately in the workbench and can stop before analysis when hard guardrails fail.
+- `舌脉与四诊要点` is treated as first-class clinical context in organize and review flows.
+- A draft can still proceed without an explicit `医生问题` when the current treatment plan is already clear enough to imply a review intent.
 - While the second-stage analysis is running, the lower workspace shows a loading shell so progress remains visible beyond the status panel.
 - The dashboard includes an in-app help surface so doctors can review assumptions, minimum input expectations, and workflow behavior without leaving the page.
 - A build label is shown in the workbench so deployment status can be checked visually after release.
 - Doctors can switch between `智能` and `常规` review modes in the workbench; the preference is stored in local browser storage and defaults to `智能`.
+- When a doctor asks for literature or clinical research support, the current system degrades honestly to经验性复核 and states that external retrieval is not yet connected.
 - The analysis dashboard keeps its core section structure stable even when a model returns fewer suggestions, so clinicians do not see key sections randomly disappear.
 - Token usage, estimated cost, model metadata, and latency stay internal and are stored for traceability rather than shown in the doctor-facing UI.
 - Doctor allowlist is now read from Supabase when the `doctor_allowlist` table is available, with environment-variable fallback during transition.

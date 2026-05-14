@@ -5,6 +5,7 @@ export type OrganizedCaseRaw = {
   年龄?: unknown;
   性别?: unknown;
   体质与生活背景?: unknown;
+  舌脉与四诊要点?: unknown;
   主诉?: unknown;
   病程?: unknown;
   病史与治疗反应?: unknown;
@@ -50,13 +51,14 @@ export function mapOrganizedCaseToForm(data: OrganizedCaseRaw, draft: string) {
     age: normalizeText(data.年龄),
     sex: normalizeText(data.性别),
     constitution: normalizeText(data.体质与生活背景),
+    tonguePulse: normalizeText(data.舌脉与四诊要点),
     chiefComplaint: normalizeText(data.主诉),
     duration: normalizeText(data.病程),
     history: normalizeText(data.病史与治疗反应) || draft,
     currentPlan: normalizeText(data.当前方案),
     herbs: normalizeText(data.方药内容),
     acupoints: normalizeText(data.穴位与操作),
-    doctorQuestion: normalizeText(data.医生问题) || "请判断当前方案可如何改良，并指出风险与需要补充的信息。",
+    doctorQuestion: normalizeText(data.医生问题),
     modelMode: "深度模式",
   };
 

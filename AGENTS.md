@@ -1,4 +1,4 @@
-# TCM Diagnosis — AI Session Memory
+# TCM Diagnosis - AI Session Memory
 
 This file records durable product and engineering rules for future coding agents.
 Keep it aligned with shipped behavior.
@@ -57,8 +57,10 @@ The tool helps registered TCM doctors:
 Hard-block minimum before analysis:
 - `主诉`
 - `当前方案`
-- `医生问题`
 - at least one timeline clue: `病程` or `病史与治疗反应`
+- either:
+  - an explicit `医生问题`, or
+  - a clearly reviewable current treatment plan with enough clinical basis to infer review intent
 
 Type-specific:
 - `方药分析`: must include `方药内容`
@@ -66,7 +68,7 @@ Type-specific:
 - `综合调理`: must include at least one concrete treatment detail such as herbs or acupoints
 
 Block patterns:
-- vague doctor question such as `帮我看看`
+- vague prompt with no implied review intent, such as `帮我看看`
 - guaranteed efficacy wording such as `保证`, `治愈`, `包好`, `一定好`
 - patient self-use wording such as `我是患者`, `我自己`, `我可以吃`, `我该怎么办`
 
@@ -74,7 +76,9 @@ Recommended-but-not-hard-block fields:
 - `年龄`
 - `性别`
 - `体质与生活背景`
+- `舌脉与四诊要点`
 - more specific treatment history or treatment response
+- case-type-specific details such as PCOS cycle markers, acupuncture frequency/method, or GI stool/tongue details
 
 ## Clinical Style
 
@@ -114,6 +118,9 @@ Recommended-but-not-hard-block fields:
   8. `随访监测`
   9. `证据状态`
 - Prompt contract is strict JSON.
+- `舌脉与四诊要点` is a first-class field in organize, validation, and prompt construction.
+- Organize prompt should preserve an empty `医生问题` when the draft did not explicitly ask one; do not auto-fill a fake generic question.
+- When doctors ask for research or literature support and retrieval is unavailable, respond as经验性复核 and say external retrieval is not connected.
 - If DeepSeek returns malformed JSON, use syntax-only repair before failing.
 - Prefer defensive normalization over brittle shape assumptions.
 - Core analysis sections should remain structurally stable; avoid a doctor seeing major sections appear in one case and disappear in another just because the model returned fewer bullets.
@@ -167,7 +174,7 @@ Logging should not block doctor-facing responses.
 - Show a visible build label in the UI so deployed-version checks are easy.
 - When local dev bypass is active, show a clear in-product indicator such as `本地开发模式`.
 
-## Audit Checklist Before Saying “Done”
+## Audit Checklist Before Saying "Done"
 
 Always check all applicable paths after meaningful changes:
 
@@ -179,7 +186,7 @@ Always check all applicable paths after meaningful changes:
 6. docs sync
 7. deploy/build marker visible when relevant
 
-Do not say “done” until the changed path is verified, not merely coded.
+Do not say "done" until the changed path is verified, not merely coded.
 Use [docs/agent-audit-checklist.md](C:\Users\chiaw\OneDrive\Desktop\playground\tcm-diagnosis\docs\agent-audit-checklist.md) as the concrete release-path checklist.
 Project-local reusable workflow notes also live in [codex-skills/tcm-workbench-audit/SKILL.md](C:\Users\chiaw\OneDrive\Desktop\playground\tcm-diagnosis\codex-skills\tcm-workbench-audit\SKILL.md).
 
