@@ -1,3 +1,5 @@
+import { logApiCallUsage, estimateCostFromRates, getDeepSeekProRates } from "./logUsage.mjs";
+
 const DEEPSEEK_URL = "https://api.deepseek.com/chat/completions";
 
 function requireApiKey() {
@@ -48,37 +50,68 @@ function buildReviewerUserPrompt(summary) {
 
 export async function reviewBackendAssessment(summary) {
   const apiKey = requireApiKey();
-  const response = await fetch(DEEPSEEK_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: getReviewerModel(),
-      temperature: 0,
-      max_tokens: 2200,
-      messages: [
-        { role: "system", content: buildReviewerSystemPrompt() },
-        { role: "user", content: buildReviewerUserPrompt(summary) },
-      ],
-    }),
-  });
+  const model = getReviewerModel();
+  const startedAt = Date.now();
+  let success = false;
 
-  if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(`Backend reviewer failed: ${response.status} ${detail.slice(0, 300)}`);
+  try {
+    const response = await fetch(DEEPSEEK_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        temperature: 0,
+        max_tokens: 2200,
+        messages: [
+          { role: "system", content: buildReviewerSystemPrompt() },
+          { role: "user", content: buildReviewerUserPrompt(summary) },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      const detail = await response.text();
+      throw new Error(`Backend reviewer failed: ${response.status} ${detail.slice(0, 300)}`);
+    }
+
+    const payload = await response.json();
+    const content = payload.choices?.[0]?.message?.content;
+    if (!content) {
+      throw new Error(`Backend reviewer returned empty content. Payload: ${JSON.stringify(payload).slice(0, 800)}`);
+    }
+
+    success = true;
+    const rates = getDeepSeekProRates();
+    const costUsd = estimateCostFromRates(payload.usage, rates);
+    const result = { model: payload.model ?? model, usage: payload.usage ?? null, text: content.trim() };
+
+    await logApiCallUsage({
+      route: "scripts/assess-backend",
+      callName: "assess-backend-reviewer",
+      model: result.model,
+      success: true,
+      latencyMs: Date.now() - startedAt,
+      usage: payload.usage,
+      costUsd,
+      rates,
+      metadata: { exampleCount: summary?.exampleCount },
+    });
+
+    return result;
+  } catch (err) {
+    if (!success) {
+      await logApiCallUsage({
+        route: "scripts/assess-backend",
+        callName: "assess-backend-reviewer",
+        model,
+        success: false,
+        latencyMs: Date.now() - startedAt,
+        metadata: { error: err.message },
+      });
+    }
+    throw err;
   }
-
-  const payload = await response.json();
-  const content = payload.choices?.[0]?.message?.content;
-  if (!content) {
-    throw new Error(`Backend reviewer returned empty content. Payload: ${JSON.stringify(payload).slice(0, 800)}`);
-  }
-
-  return {
-    model: payload.model ?? getReviewerModel(),
-    usage: payload.usage ?? null,
-    text: content.trim(),
-  };
 }

@@ -1,3 +1,5 @@
+import { logApiCallUsage, estimateCostFromRates, getDeepSeekProRates, getAnthropicSonnetRates } from "./logUsage.mjs";
+
 const DEEPSEEK_URL = "https://api.deepseek.com/chat/completions";
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 
@@ -21,7 +23,10 @@ function getAnthropicModel() {
   return process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
 }
 
-async function callDeepSeek(systemPrompt, userContent, maxTokens = 2000) {
+async function callDeepSeek(systemPrompt, userContent, maxTokens = 2000, callName = "assess-frontend-reviewer") {
+  const model = getDeepSeekModel();
+  const startedAt = Date.now();
+
   const response = await fetch(DEEPSEEK_URL, {
     method: "POST",
     headers: {
@@ -29,7 +34,7 @@ async function callDeepSeek(systemPrompt, userContent, maxTokens = 2000) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: getDeepSeekModel(),
+      model,
       temperature: 0,
       max_tokens: maxTokens,
       messages: [
@@ -41,15 +46,32 @@ async function callDeepSeek(systemPrompt, userContent, maxTokens = 2000) {
 
   if (!response.ok) {
     const detail = await response.text();
+    await logApiCallUsage({ route: "scripts/report-frontend", callName, model, success: false, latencyMs: Date.now() - startedAt });
     throw new Error(`DeepSeek call failed: ${response.status} ${detail.slice(0, 300)}`);
   }
 
   const payload = await response.json();
   const content = payload.choices?.[0]?.message?.content;
-  if (!content) throw new Error("DeepSeek returned empty content");
+  if (!content) {
+    await logApiCallUsage({ route: "scripts/report-frontend", callName, model, success: false, latencyMs: Date.now() - startedAt });
+    throw new Error("DeepSeek returned empty content");
+  }
+
+  const rates = getDeepSeekProRates();
+  const costUsd = estimateCostFromRates(payload.usage, rates);
+  await logApiCallUsage({
+    route: "scripts/report-frontend",
+    callName,
+    model: payload.model ?? model,
+    success: true,
+    latencyMs: Date.now() - startedAt,
+    usage: payload.usage,
+    costUsd,
+    rates,
+  });
 
   return {
-    model: payload.model ?? getDeepSeekModel(),
+    model: payload.model ?? model,
     usage: payload.usage ?? null,
     text: content.trim(),
   };
@@ -79,7 +101,7 @@ export async function reviewFrontendUX(observations) {
     JSON.stringify(observations, null, 2),
   ].join("\n");
 
-  return callDeepSeek(system, user, 2000);
+  return callDeepSeek(system, user, 2000, "assess-frontend-ux");
 }
 
 // ── Reviewer 2: Senior TCM practitioner (DeepSeek, text-based) ───────────────
@@ -126,7 +148,7 @@ export async function reviewFrontendTCM(observations) {
     JSON.stringify(clinicalData, null, 2),
   ].join("\n");
 
-  return callDeepSeek(system, user, 2200);
+  return callDeepSeek(system, user, 2200, "assess-frontend-tcm");
 }
 
 // ── Reviewer 3: Visual reviewer (Claude, screenshot URLs from storage) ────────
@@ -135,12 +157,14 @@ export async function reviewFrontendTCM(observations) {
 export async function reviewFrontendVisual(imageUrls) {
   const apiKey = requireAnthropicKey();
   const model = getAnthropicModel();
+  const startedAt = Date.now();
 
   const validUrls = (imageUrls ?? []).filter((u) => u && u.startsWith("http")).slice(0, 6);
 
   if (validUrls.length === 0) {
     return { model, usage: null, text: "（无截图可供分析）", skipped: true };
   }
+
 
   const imageContent = validUrls.map((url) => ({
     type: "image",
@@ -195,12 +219,44 @@ export async function reviewFrontendVisual(imageUrls) {
 
   if (!response.ok) {
     const detail = await response.text();
+    await logApiCallUsage({
+      route: "scripts/report-frontend",
+      callName: "assess-frontend-visual",
+      provider: "anthropic",
+      model,
+      success: false,
+      latencyMs: Date.now() - startedAt,
+      metadata: { imageCount: validUrls.length },
+    });
     throw new Error(`Claude visual review failed: ${response.status} ${detail.slice(0, 300)}`);
   }
 
   const payload = await response.json();
   const content = payload.content?.[0]?.text;
   if (!content) throw new Error("Claude returned empty content");
+
+  const rates = getAnthropicSonnetRates();
+  const anthropicUsage = payload.usage
+    ? {
+        prompt_tokens: payload.usage.input_tokens,
+        completion_tokens: payload.usage.output_tokens,
+        total_tokens: (payload.usage.input_tokens ?? 0) + (payload.usage.output_tokens ?? 0),
+      }
+    : null;
+  const costUsd = anthropicUsage ? estimateCostFromRates(anthropicUsage, rates) : 0;
+
+  await logApiCallUsage({
+    route: "scripts/report-frontend",
+    callName: "assess-frontend-visual",
+    provider: "anthropic",
+    model: payload.model ?? model,
+    success: true,
+    latencyMs: Date.now() - startedAt,
+    usage: anthropicUsage,
+    costUsd,
+    rates,
+    metadata: { imageCount: validUrls.length },
+  });
 
   return {
     model: payload.model ?? model,
