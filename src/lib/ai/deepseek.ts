@@ -51,7 +51,12 @@ type DeepSeekJsonResult<T> = {
 type DeepSeekErrorDetails = Record<string, unknown>;
 
 const DEEPSEEK_URL = "https://api.deepseek.com/chat/completions";
-const MODEL_RATES = {
+const DEFAULT_TIMEOUT_MS = 45_000;
+const RATE_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+// Fallback rates used when no env overrides and remote fetch unavailable.
+// Update DEEPSEEK_RATES_URL in env to pick up price changes without a redeploy.
+const HARDCODED_RATES = {
   flash: {
     inputCacheHitPer1M: 0.0028,
     inputCacheMissPer1M: 0.14,
@@ -63,29 +68,67 @@ const MODEL_RATES = {
     outputPer1M: 0.87,
   },
 } as const;
-const DEFAULT_TIMEOUT_MS = 45_000;
+
+type RateTier = { flash: { inputCacheHitPer1M: number; inputCacheMissPer1M: number; outputPer1M: number }; pro: { inputCacheHitPer1M: number; inputCacheMissPer1M: number; outputPer1M: number } };
+
+let _rateCache: { rates: RateTier; fetchedAt: number } | null = null;
+let _isFetching = false;
 
 function getRateOverride(name: string, fallback: number) {
   const raw = process.env[name];
   if (!raw) return fallback;
-
   const value = Number(raw);
   return Number.isFinite(value) && value >= 0 ? value : fallback;
 }
 
-function getModelRates() {
+function applyEnvOverrides(base: RateTier): RateTier {
   return {
     flash: {
-      inputCacheHitPer1M: getRateOverride("DEEPSEEK_FLASH_INPUT_CACHE_HIT_PER_1M", MODEL_RATES.flash.inputCacheHitPer1M),
-      inputCacheMissPer1M: getRateOverride("DEEPSEEK_FLASH_INPUT_CACHE_MISS_PER_1M", MODEL_RATES.flash.inputCacheMissPer1M),
-      outputPer1M: getRateOverride("DEEPSEEK_FLASH_OUTPUT_PER_1M", MODEL_RATES.flash.outputPer1M),
+      inputCacheHitPer1M: getRateOverride("DEEPSEEK_FLASH_INPUT_CACHE_HIT_PER_1M", base.flash.inputCacheHitPer1M),
+      inputCacheMissPer1M: getRateOverride("DEEPSEEK_FLASH_INPUT_CACHE_MISS_PER_1M", base.flash.inputCacheMissPer1M),
+      outputPer1M: getRateOverride("DEEPSEEK_FLASH_OUTPUT_PER_1M", base.flash.outputPer1M),
     },
     pro: {
-      inputCacheHitPer1M: getRateOverride("DEEPSEEK_PRO_INPUT_CACHE_HIT_PER_1M", MODEL_RATES.pro.inputCacheHitPer1M),
-      inputCacheMissPer1M: getRateOverride("DEEPSEEK_PRO_INPUT_CACHE_MISS_PER_1M", MODEL_RATES.pro.inputCacheMissPer1M),
-      outputPer1M: getRateOverride("DEEPSEEK_PRO_OUTPUT_PER_1M", MODEL_RATES.pro.outputPer1M),
+      inputCacheHitPer1M: getRateOverride("DEEPSEEK_PRO_INPUT_CACHE_HIT_PER_1M", base.pro.inputCacheHitPer1M),
+      inputCacheMissPer1M: getRateOverride("DEEPSEEK_PRO_INPUT_CACHE_MISS_PER_1M", base.pro.inputCacheMissPer1M),
+      outputPer1M: getRateOverride("DEEPSEEK_PRO_OUTPUT_PER_1M", base.pro.outputPer1M),
     },
   };
+}
+
+// Fire-and-forget: fetch remote rates once per 24h, update cache in background.
+// Does not block the caller — always returns synchronously from cached/env values.
+function triggerRateFetch() {
+  const url = process.env.DEEPSEEK_RATES_URL;
+  if (!url || _isFetching) return;
+
+  _isFetching = true;
+  fetch(url, { signal: AbortSignal.timeout(5_000) })
+    .then((res) => (res.ok ? (res.json() as Promise<unknown>) : null))
+    .then((data) => {
+      if (
+        data &&
+        typeof data === "object" &&
+        "flash" in data &&
+        "pro" in data
+      ) {
+        _rateCache = { rates: applyEnvOverrides(data as RateTier), fetchedAt: Date.now() };
+      }
+    })
+    .catch(() => undefined)
+    .finally(() => { _isFetching = false; });
+}
+
+function getModelRates(): RateTier {
+  const now = Date.now();
+  const isStale = !_rateCache || now - _rateCache.fetchedAt > RATE_CACHE_TTL_MS;
+
+  if (isStale) {
+    triggerRateFetch();
+  }
+
+  // Use remote-fetched rates if available; fall back to env overrides on hardcoded base.
+  return _rateCache?.rates ?? applyEnvOverrides(HARDCODED_RATES);
 }
 
 export class DeepSeekError extends Error {

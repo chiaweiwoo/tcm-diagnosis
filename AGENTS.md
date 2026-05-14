@@ -136,7 +136,7 @@ Recommended-but-not-hard-block fields:
 - Analyze call should default to `DEEPSEEK_MODEL_ANALYZE`, then fall back to `DEEPSEEK_MODEL_FAST`, not the deep model by default.
 - Deep model can still be used for repair fallback when fast repair fails.
 - Cost logging must reflect the actual model tier used for the call.
-- DeepSeek pricing changes over time, so pricing should be overridable through environment configuration rather than treated as permanently fixed.
+- DeepSeek pricing changes over time. Rates use a stale-while-revalidate cache (24h TTL on server, once per CLI process). Set `DEEPSEEK_RATES_URL` to a JSON endpoint of `{ flash: {...}, pro: {...} }` to get automatic rate updates without a redeploy. Individual env var overrides (`DEEPSEEK_*_PER_1M`) are applied on top of remote rates and take precedence. See `.env.local.example` for the full list.
 - Keep analyze outputs concise; long completions are a common latency problem.
 - Show elapsed time during runs and on loaded history.
 - Token usage and estimated cost must stay internal only.

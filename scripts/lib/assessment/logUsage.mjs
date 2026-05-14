@@ -71,24 +71,62 @@ export function estimateCostFromRates(usage, rates) {
   );
 }
 
-// Default DeepSeek rates (can be overridden by env)
-export function getDeepSeekProRates() {
+// Hardcoded fallback rates — override via DEEPSEEK_RATES_URL or individual env vars.
+// DEEPSEEK_RATES_URL should point to a JSON of { flash: {...}, pro: {...} } with the
+// same key names. Fetched once per CLI process run.
+const HARDCODED_RATES = {
+  flash: { inputCacheHitPer1M: 0.0028, inputCacheMissPer1M: 0.14, outputPer1M: 0.28 },
+  pro: { inputCacheHitPer1M: 0.003625, inputCacheMissPer1M: 0.435, outputPer1M: 0.87 },
+};
+
+function envNum(name, fallback) {
+  const v = Number(process.env[name]);
+  return Number.isFinite(v) && v >= 0 ? v : fallback;
+}
+
+let _remoteRates = null;
+let _remoteRatesFetched = false;
+
+async function fetchRemoteRates() {
+  if (_remoteRatesFetched) return;
+  _remoteRatesFetched = true;
+
+  const url = process.env.DEEPSEEK_RATES_URL;
+  if (!url) return;
+
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(5_000) });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data?.flash && data?.pro) {
+      _remoteRates = data;
+      console.log("[logUsage] loaded remote DeepSeek rates from", url);
+    }
+  } catch {
+    // fall back to env / hardcoded
+  }
+}
+
+function resolvedRates(tier) {
+  const base = _remoteRates?.[tier] ?? HARDCODED_RATES[tier];
   return {
-    inputCacheHitPer1M: Number(process.env.DEEPSEEK_PRO_INPUT_CACHE_HIT_PER_1M ?? 0.003625),
-    inputCacheMissPer1M: Number(process.env.DEEPSEEK_PRO_INPUT_CACHE_MISS_PER_1M ?? 0.435),
-    outputPer1M: Number(process.env.DEEPSEEK_PRO_OUTPUT_PER_1M ?? 0.87),
+    inputCacheHitPer1M: envNum(`DEEPSEEK_${tier.toUpperCase()}_INPUT_CACHE_HIT_PER_1M`, base.inputCacheHitPer1M),
+    inputCacheMissPer1M: envNum(`DEEPSEEK_${tier.toUpperCase()}_INPUT_CACHE_MISS_PER_1M`, base.inputCacheMissPer1M),
+    outputPer1M: envNum(`DEEPSEEK_${tier.toUpperCase()}_OUTPUT_PER_1M`, base.outputPer1M),
   };
 }
 
-export function getDeepSeekFlashRates() {
-  return {
-    inputCacheHitPer1M: Number(process.env.DEEPSEEK_FLASH_INPUT_CACHE_HIT_PER_1M ?? 0.0028),
-    inputCacheMissPer1M: Number(process.env.DEEPSEEK_FLASH_INPUT_CACHE_MISS_PER_1M ?? 0.14),
-    outputPer1M: Number(process.env.DEEPSEEK_FLASH_OUTPUT_PER_1M ?? 0.28),
-  };
+export async function getDeepSeekProRates() {
+  await fetchRemoteRates();
+  return resolvedRates("pro");
 }
 
-// Anthropic rates (approximate, not token-level granular)
+export async function getDeepSeekFlashRates() {
+  await fetchRemoteRates();
+  return resolvedRates("flash");
+}
+
+// Anthropic rates (approximate — no public JSON endpoint, update manually)
 export function getAnthropicSonnetRates() {
   return {
     inputCacheHitPer1M: 0.3,

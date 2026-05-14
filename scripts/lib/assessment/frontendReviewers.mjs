@@ -57,7 +57,7 @@ async function callDeepSeek(systemPrompt, userContent, maxTokens = 2000, callNam
     throw new Error("DeepSeek returned empty content");
   }
 
-  const rates = getDeepSeekProRates();
+  const rates = await getDeepSeekProRates();
   const costUsd = estimateCostFromRates(payload.usage, rates);
   await logApiCallUsage({
     route: "scripts/report-frontend",
