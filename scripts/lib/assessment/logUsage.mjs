@@ -80,3 +80,11 @@ export function getDeepSeekFlashRates()   { return RATES.deepseek.flash; }
 export function getAnthropicSonnetRates() { return RATES.anthropic.sonnet; }
 export function getAnthropicHaikuRates()  { return RATES.anthropic.haiku; }
 export function getAnthropicOpusRates()   { return RATES.anthropic.opus; }
+
+export function getAssessmentDeepSeekModel() {
+  return process.env.DEEPSEEK_MODEL_DEEP || process.env.DEEPSEEK_MODEL_ANALYZE || "deepseek-v4-pro";
+}
+
+export function getAssessmentAnthropicModel() {
+  return process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
+}

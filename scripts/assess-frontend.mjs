@@ -24,7 +24,8 @@ async function main() {
   const examples = await loadAssessmentExamples(
     path.join(rootDir, "local-data", "real-doctor-examples.md"),
   );
-  const doctorEmail = process.env.DEV_AUTH_EMAIL || "chiaweiwoo123@gmail.com";
+  const doctorEmail = process.env.DEV_AUTH_EMAIL;
+  if (!doctorEmail) throw new Error("DEV_AUTH_EMAIL must be set in .env.local to run assessments");
 
   const server = await startAssessmentServer({
     rootDir,

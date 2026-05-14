@@ -1,4 +1,4 @@
-import { logApiCallUsage, estimateCostFromRates, getDeepSeekProRates, getAnthropicSonnetRates } from "./logUsage.mjs";
+import { logApiCallUsage, estimateCostFromRates, getDeepSeekProRates, getAnthropicSonnetRates, getAssessmentDeepSeekModel, getAssessmentAnthropicModel } from "./logUsage.mjs";
 
 const DEEPSEEK_URL = "https://api.deepseek.com/chat/completions";
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
@@ -15,16 +15,9 @@ function requireAnthropicKey() {
   return key;
 }
 
-function getDeepSeekModel() {
-  return process.env.DEEPSEEK_MODEL_DEEP || process.env.DEEPSEEK_MODEL_ANALYZE || "deepseek-v4-pro";
-}
-
-function getAnthropicModel() {
-  return process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
-}
 
 async function callDeepSeek(systemPrompt, userContent, maxTokens = 2000, callName = "assess-frontend-reviewer") {
-  const model = getDeepSeekModel();
+  const model = getAssessmentDeepSeekModel();
   const startedAt = Date.now();
 
   const response = await fetch(DEEPSEEK_URL, {
@@ -156,7 +149,7 @@ export async function reviewFrontendTCM(observations) {
 // imageUrls: array of public https:// URLs
 export async function reviewFrontendVisual(imageUrls) {
   const apiKey = requireAnthropicKey();
-  const model = getAnthropicModel();
+  const model = getAssessmentAnthropicModel();
   const startedAt = Date.now();
 
   const validUrls = (imageUrls ?? []).filter((u) => u && u.startsWith("http")).slice(0, 6);

@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
         latencyMs,
         usage: result.usage,
         costUsd: result.costUsd,
-        inputRatePer1m: result.costDetail.rates.inputCacheMissPer1M,
+        cacheMissRatePer1m: result.costDetail.rates.inputCacheMissPer1M,
         outputRatePer1m: result.costDetail.rates.outputPer1M,
         cacheHitRatePer1m: result.costDetail.rates.inputCacheHitPer1M,
         promptVersion: TCM_ANALYSIS_PROMPT_VERSION,

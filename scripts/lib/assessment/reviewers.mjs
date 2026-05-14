@@ -1,4 +1,4 @@
-import { logApiCallUsage, estimateCostFromRates, getDeepSeekProRates } from "./logUsage.mjs";
+import { logApiCallUsage, estimateCostFromRates, getDeepSeekProRates, getAssessmentDeepSeekModel } from "./logUsage.mjs";
 
 const DEEPSEEK_URL = "https://api.deepseek.com/chat/completions";
 
@@ -10,9 +10,6 @@ function requireApiKey() {
   return apiKey;
 }
 
-function getReviewerModel() {
-  return process.env.DEEPSEEK_MODEL_DEEP || process.env.DEEPSEEK_MODEL_ANALYZE || "deepseek-v4-pro";
-}
 
 function buildReviewerSystemPrompt() {
   return [
@@ -50,7 +47,7 @@ function buildReviewerUserPrompt(summary) {
 
 export async function reviewBackendAssessment(summary) {
   const apiKey = requireApiKey();
-  const model = getReviewerModel();
+  const model = getAssessmentDeepSeekModel();
   const startedAt = Date.now();
   let success = false;
 
