@@ -8,13 +8,15 @@ import {
   TCM_ORGANIZE_SYSTEM_PROMPT,
 } from "@/lib/ai/prompts";
 import { logApiCall, logServerEvent } from "@/lib/logging";
+import { logActivity } from "@/lib/activityLog";
 import { mapOrganizedCaseToForm, OrganizedCaseRaw } from "@/lib/ai/organizeCase";
 import { MAX_ORGANIZE_DRAFT_CHARS, validateDraftLength } from "@/lib/inputLimits";
 import { requireApiAuth } from "@/lib/apiAuth";
 
 export async function POST(request: NextRequest) {
-  const denied = await requireApiAuth(request);
-  if (denied) return denied;
+  const auth = await requireApiAuth(request);
+  if (!auth.ok) return auth.response;
+  const { doctorEmail, isCli } = auth;
 
   const startedAt = Date.now();
 
@@ -50,8 +52,8 @@ export async function POST(request: NextRequest) {
     const mapped = mapOrganizedCaseToForm(result.data, draft);
     const latencyMs = Date.now() - startedAt;
 
-    after(() =>
-      logApiCall({
+    after(() => {
+      void logApiCall({
         route: "api/organize",
         callName: "organize",
         success: true,
@@ -65,8 +67,11 @@ export async function POST(request: NextRequest) {
           draftLength: draft.length,
           repairedJson: result.repairedJson ?? false,
         },
-      }),
-    );
+      });
+      if (doctorEmail && !isCli) {
+        void logActivity({ doctorEmail, eventType: "organize", metadata: { draftLength: draft.length } });
+      }
+    });
 
     return NextResponse.json({
       form: mapped.form,

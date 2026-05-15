@@ -3,30 +3,41 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { apiError } from "@/lib/apiResponses";
 
 /**
- * Gate for /api/organize and /api/analyze.
+ * Auth result for /api/organize and /api/analyze.
  *
- * Allows the request if EITHER:
- *   1. X-Assessment-Key header matches ASSESSMENT_API_KEY env var (CLI / assess:run)
- *   2. A valid Supabase session cookie is present (doctor via browser)
+ * ok=true:
+ *   - isCli=true  → request came from assess:run CLI (X-Assessment-Key). doctorEmail is null.
+ *   - isCli=false → request came from a logged-in doctor. doctorEmail is set.
  *
- * Returns a 401 Response if neither condition is met, or null if authorized.
- * Usage: const denied = await requireApiAuth(request); if (denied) return denied;
+ * ok=false:
+ *   - response is a 401 to return immediately.
+ *
+ * Usage:
+ *   const auth = await requireApiAuth(request);
+ *   if (!auth.ok) return auth.response;
+ *   // auth.doctorEmail, auth.isCli available
  */
-export async function requireApiAuth(request: NextRequest): Promise<Response | null> {
+export type ApiAuthResult =
+  | { ok: true;  doctorEmail: string | null; isCli: boolean }
+  | { ok: false; response: Response };
+
+export async function requireApiAuth(request: NextRequest): Promise<ApiAuthResult> {
   // Path 1: internal CLI with shared secret
   const expectedKey = process.env.ASSESSMENT_API_KEY;
   if (expectedKey && request.headers.get("X-Assessment-Key") === expectedKey) {
-    return null;
+    return { ok: true, doctorEmail: null, isCli: true };
   }
 
   // Path 2: logged-in doctor via browser session cookie
   try {
     const supabase = await createServerSupabaseClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (user) return null;
+    if (user) {
+      return { ok: true, doctorEmail: user.email ?? null, isCli: false };
+    }
   } catch {
     // fall through to 401
   }
 
-  return apiError(401, "UNAUTHORIZED", "请先登录后再使用。");
+  return { ok: false, response: apiError(401, "UNAUTHORIZED", "请先登录后再使用。") };
 }

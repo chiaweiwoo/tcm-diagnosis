@@ -389,6 +389,68 @@
   margin-bottom: 2px;
 }
 
+/* ── Activity log ── */
+.activity-log {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.activity-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+}
+
+.activity-row:hover {
+  background: var(--sage);
+}
+
+.activity-time {
+  font-size: 12px;
+  color: var(--muted);
+  min-width: 90px;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.activity-email {
+  font-weight: 600;
+  color: var(--foreground);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activity-meta {
+  font-size: 12px;
+  color: var(--muted);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.activity-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 8px;
+  border-radius: 10px;
+  min-width: 38px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.activity-badge-login    { background: #ede9fe; color: #4c1d95; }
+.activity-badge-organize { background: #fef9c3; color: #92400e; }
+.activity-badge-analyze  { background: #d1fae5; color: #065f46; }
+.activity-badge-default  { background: var(--sage); color: var(--muted); }
+
 /* ── Examples page ── */
 .example-full-list {
   display: flex;

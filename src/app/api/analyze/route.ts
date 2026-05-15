@@ -9,12 +9,14 @@ import {
 } from "@/lib/ai/prompts";
 import { caseSchema, CaseForm, validateCaseForm } from "@/lib/caseValidation";
 import { logApiCall, logServerEvent } from "@/lib/logging";
+import { logActivity } from "@/lib/activityLog";
 import { AnalysisJson, buildAnalysisResult } from "@/lib/ai/analysisResult";
 import { requireApiAuth } from "@/lib/apiAuth";
 
 export async function POST(request: NextRequest) {
-  const denied = await requireApiAuth(request);
-  if (denied) return denied;
+  const auth = await requireApiAuth(request);
+  if (!auth.ok) return auth.response;
+  const { doctorEmail, isCli } = auth;
 
   const startedAt = Date.now();
   let reviewMode: "smart" | "normal" = "smart";
@@ -52,8 +54,8 @@ export async function POST(request: NextRequest) {
     const output = buildAnalysisResult(data, parsed.data.caseType);
     const latencyMs = Date.now() - startedAt;
 
-    after(() =>
-      logApiCall({
+    after(() => {
+      void logApiCall({
         route: "api/analyze",
         callName: reviewMode === "normal" ? "analyze-normal" : "analyze-smart",
         success: true,
@@ -68,8 +70,15 @@ export async function POST(request: NextRequest) {
           repairedJson: result.repairedJson ?? false,
           reviewMode,
         },
-      }),
-    );
+      });
+      if (doctorEmail && !isCli) {
+        void logActivity({
+          doctorEmail,
+          eventType: "analyze",
+          metadata: { caseType: parsed.data.caseType, reviewMode },
+        });
+      }
+    });
 
     return NextResponse.json({
       result: output,
