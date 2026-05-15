@@ -1,4 +1,3 @@
-import path from "node:path";
 import { loadLocalEnv } from "./lib/env.mjs";
 import { loadAssessmentExamples } from "./lib/assessment/examples.mjs";
 import { runBackendAssessment } from "./lib/assessment/backend.mjs";
@@ -34,7 +33,7 @@ async function main() {
   const baseUrl = process.env.ASSESS_BASE_URL;
   if (!baseUrl) throw new Error("ASSESS_BASE_URL must be set in .env.local (e.g. https://your-vercel-app.vercel.app)");
 
-  const examples = await loadAssessmentExamples(path.join(rootDir, "local-data", "real-doctor-examples.md"));
+  const examples = await loadAssessmentExamples();
   const runId = sgtRunId(mode);
 
   console.log(`[assess:run] run_id=${runId}  mode=${mode}  examples=${examples.length}  base=${baseUrl}`);

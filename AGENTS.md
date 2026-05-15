@@ -194,7 +194,7 @@ Calibration = running the pipeline on real doctor examples, reviewing outputs wi
 npm run assess:run -- --mode normal   # or --mode smart
 ```
 
-- Reads examples from `local-data/real-doctor-examples.md` (gitignored, local only)
+- Reads examples from `doctor_examples` Supabase table (seed with `npm run assess:seed` first)
 - Hits live Vercel app (`ASSESS_BASE_URL`) with `X-Assessment-Key` header
 - Runs organize → analyze for all examples in parallel (`Promise.all`)
 - Run ID format: `assessment-YYYY-MM-DD_HH-MM-SS-SGT-{mode}`
@@ -220,11 +220,19 @@ Saves `example_reviews`, `section_reviews`, `reviewer_text` to DB. Status → `r
 
 ---
 
-## Local Working Data
+## Doctor Examples
 
-- `local-data/real-doctor-examples.md` — canonical example source (gitignored)
-- `local-data/real-doctor-examples-notes.md` — supporting notes (gitignored)
-- Parse markdown directly in scripts. Do not maintain parallel JSON copies.
+Examples live in the `doctor_examples` Supabase table. Admin read-only at `/admin/examples`.
+
+Seed workflow (run once when examples change):
+```bash
+npm run assess:seed -- --file local-data/real-doctor-examples.md
+```
+
+- `assess:run` reads exclusively from DB — throws if table is empty
+- `local-data/real-doctor-examples.md` is gitignored, kept only as the seed source
+- `local-data/real-doctor-examples-notes.md` — supporting notes (gitignored, local only)
+- To disable an example without deleting: set `is_active = false` directly in Supabase table editor
 
 ---
 
@@ -268,11 +276,8 @@ Expected — repair is built in. Check `repairedJson: true` in logs. If repair t
 **Organize succeeds but analyze returns 401**
 Both routes require auth. If running assess:run against a Vercel deployment that doesn't yet have `ASSESSMENT_API_KEY` set, redeploy after adding the env var.
 
-**`local-data/` not found in worktree**
-The worktree doesn't inherit gitignored files. Copy from main project dir:
-```
-copy ..\..\..\..\..\local-data\real-doctor-examples.md local-data\
-```
+**`assess:run` throws "No active examples found in DB"**
+Run `npm run assess:seed -- --file local-data/real-doctor-examples.md` to populate the `doctor_examples` table. Examples now live in DB, not in the local file.
 
 ---
 
