@@ -30,11 +30,7 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           MODE: ${{ inputs.mode }}
-        run: |
-          OUTPUT=$(node scripts/assess-run.mjs --mode "$MODE")
-          echo "$OUTPUT"
-          RUN_ID=$(echo "$OUTPUT" | sed -n 's/.*run_id=\([^ ]*\).*/\1/p' | head -1)
-          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
+        run: node scripts/assess-run.mjs --mode "$MODE"
 
       - name: Review assessment
         env:

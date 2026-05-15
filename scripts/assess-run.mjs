@@ -49,6 +49,12 @@ async function main() {
     baseUrl,
   });
 
+  // Write run_id to GitHub Actions output if running in CI
+  if (process.env.GITHUB_OUTPUT) {
+    const { appendFileSync } = await import("fs");
+    appendFileSync(process.env.GITHUB_OUTPUT, `run_id=${runId}\n`);
+  }
+
   console.log(
     JSON.stringify(
       {
