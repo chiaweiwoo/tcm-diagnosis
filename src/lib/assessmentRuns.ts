@@ -4,6 +4,7 @@ export type AssessmentRunSummary = {
   created_at: string;
   example_count: number | null;
   status: string;
+  mode: string | null;
   organize_stats: { success: number; failed: number; total: number } | null;
   mode_stats: Record<string, {
     count: number;
@@ -42,12 +43,29 @@ export type ExampleSummary = {
   modes: Record<string, ExampleModeSummary | null>;
 };
 
+export type ExampleReview = {
+  id: string;
+  scorecard: string | null;
+  model?: string;
+  error?: string;
+};
+
+export type SectionReview = {
+  key: string;
+  label: string;
+  analysis: string | null;
+  model?: string;
+  error?: string;
+};
+
 export type AssessmentRunDetail = AssessmentRunSummary & {
   base_url: string | null;
   blocked_reason_groups: Record<string, number> | null;
   reviewer_text: string | null;
   reviewer_model: string | null;
   report_url: string | null;
+  example_reviews: ExampleReview[] | null;
+  section_reviews: SectionReview[] | null;
   raw_results: {
     aggregate: {
       examples: ExampleSummary[];
@@ -75,7 +93,7 @@ export async function listAssessmentRuns(): Promise<AssessmentRunSummary[]> {
   const url = new URL(config.baseUrl);
   url.searchParams.set(
     "select",
-    "run_id,triggered_by,created_at,example_count,status,organize_stats,mode_stats",
+    "run_id,triggered_by,created_at,example_count,status,mode,organize_stats,mode_stats",
   );
   url.searchParams.set("order", "created_at.desc");
   url.searchParams.set("limit", "50");
@@ -93,7 +111,7 @@ export async function getAssessmentRun(runId: string): Promise<AssessmentRunDeta
   url.searchParams.set("run_id", `eq.${runId}`);
   url.searchParams.set(
     "select",
-    "run_id,triggered_by,created_at,example_count,status,base_url,organize_stats,mode_stats,blocked_reason_groups,reviewer_text,reviewer_model,report_url,raw_results",
+    "run_id,triggered_by,created_at,example_count,status,mode,base_url,organize_stats,mode_stats,blocked_reason_groups,reviewer_text,reviewer_model,report_url,example_reviews,section_reviews,raw_results",
   );
   url.searchParams.set("limit", "1");
 

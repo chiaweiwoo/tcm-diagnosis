@@ -1,5 +1,7 @@
 import { loadLocalEnv } from "./lib/env.mjs";
 import { fetchRawRun, updateReviewerOutput } from "./lib/assessment/db.mjs";
+import { reviewAllExamples } from "./lib/assessment/perExampleReviewer.mjs";
+import { reviewAllSections } from "./lib/assessment/perSectionReviewer.mjs";
 import { reviewBackendAssessment } from "./lib/assessment/reviewers.mjs";
 
 const rootDir = process.cwd();
@@ -14,9 +16,12 @@ async function main() {
   const row = await fetchRawRun(runId);
   if (!row) throw new Error(`Run not found in DB: ${runId}`);
 
-  // The aggregate is stored inside raw_results; fall back to top-level stats if needed
+  const mode = row.mode ?? "normal";
+  // Use full results (not trimmed aggregate) for deep review
+  const fullExamples = row.raw_results?.results?.examples ?? [];
   const aggregate = row.raw_results?.aggregate ?? {
     runId: row.run_id,
+    mode,
     exampleCount: row.example_count,
     organizeStats: row.organize_stats,
     modeStats: row.mode_stats,
@@ -24,17 +29,32 @@ async function main() {
     examples: [],
   };
 
-  console.log(`[assess:review] running reviewer  examples=${aggregate.exampleCount}`);
+  console.log(`[assess:review] mode=${mode}  examples=${fullExamples.length}`);
+  console.log("[assess:review] stage 1+2: per-example scorecards + per-section consistency (parallel)");
 
-  const reviewer = await reviewBackendAssessment(aggregate);
+  // Stage 1 + 2 in parallel — independent of each other
+  const [exampleReviews, sectionReviews] = await Promise.all([
+    reviewAllExamples(fullExamples, mode),
+    reviewAllSections(fullExamples, mode),
+  ]);
 
-  const saved = await updateReviewerOutput({ runId, reviewer });
+  console.log(`[assess:review] stage 1 done: ${exampleReviews.length} example scorecards`);
+  console.log(`[assess:review] stage 2 done: ${sectionReviews.length} section analyses`);
+  console.log("[assess:review] stage 3: final synthesis");
+
+  const reviewer = await reviewBackendAssessment(aggregate, exampleReviews, sectionReviews);
+
+  console.log("[assess:review] saving to DB");
+  const saved = await updateReviewerOutput({ runId, reviewer, exampleReviews, sectionReviews });
 
   console.log(
     JSON.stringify(
       {
         status: "reviewed",
         runId,
+        mode,
+        exampleReviewCount: exampleReviews.length,
+        sectionReviewCount: sectionReviews.length,
         reviewerModel: reviewer.model,
         usage: reviewer.usage,
         savedToDb: saved,

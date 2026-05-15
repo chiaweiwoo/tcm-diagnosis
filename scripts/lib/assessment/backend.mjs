@@ -1,59 +1,46 @@
 import { postJson } from "./http.mjs";
 
-const REVIEW_MODES = ["smart", "normal"];
-
 function trimList(items, limit = 3) {
   return Array.isArray(items) ? items.slice(0, limit) : [];
 }
 
 function summarizeAnalysis(result) {
   if (!result) return null;
-
   return {
     title: result.title ?? "",
     keyPoints: trimList(result.keyPoints, 4),
-    groups:
-      Array.isArray(result.groups)
-        ? result.groups.map((group) => ({
-            title: group.title,
-            sections:
-              Array.isArray(group.sections)
-                ? group.sections.map((section) => ({
-                    title: section.title,
-                  }))
-                : [],
-          }))
-        : [],
+    groups: Array.isArray(result.groups)
+      ? result.groups.map((g) => ({
+          title: g.title,
+          sections: Array.isArray(g.sections)
+            ? g.sections.map((s) => ({ title: s.title }))
+            : [],
+        }))
+      : [],
     cautions: trimList(result.cautions, 4),
     evidence: trimList(result.evidence, 4),
   };
 }
 
-function buildAggregateSummary(results) {
-  const modeStats = {
-    smart: { count: 0, success: 0, blocked: 0, failed: 0, repairTriggered: 0, averageLatencyMs: 0, averageCostUsd: 0 },
-    normal: { count: 0, success: 0, blocked: 0, failed: 0, repairTriggered: 0, averageLatencyMs: 0, averageCostUsd: 0 },
-  };
-
+function buildAggregateSummary(results, mode) {
+  const stat = { count: 0, success: 0, blocked: 0, failed: 0, repairTriggered: 0, averageLatencyMs: 0, averageCostUsd: 0 };
   const blockedReasonGroups = {};
 
   for (const item of results.examples) {
-    for (const mode of REVIEW_MODES) {
-      const run = item.modes[mode];
-      if (!run) continue;
-      modeStats[mode].count += 1;
-      if (run.status === "success") modeStats[mode].success += 1;
-      if (run.status === "blocked") {
-        modeStats[mode].blocked += 1;
-        for (const reason of (run.blockedReasons ?? [])) {
-          blockedReasonGroups[reason] = (blockedReasonGroups[reason] ?? 0) + 1;
-        }
+    const run = item.modes[mode];
+    if (!run) continue;
+    stat.count += 1;
+    if (run.status === "success") stat.success += 1;
+    if (run.status === "blocked") {
+      stat.blocked += 1;
+      for (const reason of (run.blockedReasons ?? [])) {
+        blockedReasonGroups[reason] = (blockedReasonGroups[reason] ?? 0) + 1;
       }
-      if (run.status === "failed") modeStats[mode].failed += 1;
-      if (run.repairedJson) modeStats[mode].repairTriggered += 1;
-      modeStats[mode].averageLatencyMs += run.latencyMs ?? 0;
-      modeStats[mode].averageCostUsd += run.costUsd ?? 0;
     }
+    if (run.status === "failed") stat.failed += 1;
+    if (run.repairedJson) stat.repairTriggered += 1;
+    stat.averageLatencyMs += run.latencyMs ?? 0;
+    stat.averageCostUsd += run.costUsd ?? 0;
   }
 
   const organizeStats = {
@@ -62,19 +49,18 @@ function buildAggregateSummary(results) {
     total: results.examples.length,
   };
 
-  for (const mode of REVIEW_MODES) {
-    if (modeStats[mode].count > 0) {
-      modeStats[mode].averageLatencyMs = Math.round(modeStats[mode].averageLatencyMs / modeStats[mode].count);
-      modeStats[mode].averageCostUsd = Number((modeStats[mode].averageCostUsd / modeStats[mode].count).toFixed(6));
-    }
+  if (stat.count > 0) {
+    stat.averageLatencyMs = Math.round(stat.averageLatencyMs / stat.count);
+    stat.averageCostUsd = Number((stat.averageCostUsd / stat.count).toFixed(6));
   }
 
   return {
     runId: results.runId,
     generatedAt: results.generatedAt,
     exampleCount: results.examples.length,
+    mode,
     organizeStats,
-    modeStats,
+    modeStats: { [mode]: stat },
     blockedReasonGroups,
     examples: results.examples.map((item) => ({
       id: item.id,
@@ -88,36 +74,27 @@ function buildAggregateSummary(results) {
         notes: trimList(item.organize.notes, 4),
         suggestions: trimList(item.organize.suggestions, 4),
       },
-      modes: Object.fromEntries(
-        REVIEW_MODES.map((mode) => [
-          mode,
-          item.modes[mode]
-            ? {
-                status: item.modes[mode].status,
-                latencyMs: item.modes[mode].latencyMs,
-                model: item.modes[mode].model,
-                costUsd: item.modes[mode].costUsd,
-                repairedJson: item.modes[mode].repairedJson,
-                error: item.modes[mode].error,
-                blockedReasons: trimList(item.modes[mode].blockedReasons, 3),
-                result: summarizeAnalysis(item.modes[mode].result),
-              }
-            : null,
-        ]),
-      ),
+      modes: {
+        [mode]: item.modes[mode]
+          ? {
+              status: item.modes[mode].status,
+              latencyMs: item.modes[mode].latencyMs,
+              model: item.modes[mode].model,
+              costUsd: item.modes[mode].costUsd,
+              repairedJson: item.modes[mode].repairedJson,
+              error: item.modes[mode].error,
+              blockedReasons: trimList(item.modes[mode].blockedReasons, 3),
+              result: summarizeAnalysis(item.modes[mode].result),
+            }
+          : null,
+      },
     })),
   };
 }
 
-
-export async function runBackendAssessment({ baseUrl, examples, runId }) {
+export async function runBackendAssessment({ baseUrl, examples, runId, mode }) {
   const generatedAt = new Date().toISOString();
-  const results = {
-    runId,
-    generatedAt,
-    baseUrl,
-    examples: [],
-  };
+  const results = { runId, generatedAt, baseUrl, examples: [] };
 
   async function runExample(example) {
     const organize = await postJson(`${baseUrl}/api/organize`, { draft: example.draft });
@@ -147,38 +124,29 @@ export async function runBackendAssessment({ baseUrl, examples, runId }) {
         form.tonguePulse ? "舌脉与四诊" : "",
       ].filter(Boolean);
 
-      // Run smart and normal in parallel — they're independent once organized
-      const modeResults = await Promise.all(
-        REVIEW_MODES.map((mode) => postJson(`${baseUrl}/api/analyze`, { form, mode })),
-      );
-
-      for (let i = 0; i < REVIEW_MODES.length; i++) {
-        const mode = REVIEW_MODES[i];
-        const analyze = modeResults[i];
-        item.modes[mode] = {
-          status: analyze.ok
-            ? "success"
-            : analyze.payload?.code === "VALIDATION_BLOCKED"
-              ? "blocked"
-              : "failed",
-          latencyMs: analyze.latencyMs,
-          model: analyze.payload?.model ?? null,
-          costUsd: analyze.payload?.costUsd ?? 0,
-          repairedJson: analyze.payload?.repairedJson ?? false,
-          error: analyze.ok ? null : analyze.payload?.error ?? "Unknown error",
-          blockedReasons: analyze.payload?.details?.blockedReasons ?? [],
-          result: analyze.ok ? analyze.payload.result : null,
-          validation: analyze.payload?.validation ?? analyze.payload?.details ?? null,
-        };
-      }
+      const analyze = await postJson(`${baseUrl}/api/analyze`, { form, mode });
+      item.modes[mode] = {
+        status: analyze.ok
+          ? "success"
+          : analyze.payload?.code === "VALIDATION_BLOCKED"
+            ? "blocked"
+            : "failed",
+        latencyMs: analyze.latencyMs,
+        model: analyze.payload?.model ?? null,
+        costUsd: analyze.payload?.costUsd ?? 0,
+        repairedJson: analyze.payload?.repairedJson ?? false,
+        error: analyze.ok ? null : analyze.payload?.error ?? "Unknown error",
+        blockedReasons: analyze.payload?.details?.blockedReasons ?? [],
+        result: analyze.ok ? analyze.payload.result : null,
+        validation: analyze.payload?.validation ?? analyze.payload?.details ?? null,
+      };
     }
 
     return item;
   }
 
-  // Run all examples in parallel — independent of each other
+  // All examples run in parallel — independent of each other
   results.examples = await Promise.all(examples.map(runExample));
-
-  const aggregate = buildAggregateSummary(results);
+  const aggregate = buildAggregateSummary(results, mode);
   return { results, aggregate };
 }

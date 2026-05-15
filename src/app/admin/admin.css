@@ -388,3 +388,91 @@
   color: var(--muted);
   margin-bottom: 2px;
 }
+
+/* ── Mode tag ── */
+.mode-tag {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 8px;
+  background: var(--mint);
+  color: var(--foreground);
+}
+
+.mode-tag.muted {
+  background: var(--sage);
+  color: var(--muted);
+}
+
+/* ── Per-example scorecards ── */
+.scorecard-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.scorecard-card {
+  padding: 14px 16px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.scorecard-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.scorecard-id {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.scorecard-body {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--foreground);
+  white-space: pre-wrap;
+  font-family: inherit;
+  margin: 0;
+  padding-left: 4px;
+  border-left: 2px solid var(--line);
+}
+
+.scorecard-error {
+  font-size: 13px;
+  color: var(--danger);
+}
+
+/* ── Per-section consistency reviews ── */
+.section-review-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 12px;
+}
+
+.section-review-card {
+  padding: 14px 16px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.section-review-header {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+.section-review-body {
+  font-size: 13px;
+}

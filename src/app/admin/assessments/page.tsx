@@ -27,10 +27,10 @@ export default async function AssessmentsPage() {
             <tr>
               <th>运行 ID</th>
               <th>时间</th>
+              <th>模式</th>
               <th>样本数</th>
               <th>整理成功率</th>
-              <th>常规成功率</th>
-              <th>智能成功率</th>
+              <th>分析成功率</th>
               <th>状态</th>
               <th></th>
             </tr>
@@ -38,26 +38,34 @@ export default async function AssessmentsPage() {
           <tbody>
             {runs.map((run) => {
               const org = run.organize_stats;
-              const orgRate = org && org.total > 0
-                ? `${org.success}/${org.total}`
-                : "—";
-              const normal = run.mode_stats?.normal;
-              const smart = run.mode_stats?.smart;
-              const normalRate = normal && normal.count > 0
-                ? `${normal.success}/${normal.count}`
-                : "—";
-              const smartRate = smart && smart.count > 0
-                ? `${smart.success}/${smart.count}`
+              const orgRate = org && org.total > 0 ? `${org.success}/${org.total}` : "—";
+
+              // For single-mode runs use run.mode; for old dual-mode runs aggregate both
+              const modeKey = run.mode ?? null;
+              const modeStats = modeKey
+                ? run.mode_stats?.[modeKey]
+                : Object.values(run.mode_stats ?? {}).reduce<{ success: number; count: number } | null>(
+                    (acc, s) => acc
+                      ? { success: acc.success + s.success, count: acc.count + s.count }
+                      : { success: s.success, count: s.count },
+                    null,
+                  );
+              const analyzeRate = modeStats && modeStats.count > 0
+                ? `${modeStats.success}/${modeStats.count}`
                 : "—";
 
               return (
                 <tr key={run.run_id}>
                   <td className="run-id-cell"><code>{run.run_id}</code></td>
                   <td>{new Date(run.created_at).toLocaleString("zh-SG")}</td>
+                  <td>
+                    {modeKey
+                      ? <span className="mode-tag">{modeKey === "normal" ? "常规" : "智能"}</span>
+                      : <span className="mode-tag muted">—</span>}
+                  </td>
                   <td>{run.example_count ?? "—"}</td>
                   <td>{orgRate}</td>
-                  <td>{normalRate}</td>
-                  <td>{smartRate}</td>
+                  <td>{analyzeRate}</td>
                   <td>
                     <span className={`status-pill ${run.status}`}>{run.status}</span>
                   </td>

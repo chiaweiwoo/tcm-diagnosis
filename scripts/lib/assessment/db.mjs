@@ -61,12 +61,13 @@ async function supabaseGet(config, path) {
 }
 
 // assess:run — save raw results immediately after API calls, before reviewer
-export async function saveRawRun({ runId, results, aggregate, baseUrl }) {
+export async function saveRawRun({ runId, mode, results, aggregate, baseUrl }) {
   const config = getSupabaseConfig();
   if (!config) { warnNoCredentials("saveRawRun"); return false; }
 
   const row = {
     run_id: runId,
+    mode: mode ?? null,
     triggered_by: "assess:run",
     created_at: results.generatedAt,
     example_count: results.examples.length,
@@ -87,7 +88,7 @@ export async function saveRawRun({ runId, results, aggregate, baseUrl }) {
   }
 }
 
-// assess:review — fetch the raw run so the reviewer can read the aggregate
+// assess:review — fetch the raw run so the reviewer can read pipeline data
 export async function fetchRawRun(runId) {
   const config = getSupabaseConfig();
   if (!config) { warnNoCredentials("fetchRawRun"); return null; }
@@ -95,7 +96,7 @@ export async function fetchRawRun(runId) {
   try {
     const rows = await supabaseGet(
       config,
-      `${SUPABASE_TABLE}?run_id=eq.${encodeURIComponent(runId)}&select=run_id,raw_results,organize_stats,mode_stats,blocked_reason_groups,example_count,base_url,created_at`,
+      `${SUPABASE_TABLE}?run_id=eq.${encodeURIComponent(runId)}&select=run_id,mode,raw_results,organize_stats,mode_stats,blocked_reason_groups,example_count,base_url,created_at`,
     );
     if (!rows || rows.length === 0) throw new Error(`run_id not found: ${runId}`);
     return rows[0];
@@ -105,8 +106,8 @@ export async function fetchRawRun(runId) {
   }
 }
 
-// assess:review — write reviewer output and mark the run as reviewed
-export async function updateReviewerOutput({ runId, reviewer }) {
+// assess:review — write all reviewer output and mark the run as reviewed
+export async function updateReviewerOutput({ runId, reviewer, exampleReviews, sectionReviews }) {
   const config = getSupabaseConfig();
   if (!config) { warnNoCredentials("updateReviewerOutput"); return false; }
 
@@ -117,6 +118,8 @@ export async function updateReviewerOutput({ runId, reviewer }) {
       {
         reviewer_text: reviewer.text ?? null,
         reviewer_model: reviewer.model ?? null,
+        example_reviews: exampleReviews ?? null,
+        section_reviews: sectionReviews ?? null,
         status: "reviewed",
       },
     );

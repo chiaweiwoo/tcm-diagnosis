@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getAssessmentRun, type ExampleSummary } from "@/lib/assessmentRuns";
+import { getAssessmentRun, type ExampleSummary, type ExampleReview, type SectionReview } from "@/lib/assessmentRuns";
 
 function renderMarkdown(text: string) {
   const lines = text.split("\n");
@@ -50,8 +50,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 function ExampleCard({ ex, index }: { ex: ExampleSummary; index: number }) {
-  const normal = ex.modes?.normal;
-  const smart = ex.modes?.smart;
+  const modeKeys = Object.keys(ex.modes ?? {});
 
   return (
     <div className="example-card">
@@ -80,44 +79,55 @@ function ExampleCard({ ex, index }: { ex: ExampleSummary; index: number }) {
           )}
         </div>
 
-        {/* Normal mode */}
-        {normal && (
-          <div className="example-stage">
-            <span className="stage-label">常规</span>
-            <StatusBadge status={normal.status} />
-            {normal.latencyMs != null && <span className="stage-meta">{normal.latencyMs} ms</span>}
-            {normal.costUsd != null && <span className="stage-meta">US${normal.costUsd.toFixed(5)}</span>}
-            {normal.repairedJson && <span className="stage-meta warn">已修复 JSON</span>}
-            {normal.blockedReasons && normal.blockedReasons.length > 0 && (
-              <div className="blocked-reasons">
-                {normal.blockedReasons.map((r, i) => <span key={i} className="blocked-tag">{r}</span>)}
-              </div>
-            )}
-            {normal.result?.title && (
-              <p className="result-title">{normal.result.title}</p>
-            )}
-          </div>
-        )}
-
-        {/* Smart mode */}
-        {smart && (
-          <div className="example-stage">
-            <span className="stage-label">智能</span>
-            <StatusBadge status={smart.status} />
-            {smart.latencyMs != null && <span className="stage-meta">{smart.latencyMs} ms</span>}
-            {smart.costUsd != null && <span className="stage-meta">US${smart.costUsd.toFixed(5)}</span>}
-            {smart.repairedJson && <span className="stage-meta warn">已修复 JSON</span>}
-            {smart.blockedReasons && smart.blockedReasons.length > 0 && (
-              <div className="blocked-reasons">
-                {smart.blockedReasons.map((r, i) => <span key={i} className="blocked-tag">{r}</span>)}
-              </div>
-            )}
-            {smart.result?.title && (
-              <p className="result-title">{smart.result.title}</p>
-            )}
-          </div>
-        )}
+        {/* Mode stages (single or dual) */}
+        {modeKeys.map((modeKey) => {
+          const m = ex.modes[modeKey];
+          if (!m) return null;
+          return (
+            <div key={modeKey} className="example-stage">
+              <span className="stage-label">{modeKey === "normal" ? "常规" : modeKey === "smart" ? "智能" : modeKey}</span>
+              <StatusBadge status={m.status} />
+              {m.latencyMs != null && <span className="stage-meta">{m.latencyMs} ms</span>}
+              {m.costUsd != null && <span className="stage-meta">US${m.costUsd.toFixed(5)}</span>}
+              {m.repairedJson && <span className="stage-meta warn">已修复 JSON</span>}
+              {m.blockedReasons && m.blockedReasons.length > 0 && (
+                <div className="blocked-reasons">
+                  {m.blockedReasons.map((r, i) => <span key={i} className="blocked-tag">{r}</span>)}
+                </div>
+              )}
+              {m.result?.title && (
+                <p className="result-title">{m.result.title}</p>
+              )}
+            </div>
+          );
+        })}
       </div>
+    </div>
+  );
+}
+
+function ScorecardCard({ rev, index }: { rev: ExampleReview; index: number }) {
+  return (
+    <div className="scorecard-card">
+      <div className="scorecard-header">
+        <span className="example-index">#{index + 1}</span>
+        <span className="scorecard-id">{rev.id}</span>
+        {rev.error && <span className="stage-meta warn">评审失败</span>}
+      </div>
+      {rev.scorecard
+        ? <pre className="scorecard-body">{rev.scorecard}</pre>
+        : <p className="scorecard-error">{rev.error ?? "未知错误"}</p>}
+    </div>
+  );
+}
+
+function SectionCard({ sec }: { sec: SectionReview }) {
+  return (
+    <div className="section-review-card">
+      <div className="section-review-header">{sec.label}</div>
+      {sec.analysis
+        ? <div className="section-review-body admin-markdown">{renderMarkdown(sec.analysis)}</div>
+        : <p className="scorecard-error">{sec.error ?? "未知错误"}</p>}
     </div>
   );
 }
@@ -132,8 +142,12 @@ export default async function AssessmentRunPage({
   if (!run) notFound();
 
   const org = run.organize_stats;
-  const modes = ["normal", "smart"] as const;
+  const modeKey = run.mode ?? null;
+  const modeLabel = modeKey === "normal" ? "常规" : modeKey === "smart" ? "智能" : null;
   const examples = run.raw_results?.aggregate?.examples ?? [];
+
+  // Collect which modes actually have stats
+  const activeModesWithStats = Object.entries(run.mode_stats ?? {}).filter(([, s]) => s && s.count > 0);
 
   return (
     <main className="admin-page">
@@ -144,6 +158,7 @@ export default async function AssessmentRunPage({
           <p className="admin-meta">
             {new Date(run.created_at).toLocaleString("zh-SG")} ·{" "}
             {run.example_count ?? 0} 个样本 · 触发：{run.triggered_by}
+            {modeLabel && <> · 模式：{modeLabel}</>}
             {run.base_url && <> · <span>{run.base_url}</span></>}
           </p>
         </div>
@@ -164,18 +179,14 @@ export default async function AssessmentRunPage({
               <span className="stat-sub">失败 {org.failed}</span>
             </div>
           )}
-          {modes.map((mode) => {
-            const s = run.mode_stats?.[mode];
-            if (!s) return null;
-            return (
-              <div key={mode} className="admin-stat-card">
-                <span className="stat-label">{mode === "normal" ? "常规" : "智能"} 成功</span>
-                <span className="stat-value">{s.success}/{s.count}</span>
-                <span className="stat-sub">阻断 {s.blocked} · 失败 {s.failed} · 修复 {s.repairTriggered}</span>
-                <span className="stat-sub">均延迟 {s.averageLatencyMs} ms · 均费用 US${s.averageCostUsd}</span>
-              </div>
-            );
-          })}
+          {activeModesWithStats.map(([mode, s]) => (
+            <div key={mode} className="admin-stat-card">
+              <span className="stat-label">{mode === "normal" ? "常规" : "智能"} 成功</span>
+              <span className="stat-value">{s.success}/{s.count}</span>
+              <span className="stat-sub">阻断 {s.blocked} · 失败 {s.failed} · 修复 {s.repairTriggered}</span>
+              <span className="stat-sub">均延迟 {s.averageLatencyMs} ms · 均费用 US${s.averageCostUsd}</span>
+            </div>
+          ))}
         </div>
       </section>
 
@@ -203,15 +214,39 @@ export default async function AssessmentRunPage({
         </section>
       )}
 
-      {/* Reviewer commentary */}
+      {/* Per-example scorecards */}
+      {run.example_reviews && run.example_reviews.length > 0 && (
+        <section className="admin-section">
+          <h2>逐条病案评分 <span className="admin-meta">({run.example_reviews.length} 条)</span></h2>
+          <div className="scorecard-list">
+            {run.example_reviews.map((rev, i) => (
+              <ScorecardCard key={rev.id ?? i} rev={rev} index={i} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Per-section consistency analyses */}
+      {run.section_reviews && run.section_reviews.length > 0 && (
+        <section className="admin-section">
+          <h2>输出栏目一致性 <span className="admin-meta">({run.section_reviews.length} 个栏目)</span></h2>
+          <div className="section-review-list">
+            {run.section_reviews.map((sec) => (
+              <SectionCard key={sec.key} sec={sec} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Final reviewer commentary */}
       {run.reviewer_text ? (
         <section className="admin-section">
-          <h2>DeepSeek 评审意见 <span className="admin-meta">({run.reviewer_model})</span></h2>
+          <h2>综合评审报告 <span className="admin-meta">({run.reviewer_model})</span></h2>
           <div className="admin-markdown">{renderMarkdown(run.reviewer_text)}</div>
         </section>
       ) : (
         <section className="admin-section">
-          <h2>评审意见</h2>
+          <h2>评审报告</h2>
           <div className="admin-empty" style={{ padding: 20 }}>
             <p>评审尚未生成。在 GitHub Actions → Assess Review 填入此 run_id 触发。</p>
             <p style={{ marginTop: 8 }}><code>{run.run_id}</code></p>
