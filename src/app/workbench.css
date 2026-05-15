@@ -281,6 +281,38 @@
   font-weight: 800;
 }
 
+.app-footer {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 24px;
+  padding: 12px 4px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.app-footer a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.app-footer a:hover {
+  color: var(--foreground);
+}
+
+.footer-badge {
+  padding: 2px 8px;
+  border: 1px solid #ead5a8;
+  border-radius: 999px;
+  background: #fffaf0;
+  color: #7f5a12;
+  font-weight: 700;
+}
+
 .notice-bar {
   display: flex;
   align-items: center;

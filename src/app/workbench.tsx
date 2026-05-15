@@ -630,16 +630,6 @@ export default function Workbench({
             </a>
           </div>
         </div>
-        <div className="hero-meta-row">
-          {isDevBypass ? <span className="dev-bypass-badge">本地开发模式</span> : null}
-          <span>构建：{buildLabel}</span>
-          <span className="model-label">当前模型：{activeModel}</span>
-          <span>作者：Woo Chia Wei</span>
-          <a href="https://github.com/chiaweiwoo/tcm-diagnosis" target="_blank" rel="noreferrer">
-            <GitBranch size={14} />
-            GitHub 仓库
-          </a>
-        </div>
       </section>
 
       <section className="panel flow-panel">
@@ -840,6 +830,17 @@ export default function Workbench({
           onClose={() => setShowGuide(false)}
         />
       ) : null}
+
+      <footer className="app-footer">
+        {isDevBypass ? <span className="dev-bypass-badge footer-badge">本地开发模式</span> : null}
+        <span>构建：{buildLabel}</span>
+        <span>当前模型：{activeModel}</span>
+        <span>作者：Woo Chia Wei</span>
+        <a href="https://github.com/chiaweiwoo/tcm-diagnosis" target="_blank" rel="noreferrer">
+          <GitBranch size={13} />
+          GitHub 仓库
+        </a>
+      </footer>
     </main>
   );
 }
