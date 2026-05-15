@@ -59,7 +59,7 @@ export default async function AssessmentsPage() {
               return (
                 <tr key={run.run_id}>
                   <td className="run-id-cell"><code>{run.run_id}</code></td>
-                  <td>{new Date(run.created_at).toLocaleString("zh-SG")}</td>
+                  <td>{new Date(run.created_at).toLocaleString("zh-SG", { timeZone: "Asia/Singapore" })}</td>
                   <td>
                     {modeKey
                       ? <span className="mode-tag">{modeKey === "normal" ? "常规" : "智能"}</span>

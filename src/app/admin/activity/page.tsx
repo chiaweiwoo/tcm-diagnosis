@@ -10,11 +10,11 @@ function timeAgo(iso: string) {
   if (hrs < 24) return `${hrs} 小时前`;
   const days = Math.floor(hrs / 24);
   if (days < 7) return `${days} 天前`;
-  return new Date(iso).toLocaleDateString("zh-SG");
+  return new Date(iso).toLocaleDateString("zh-SG", { timeZone: "Asia/Singapore" });
 }
 
 function fmtDateTime(iso: string) {
-  return new Date(iso).toLocaleString("zh-SG", {
+  return new Date(iso).toLocaleString("zh-SG", { timeZone: "Asia/Singapore",
     month: "2-digit",
     day: "2-digit",
     hour: "2-digit",

@@ -144,7 +144,7 @@ export default async function AssessmentRunPage({
           <p className="eyebrow">评估详情</p>
           <h1><code>{run.run_id}</code></h1>
           <p className="admin-meta">
-            {new Date(run.created_at).toLocaleString("zh-SG")} ·{" "}
+            {new Date(run.created_at).toLocaleString("zh-SG", { timeZone: "Asia/Singapore" })} ·{" "}
             {run.example_count ?? 0} 个样本
             {modeLabel && <> · 模式：{modeLabel}</>}
           </p>
