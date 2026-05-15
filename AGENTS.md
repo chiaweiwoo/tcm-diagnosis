@@ -27,6 +27,8 @@ The tool helps registered TCM doctors:
 ## Branch And Delivery Rules
 
 - Use a single-branch workflow on `main` unless the user explicitly asks otherwise.
+- AI agents work inside a git worktree (`claude/reverent-kilby-a695cc`). Always push via `git push origin HEAD:main`, never push the worktree branch itself.
+- Before pushing, always `git fetch origin main && git rebase origin/main` to avoid rejected pushes.
 - Do not describe a feature as done unless it is committed, pushed, and reflected in the running UI or CLI behavior.
 - Update `AGENTS.md` and `README.md` when product behavior meaningfully changes.
 - After significant UI or route changes, run `npm.cmd run build`.
@@ -54,8 +56,8 @@ The tool helps registered TCM doctors:
    - `DEV_AUTH_EMAIL` is present and still passes the doctor allowlist check
 8. The dev-only bypass must never be honored in production or preview deployments.
 9. Server routes must reject overlong drafts before any AI call is made. The current organize draft ceiling is `8000` characters.
-10. `/api/organize` and `/api/analyze` require auth: valid Supabase session cookie (doctor via browser) OR `X-Assessment-Key` header matching `ASSESSMENT_API_KEY` env var (CLI). Neither → 401. This is enforced via `src/lib/apiAuth.ts`.
-11. `ASSESSMENT_API_KEY` must never be exposed to the browser. It is a server-side / CLI-only secret.
+10. `/api/organize` and `/api/analyze` require auth: valid Supabase session cookie (doctor via browser) OR `X-Assessment-Key` header matching `ASSESSMENT_API_KEY` env var (calibration CLI). Neither → 401. Enforced via `src/lib/apiAuth.ts`.
+11. `ASSESSMENT_API_KEY` must never be exposed to the browser. It is a server-side / CLI-only secret. Set in Vercel env vars, `.env.local`, and GitHub Actions secrets.
 
 ## Stage-One Clinical Guardrails
 
@@ -190,7 +192,7 @@ Tables:
   - `is_active = false` blocks login even if in the table
   - `is_admin = true` grants access to `/admin/*` routes
   - Falls back to `ALLOWED_DOCTOR_EMAILS` env var only when Supabase is unreachable
-- `assessment_runs` — assessment CLI execution records; stored by the CLI after each run
+- `assessment_runs` — calibration run records. Columns: `run_id`, `mode`, `triggered_by`, `status` (`raw` → `reviewed`), `organize_stats`, `mode_stats`, `blocked_reason_groups`, `raw_results` (full per-example pipeline data), `example_reviews` (per-example DeepSeek scorecards), `section_reviews` (per-section consistency analyses), `reviewer_text` (final synthesis), `reviewer_model`
 
 All tables use service_role key only (no anon/user RLS policies). Never expose service_role key to the browser.
 
@@ -199,42 +201,51 @@ All tables use service_role key only (no anon/user RLS policies). Never expose s
 - There are two roles: user and admin. Admin is a boolean `is_admin` column on `doctor_allowlist`.
 - Admin check: `isAdminDoctorEmail()` in `src/lib/auth.ts` — returns true only when both `is_active` and `is_admin` are true.
 - Admin guard: `src/app/admin/layout.tsx` — server-side check; redirects to `/?reason=not_admin` for non-admins.
-- Admin pages live under `/admin/*`. Currently: `/admin/assessments` (list) and `/admin/assessments/[runId]` (detail).
+- Admin pages live under `/admin/*`. Currently: `/admin/assessments` (calibration run list) and `/admin/assessments/[runId]` (full calibration report detail).
 - Admin pages use service_role key through `src/lib/assessmentRuns.ts` — never anon key.
 - Only `chiaweiwoo123@gmail.com` is seeded as admin.
 
-## Assessment Workflow
+## Calibration Workflow
 
-- Assessment is CLI-first and local-only. Not a doctor-facing feature.
-- Two independent evaluation tracks:
+Calibration is the process of running the pipeline against real doctor examples, reviewing the outputs with AI, and using the resulting report to improve prompts. It is CLI-first, internal-only, and not doctor-facing.
 
-### Backend assessment (`assess:backend`)
-  - Loads real-doctor examples from `local-data/real-doctor-examples.md`
-  - Reuses an existing local dev server when possible, or starts one with dev bypass
-  - Runs organize/analyze for both `智能` and `常规` on every example
-  - Generates Markdown + JSON reports under `output/assessment/<run-id>/`
-  - Uses DeepSeek to produce reviewer commentary and prompt-improvement suggestions
-  - Saves run record to `assessment_runs` Supabase table via `scripts/lib/assessment/db.mjs`
-  - Report includes: organize success rate, per-mode success/blocked/failed/repair counts, blocked reason groups, per-example `repairedJson` flag
-  - `智能` mode is preserved to track reliability vs `常规`
+The underlying scripts and DB table still use "assess" naming (`assess:run`, `assess:review`, `assessment_runs`) — the concept name is calibration, the code names are unchanged.
 
-### Frontend assessment (`assess:frontend`)
-  - Picks 3 random eligible examples (draft length > 100 chars) from real-doctor examples
-  - Opens real Chromium browser (Playwright) against the local dev server with dev bypass
-  - Runs Scenario A (success flow, ×3 examples), Scenario B (intentional block), Scenario C (history reload)
-  - Captures structured DOM observations + screenshots at each stage
-  - Three reviewers run in parallel after all scenarios complete:
-    1. DeepSeek: UX/product flow reviewer (text-based observations)
-    2. DeepSeek: TCM practitioner reviewer (extracted section text from successful runs)
-    3. Claude (`ANTHROPIC_API_KEY`): visual reviewer (up to 6 screenshots as base64)
-  - Generates `frontend-report.html` (self-contained, screenshots embedded as base64, lightbox on click)
-  - Also writes Markdown + JSON reports and saves to Supabase `assessment_runs`
-  - Cleans up assessment-created consultation records by default
-  - Screenshots stay local; HTML report is the primary human-audit artifact
-  - `ANTHROPIC_API_KEY` + `ANTHROPIC_MODEL` (default: `claude-sonnet-4-6`) are required for visual reviewer; set in `.env.local` only, never Vercel
+### Philosophy
 
-- Both tracks are viewable from the admin UI at `/admin/assessments`
-- `triggered_by` field distinguishes: `"cli"` (backend) vs `"assess:frontend"` (frontend)
+The developer is not a TCM expert. The goal is to use AI to do the heavy reading and pattern-finding, produce a structured report the developer can act on, and generate a doctor-ready brief for focused expert consultation. Each calibration run tightens the feedback loop: run → AI reviews → developer reads → developer+AI refine prompts → re-run → compare.
+
+### Step 1 — `npm run assess:run` (local)
+
+- Reads examples from `local-data/real-doctor-examples.md` (gitignored, stays local)
+- Accepts `--mode normal` or `--mode smart` (default: `normal`) — one mode per run
+- Hits the live Vercel app (`ASSESS_BASE_URL`) with `X-Assessment-Key` auth header
+- Runs organize → analyze for every example in parallel
+- Generates SGT run ID: `assessment-YYYY-MM-DD_HH-MM-SS-SGT-{mode}`
+- Saves raw results to `assessment_runs` with `status: raw`
+- Prints the `run_id` — use it in Step 2
+
+To compare models, run twice: once with `--mode normal`, once with `--mode smart`. Two rows in DB, two reports in admin UI.
+
+### Step 2 — GitHub Actions "Assess Review" (cloud)
+
+Triggered via `workflow_dispatch` with the `run_id` from Step 1. Three stages run from a single `assess:review` entry point:
+
+**Stage 1 + 2 (parallel):**
+- Stage 1 — per-example scorecards: for each example, send full pipeline output to DeepSeek pro. Returns a compact structured verdict: 整理质量, 分析量, 实用性, 内部重复, 情感基调, 整体判断, 具体问题.
+- Stage 2 — per-section consistency: across all examples, check each output section (重点结论, 当前思路, 建议优化, 随访监测, 风险与提醒, 资料整理) for sentiment drift, templating, depth variance.
+
+**Stage 3 (after 1+2 complete):**
+- Final synthesis: DeepSeek pro reads all scorecards + section analyses. Produces: executive summary, main findings, cross-example patterns, prompt improvement directions, priority actions (urgent / medium / good to have), doctor brief (ready to share with a TCM doctor for focused feedback).
+
+All review calls use DeepSeek pro. Stages 1 and 2 run in parallel via `Promise.all` — no orchestration framework needed.
+
+Results saved to same `assessment_runs` row: `example_reviews`, `section_reviews`, `reviewer_text`, `status: reviewed`.
+
+### Admin UI
+
+- `/admin/assessments` — list of all runs, shows mode column for easy comparison
+- `/admin/assessments/[runId]` — full report: pipeline stats, per-example breakdown, per-example scorecards, per-section analyses, final synthesis with doctor brief
 
 ## Design Direction
 
@@ -269,14 +280,14 @@ Batch C recovery notes live in [docs/batch-c-handoff.md](docs/batch-c-handoff.md
 ## Documentation Direction
 
 - `README.md` is written in simplified Chinese. Technical terms (API routes, env var names, CLI commands, model names) stay in English.
-- Keep README minimal — workflow, API routes, local dev, assessment CLI, stack. No architecture diagrams, no marketing prose.
+- Keep README minimal — workflow, API routes, local dev, calibration CLI, stack. No architecture diagrams, no marketing prose.
 - Do not add sections to README unless the user explicitly asks. Shorter is better.
 - The dev-only auth bypass must be documented in `.env.local.example` with a brief, explicit note.
 - Update README only when user-visible behavior meaningfully changes.
 
 ## Deferred Scope
 
-1. Frontend automation assessment CLI
-2. Doctor feedback capture and accepted/rejected suggestion tracking
-3. External citation retrieval layer
-4. Regression comparison dashboard across prompt/model versions
+1. Doctor feedback capture and accepted/rejected suggestion tracking
+2. External citation retrieval layer
+3. Side-by-side calibration run comparison view in admin UI (normal vs smart)
+4. Scheduling calibration runs automatically (currently manual trigger)
