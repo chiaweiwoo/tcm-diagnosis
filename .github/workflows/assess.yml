@@ -29,11 +29,12 @@ jobs:
           ASSESSMENT_API_KEY: ${{ secrets.ASSESSMENT_API_KEY }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          MODE: ${{ inputs.mode }}
         run: |
-          OUTPUT=$(node scripts/assess-run.mjs --mode ${{ inputs.mode }})
+          OUTPUT=$(node scripts/assess-run.mjs --mode "$MODE")
           echo "$OUTPUT"
-          RUN_ID=$(echo "$OUTPUT" | grep -oP 'run_id=\K\S+')
-          echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
+          RUN_ID=$(echo "$OUTPUT" | sed -n 's/.*run_id=\([^ ]*\).*/\1/p' | head -1)
+          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
 
       - name: Review assessment
         env:
