@@ -16,13 +16,43 @@ export type AssessmentRunSummary = {
   }> | null;
 };
 
+export type ExampleModeSummary = {
+  status: string;
+  latencyMs?: number;
+  model?: string;
+  costUsd?: number;
+  repairedJson?: boolean;
+  error?: string | null;
+  blockedReasons?: string[];
+  result?: { title?: string; keyPoints?: string[] } | null;
+};
+
+export type ExampleSummary = {
+  id: string;
+  caseTypeGuess?: string;
+  topicGuess?: string;
+  draftPreview?: string;
+  organize: {
+    status: string;
+    latencyMs?: number;
+    formSummary?: string[];
+    notes?: string[];
+    suggestions?: string[];
+  };
+  modes: Record<string, ExampleModeSummary | null>;
+};
+
 export type AssessmentRunDetail = AssessmentRunSummary & {
   base_url: string | null;
   blocked_reason_groups: Record<string, number> | null;
   reviewer_text: string | null;
   reviewer_model: string | null;
   report_url: string | null;
-  full_report: unknown | null;
+  raw_results: {
+    aggregate: {
+      examples: ExampleSummary[];
+    };
+  } | null;
 };
 
 function getConfig() {
@@ -61,6 +91,10 @@ export async function getAssessmentRun(runId: string): Promise<AssessmentRunDeta
 
   const url = new URL(config.baseUrl);
   url.searchParams.set("run_id", `eq.${runId}`);
+  url.searchParams.set(
+    "select",
+    "run_id,triggered_by,created_at,example_count,status,base_url,organize_stats,mode_stats,blocked_reason_groups,reviewer_text,reviewer_model,report_url,raw_results",
+  );
   url.searchParams.set("limit", "1");
 
   const response = await fetch(url, { headers: config.headers, cache: "no-store" });

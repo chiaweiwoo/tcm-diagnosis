@@ -115,9 +115,15 @@
   color: var(--muted);
 }
 
-.status-pill.completed {
+.status-pill.completed,
+.status-pill.reviewed {
   background: #d1fae5;
   color: #065f46;
+}
+
+.status-pill.raw {
+  background: #fef9c3;
+  color: #92400e;
 }
 
 .status-pill.failed {
@@ -126,8 +132,147 @@
 }
 
 .status-pill.running {
+  background: #ede9fe;
+  color: #4c1d95;
+}
+
+/* ── Per-example breakdown ── */
+.example-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.example-card {
+  padding: 14px 16px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.example-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.example-index {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  min-width: 24px;
+}
+
+.example-tag {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: var(--mint);
+  color: var(--foreground);
+}
+
+.example-tag.muted {
+  background: var(--sage);
+  color: var(--muted);
+}
+
+.example-draft {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 10px;
+  line-height: 1.5;
+  border-left: 2px solid var(--line);
+  padding-left: 8px;
+}
+
+.example-stages {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.example-stage {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.stage-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  min-width: 36px;
+}
+
+.stage-meta {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.stage-meta.warn {
+  color: #92400e;
+  font-weight: 600;
+}
+
+.example-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 10px;
+}
+
+.badge-success { background: #d1fae5; color: #065f46; }
+.badge-blocked { background: #fef9c3; color: #92400e; }
+.badge-failed  { background: var(--danger-bg); color: var(--danger); }
+.badge-default { background: var(--line); color: var(--muted); }
+
+.form-summary-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+  width: 100%;
+}
+
+.form-pill {
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 8px;
+  background: var(--sage);
+  color: var(--muted);
+}
+
+.blocked-reasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+  width: 100%;
+}
+
+.blocked-tag {
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 8px;
   background: #fef9c3;
   color: #92400e;
+}
+
+.result-title {
+  width: 100%;
+  font-size: 12px;
+  color: var(--foreground);
+  font-weight: 600;
+  margin-top: 2px;
+  padding-left: 4px;
+  border-left: 2px solid #a7f3d0;
 }
 
 .admin-empty {

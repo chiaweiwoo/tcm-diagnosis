@@ -19,7 +19,7 @@ export default async function AssessmentsPage() {
 
       {runs.length === 0 ? (
         <div className="admin-empty">
-          <p>暂无评估记录。运行 <code>npm run assess:backend</code> 后记录将自动存入。</p>
+          <p>暂无评估记录。运行 <code>npm run assess:run</code> 后记录将自动存入。</p>
         </div>
       ) : (
         <table className="admin-table">

@@ -1,18 +1,21 @@
 # 临床复核伙伴
 
-面向中医师的临床工作台。把自由书写的病案草稿整理成结构化的临床脉络，在复核深入之前先提示资料完整性，再给出中医临床参考建议，并将诊次记录保存为可回顾的历史。
+> 面向中医师的临床工作台
+> **Live: [tcm.chiawei.me](https://tcm.chiawei.me)**
 
----
+把自由书写的病案草稿整理成结构化临床脉络，在分析深入前先验证资料完整性，再给出中医临床参考建议，并保存可回顾的诊次历史。
 
-## 工作流程
+医生写下病情、当前处理与想确认的问题，系统先整理草稿、提示缺失资料，资料足够时继续给出判断与随访提醒。结果自动保存，可重新打开、修改、重新生成或删除。
 
-1. 用 Google 账号登录，通过允许名单验证后进入工作台。
-2. 按习惯写下病情、当前处理与想确认的问题。
-3. 系统先整理草稿，提示资料完整性。
-4. 资料足够时继续进入临床复核，给出判断、方案与随访提醒。
-5. 结果自动保存；可重新打开、修改草稿、重新生成，或删除记录。
+## 技术栈
 
----
+| 层 | 技术 |
+|---|---|
+| Frontend | Next.js + TypeScript，部署于 Vercel |
+| UI | 自定义 CSS + lucide-react |
+| AI | DeepSeek（服务端路由，仅后端调用）|
+| 认证与数据 | Supabase（Google OAuth、允许名单、JSONB 病案存储、日志）|
+| 测试与 CI | GitHub Actions + Vitest |
 
 ## API Routes
 
@@ -28,50 +31,36 @@
 | `GET /auth/callback` | Google OAuth 回调与允许名单验证 |
 | `GET /auth/signout` | 登出并跳转登录页 |
 
----
-
 ## 本地开发
 
-正常开发仍需 Google OAuth。如需本地 UI 调试，可在 `.env.local` 启用开发绕过：
+正常开发需要 Google OAuth。如需本地 UI 调试，可在 `.env.local` 启用开发绕过：
 
 ```env
 DEV_AUTH_BYPASS=true
-DEV_AUTH_EMAIL=chiaweiwoo123@gmail.com
+DEV_AUTH_EMAIL=you@example.com
 ```
 
-绕过仍会校验允许名单，且在生产和预览环境下永远无效。
+绕过仍会校验允许名单，且在生产和预览环境永远无效。
 
-参考 `.env.local.example` 配置所有必填环境变量，包括 Supabase、DeepSeek API Key 和可选的 `AI_RATES_URL`。
+参考 `.env.local.example` 配置所有必填环境变量（Supabase、DeepSeek API Key 等）。
 
----
+```bash
+npm install
+npm run dev    # http://localhost:3000
+npm run test   # Vitest
+npm run build  # 本地构建验证
+```
 
 ## 评估 CLI
 
-两个独立的评估轨道，均为本地 CLI 运行，不对外暴露。
-
-**后端评估**（流水线稳定性）
+流水线稳定性评估，分两步运行，结果存入 Supabase，可在 `/admin/assessments` 查看。
 
 ```bash
-npm run assess:backend
+# 第一步（本地）：对 Vercel 部署运行所有样本，保存原始结果
+ASSESS_BASE_URL=https://tcm.chiawei.me npm run assess:run
+
+# 第二步（GitHub Actions）：读取原始结果，生成 DeepSeek 评审意见
+# 在 Actions → Assess Review → Run workflow 填入 run_id
 ```
 
-从 `local-data/real-doctor-examples.md` 读取真实医师案例，对每个案例运行 `organize → analyze` 流水线，并调用 DeepSeek 生成评审意见。报告写入 `output/assessment/<run-id>/`，运行记录存入 Supabase，可在 `/admin/assessments` 查看。
-
-**前端评估**（浏览器交互）
-
-```bash
-npm run assess:frontend   # 第一步：浏览器运行 + 截图上传
-npm run report:frontend   # 第二步：生成 HTML 报告
-```
-
-需要在 `.env.local` 配置 `ANTHROPIC_API_KEY`（Claude 视觉评审用）。随机抽取 3 个案例，用 Playwright 打开真实浏览器，运行成功路径、阻断场景与历史记录加载场景，并行调用三个评审员（DeepSeek UX、DeepSeek 中医临床、Claude 视觉），生成含截图的自包含 HTML 报告。
-
----
-
-## 技术栈
-
-- **Web App**：Next.js + TypeScript，部署于 Vercel
-- **UI**：自定义 CSS + lucide-react
-- **AI**：DeepSeek（服务端路由），Claude（评估 CLI 视觉评审）
-- **认证与数据**：Supabase（Google OAuth、允许名单、JSONB 病案存储、日志）
-- **测试**：`npm run test`（Vitest）、`npm run build`
+样本来源：`local-data/real-doctor-examples.md`（本地，不进仓库）。
