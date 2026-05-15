@@ -10,8 +10,12 @@ import {
 import { logApiCall, logServerEvent } from "@/lib/logging";
 import { mapOrganizedCaseToForm, OrganizedCaseRaw } from "@/lib/ai/organizeCase";
 import { MAX_ORGANIZE_DRAFT_CHARS, validateDraftLength } from "@/lib/inputLimits";
+import { requireApiAuth } from "@/lib/apiAuth";
 
 export async function POST(request: NextRequest) {
+  const denied = await requireApiAuth(request);
+  if (denied) return denied;
+
   const startedAt = Date.now();
 
   try {

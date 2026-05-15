@@ -54,6 +54,8 @@ The tool helps registered TCM doctors:
    - `DEV_AUTH_EMAIL` is present and still passes the doctor allowlist check
 8. The dev-only bypass must never be honored in production or preview deployments.
 9. Server routes must reject overlong drafts before any AI call is made. The current organize draft ceiling is `8000` characters.
+10. `/api/organize` and `/api/analyze` require auth: valid Supabase session cookie (doctor via browser) OR `X-Assessment-Key` header matching `ASSESSMENT_API_KEY` env var (CLI). Neither → 401. This is enforced via `src/lib/apiAuth.ts`.
+11. `ASSESSMENT_API_KEY` must never be exposed to the browser. It is a server-side / CLI-only secret.
 
 ## Stage-One Clinical Guardrails
 

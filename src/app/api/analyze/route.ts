@@ -10,8 +10,12 @@ import {
 import { caseSchema, CaseForm, validateCaseForm } from "@/lib/caseValidation";
 import { logApiCall, logServerEvent } from "@/lib/logging";
 import { AnalysisJson, buildAnalysisResult } from "@/lib/ai/analysisResult";
+import { requireApiAuth } from "@/lib/apiAuth";
 
 export async function POST(request: NextRequest) {
+  const denied = await requireApiAuth(request);
+  if (denied) return denied;
+
   const startedAt = Date.now();
   let reviewMode: "smart" | "normal" = "smart";
 
