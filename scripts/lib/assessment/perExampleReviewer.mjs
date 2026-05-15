@@ -59,17 +59,20 @@ function buildUserPrompt(example, mode) {
     }
     if (modeData.status === "success" && modeData.result) {
       const r = modeData.result;
-      if (r["重点结论"]?.length) lines.push(`重点结论：\n${r["重点结论"].map((s) => `- ${s}`).join("\n")}`);
-      if (r["病案摘要"]) lines.push(`病案摘要：${r["病案摘要"]}`);
-      if (r["当前思路"]) {
-        const t = r["当前思路"];
-        if (t["可取之处"]?.length) lines.push(`当前思路（可取）：\n${t["可取之处"].map((s) => `- ${s}`).join("\n")}`);
-        if (t["需要复核"]?.length) lines.push(`当前思路（复核）：\n${t["需要复核"].map((s) => `- ${s}`).join("\n")}`);
+      if (r.title) lines.push(`标题：${r.title}`);
+      if (r.keyPoints?.length) lines.push(`重点结论：\n${r.keyPoints.map((s) => `- ${s}`).join("\n")}`);
+      if (r.summary) lines.push(`病案摘要：${r.summary}`);
+      if (r.groups?.length) {
+        for (const group of r.groups) {
+          for (const section of group.sections ?? []) {
+            if (section.items?.length) {
+              lines.push(`${group.title} — ${section.title}：\n${section.items.map((s) => `- ${s}`).join("\n")}`);
+            }
+          }
+        }
       }
-      if (r["建议优化"]?.length) lines.push(`建议优化：\n${r["建议优化"].map((s) => `- ${s}`).join("\n")}`);
-      if (r["风险与提醒"]?.length) lines.push(`风险与提醒：\n${r["风险与提醒"].map((s) => `- ${s}`).join("\n")}`);
-      if (r["随访监测"]?.length) lines.push(`随访监测：\n${r["随访监测"].map((s) => `- ${s}`).join("\n")}`);
-      if (r["证据状态"]?.length) lines.push(`证据状态：\n${r["证据状态"].map((s) => `- ${s}`).join("\n")}`);
+      if (r.cautions?.length) lines.push(`风险与提醒：\n${r.cautions.map((s) => `- ${s}`).join("\n")}`);
+      if (r.evidence?.length) lines.push(`证据状态：\n${r.evidence.map((s) => `- ${s}`).join("\n")}`);
     }
   } else {
     lines.push("");

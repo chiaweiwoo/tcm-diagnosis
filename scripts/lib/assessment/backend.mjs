@@ -9,11 +9,12 @@ function summarizeAnalysis(result) {
   return {
     title: result.title ?? "",
     keyPoints: trimList(result.keyPoints, 4),
+    summary: result.summary ?? "",
     groups: Array.isArray(result.groups)
       ? result.groups.map((g) => ({
           title: g.title,
           sections: Array.isArray(g.sections)
-            ? g.sections.map((s) => ({ title: s.title }))
+            ? g.sections.map((s) => ({ title: s.title, items: trimList(s.items, 3) }))
             : [],
         }))
       : [],
