@@ -65,21 +65,11 @@ function ExampleCard({ ex, index }: { ex: ExampleSummary; index: number }) {
       )}
 
       <div className="example-stages">
-        {/* Organize */}
         <div className="example-stage">
           <span className="stage-label">整理</span>
           <StatusBadge status={ex.organize.status} />
-          {ex.organize.latencyMs != null && (
-            <span className="stage-meta">{ex.organize.latencyMs} ms</span>
-          )}
-          {ex.organize.formSummary && ex.organize.formSummary.length > 0 && (
-            <div className="form-summary-pills">
-              {ex.organize.formSummary.map((s, i) => <span key={i} className="form-pill">{s}</span>)}
-            </div>
-          )}
         </div>
 
-        {/* Mode stages (single or dual) */}
         {modeKeys.map((modeKey) => {
           const m = ex.modes[modeKey];
           if (!m) return null;
@@ -87,8 +77,6 @@ function ExampleCard({ ex, index }: { ex: ExampleSummary; index: number }) {
             <div key={modeKey} className="example-stage">
               <span className="stage-label">{modeKey === "normal" ? "常规" : modeKey === "smart" ? "智能" : modeKey}</span>
               <StatusBadge status={m.status} />
-              {m.latencyMs != null && <span className="stage-meta">{m.latencyMs} ms</span>}
-              {m.costUsd != null && <span className="stage-meta">US${m.costUsd.toFixed(5)}</span>}
               {m.repairedJson && <span className="stage-meta warn">已修复 JSON</span>}
               {m.blockedReasons && m.blockedReasons.length > 0 && (
                 <div className="blocked-reasons">
@@ -157,9 +145,8 @@ export default async function AssessmentRunPage({
           <h1><code>{run.run_id}</code></h1>
           <p className="admin-meta">
             {new Date(run.created_at).toLocaleString("zh-SG")} ·{" "}
-            {run.example_count ?? 0} 个样本 · 触发：{run.triggered_by}
+            {run.example_count ?? 0} 个样本
             {modeLabel && <> · 模式：{modeLabel}</>}
-            {run.base_url && <> · <span>{run.base_url}</span></>}
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
@@ -183,12 +170,50 @@ export default async function AssessmentRunPage({
             <div key={mode} className="admin-stat-card">
               <span className="stat-label">{mode === "normal" ? "常规" : "智能"} 成功</span>
               <span className="stat-value">{s.success}/{s.count}</span>
-              <span className="stat-sub">阻断 {s.blocked} · 失败 {s.failed} · 修复 {s.repairTriggered}</span>
-              <span className="stat-sub">均延迟 {s.averageLatencyMs} ms · 均费用 US${s.averageCostUsd}</span>
+              <span className="stat-sub">阻断 {s.blocked} · 失败 {s.failed}{s.repairTriggered > 0 ? ` · 修复 ${s.repairTriggered}` : ""}</span>
             </div>
           ))}
         </div>
       </section>
+
+      {/* Final reviewer commentary — top of report, most important */}
+      {run.reviewer_text ? (
+        <section className="admin-section">
+          <h2>综合评审报告</h2>
+          <div className="admin-markdown">{renderMarkdown(run.reviewer_text)}</div>
+        </section>
+      ) : (
+        <section className="admin-section">
+          <div className="admin-empty" style={{ padding: 20 }}>
+            <p>评审尚未生成。触发 GitHub Actions → <strong>Assess</strong> 运行后将自动填入。</p>
+            <p style={{ marginTop: 8 }}><code>{run.run_id}</code></p>
+          </div>
+        </section>
+      )}
+
+      {/* Per-example scorecards */}
+      {run.example_reviews && run.example_reviews.length > 0 && (
+        <section className="admin-section">
+          <h2>逐条病案评分</h2>
+          <div className="scorecard-list">
+            {run.example_reviews.map((rev, i) => (
+              <ScorecardCard key={rev.id ?? i} rev={rev} index={i} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Per-section consistency analyses */}
+      {run.section_reviews && run.section_reviews.length > 0 && (
+        <section className="admin-section">
+          <h2>输出栏目一致性</h2>
+          <div className="section-review-list">
+            {run.section_reviews.map((sec) => (
+              <SectionCard key={sec.key} sec={sec} />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Blocked reason groups */}
       {run.blocked_reason_groups && Object.keys(run.blocked_reason_groups).length > 0 && (
@@ -202,54 +227,14 @@ export default async function AssessmentRunPage({
         </section>
       )}
 
-      {/* Per-example breakdown */}
+      {/* Per-example pipeline breakdown — detail reference */}
       {examples.length > 0 && (
         <section className="admin-section">
-          <h2>样本明细 <span className="admin-meta">({examples.length} 个)</span></h2>
+          <h2>样本明细</h2>
           <div className="example-list">
             {examples.map((ex, i) => (
               <ExampleCard key={ex.id ?? i} ex={ex} index={i} />
             ))}
-          </div>
-        </section>
-      )}
-
-      {/* Per-example scorecards */}
-      {run.example_reviews && run.example_reviews.length > 0 && (
-        <section className="admin-section">
-          <h2>逐条病案评分 <span className="admin-meta">({run.example_reviews.length} 条)</span></h2>
-          <div className="scorecard-list">
-            {run.example_reviews.map((rev, i) => (
-              <ScorecardCard key={rev.id ?? i} rev={rev} index={i} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Per-section consistency analyses */}
-      {run.section_reviews && run.section_reviews.length > 0 && (
-        <section className="admin-section">
-          <h2>输出栏目一致性 <span className="admin-meta">({run.section_reviews.length} 个栏目)</span></h2>
-          <div className="section-review-list">
-            {run.section_reviews.map((sec) => (
-              <SectionCard key={sec.key} sec={sec} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Final reviewer commentary */}
-      {run.reviewer_text ? (
-        <section className="admin-section">
-          <h2>综合评审报告 <span className="admin-meta">({run.reviewer_model})</span></h2>
-          <div className="admin-markdown">{renderMarkdown(run.reviewer_text)}</div>
-        </section>
-      ) : (
-        <section className="admin-section">
-          <h2>评审报告</h2>
-          <div className="admin-empty" style={{ padding: 20 }}>
-            <p>评审尚未生成。在 GitHub Actions → Assess Review 填入此 run_id 触发。</p>
-            <p style={{ marginTop: 8 }}><code>{run.run_id}</code></p>
           </div>
         </section>
       )}
