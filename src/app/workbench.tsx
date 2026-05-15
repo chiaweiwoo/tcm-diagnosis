@@ -123,11 +123,13 @@ export default function Workbench({
   buildLabel,
   isDevBypass,
   activeModel,
+  isAdmin = false,
 }: {
   userEmail: string;
   buildLabel: string;
   isDevBypass: boolean;
   activeModel: string;
+  isAdmin?: boolean;
 }) {
   const [consultationName, setConsultationName] = useState("");
   const [activeConsultationId, setActiveConsultationId] = useState("");
@@ -616,10 +618,17 @@ export default function Workbench({
               仅供注册中医师临床参考；最终判断仍以医生面诊与专业评估为准。
             </p>
           </div>
-          <a className="secondary-button hero-action" href="/auth/signout">
-            <LogOut size={15} />
-            {userEmail}
-          </a>
+          <div className="hero-actions">
+            {isAdmin && (
+              <a className="secondary-button compact-button" href="/admin/assessments">
+                后台管理
+              </a>
+            )}
+            <a className="secondary-button hero-action" href="/auth/signout">
+              <LogOut size={15} />
+              {userEmail}
+            </a>
+          </div>
         </div>
         <div className="hero-meta-row">
           {isDevBypass ? <span className="dev-bypass-badge">本地开发模式</span> : null}

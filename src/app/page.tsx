@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getDevBypassDoctorEmail, isAllowedDoctorEmail } from "@/lib/auth";
+import { getDevBypassDoctorEmail, isAllowedDoctorEmail, isAdminDoctorEmail } from "@/lib/auth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import packageJson from "../../package.json";
 import Workbench from "./workbench";
@@ -34,6 +34,7 @@ export default async function Home() {
   const revision = (process.env.VERCEL_GIT_COMMIT_SHA ?? "local").slice(0, 7);
   const buildLabel = `v${packageJson.version} · ${revision}`;
   const activeModel = process.env.DEEPSEEK_MODEL_ANALYZE || process.env.DEEPSEEK_MODEL_FAST || "deepseek-v4-flash";
+  const isAdmin = await isAdminDoctorEmail(userEmail);
 
   return (
     <Workbench
@@ -41,6 +42,7 @@ export default async function Home() {
       buildLabel={buildLabel}
       isDevBypass={isDevBypass}
       activeModel={activeModel}
+      isAdmin={isAdmin}
     />
   );
 }

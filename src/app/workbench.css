@@ -190,6 +190,28 @@
   gap: 6px;
 }
 
+.hero-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.hero-actions .secondary-button:not(.hero-action) {
+  font-size: 12px;
+  min-height: 28px;
+  padding: 0 10px;
+  border-color: rgba(255, 255, 255, 0.26);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff6ee;
+}
+
+.hero-actions .secondary-button:not(.hero-action):hover {
+  border-color: rgba(255, 255, 255, 0.44);
+  background: rgba(255, 255, 255, 0.12);
+}
+
 .hero-action {
   max-width: 340px;
   overflow: hidden;
