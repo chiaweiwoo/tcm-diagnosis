@@ -498,7 +498,7 @@
 
 .entry-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.75fr) minmax(270px, 0.75fr);
+  grid-template-columns: minmax(0, 1fr) 280px;
   gap: 10px;
   align-items: start;
 }
@@ -610,7 +610,7 @@
 }
 
 .compact-draft textarea {
-  min-height: 200px;
+  min-height: 300px;
 }
 
 .history-row {
@@ -857,11 +857,20 @@
   opacity: 0.45;
 }
 
-.cost-note {
-  margin: 0;
+.kbd-hint {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: var(--paper);
   color: var(--muted);
-  font-size: 12px;
-  line-height: 1.4;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
 .primary-button:hover {
@@ -1253,12 +1262,6 @@
 
   .hero-action {
     max-width: 100%;
-  }
-
-  .hero-meta-row {
-    justify-content: flex-start;
-    flex-wrap: wrap;
-    gap: 10px;
   }
 
   .organize-review-grid,

@@ -610,7 +610,7 @@ export default function Workbench({
           <div className="hero-main">
             <h1>临床复核伙伴</h1>
             <p className="hero-copy">
-              把自由病案整理成清晰脉络，先提示值得补充的关键信息，再陪你复核思路与后续重点。
+              整理病案脉络，提示关键信息，陪你复核思路。
             </p>
             <p className="hero-mission">让医生看得更全，记得更准，面对难题时不再孤单。</p>
             <p className="hero-note">
@@ -691,7 +691,7 @@ export default function Workbench({
                   value={consultationName}
                   onChange={(event) => handleNameChange(event.target.value)}
                   disabled={isLocked}
-                  placeholder="例如：代号 A-01（勿填真实姓名）"
+                  placeholder="代号或备注名"
                 />
               </label>
             <label className="field-block history-field">
@@ -733,7 +733,7 @@ export default function Workbench({
               onChange={(event) => handleDraftChange(event.target.value)}
               onKeyDown={handleDraftKeyDown}
               disabled={isLocked}
-              rows={10}
+              rows={16}
               placeholder="先按你的习惯写下病情、当前处理与想确认的问题；系统会先帮你整理重点，再给出临床复核建议。"
             />
           </label>
@@ -746,11 +746,9 @@ export default function Workbench({
               disabled={!draft.trim() || isLocked}
             >
               <Sparkles size={18} />
-              {isOrganizing ? "资料整理中..." : isAnalyzing ? "临床研判中..." : "生成临床复核"}
+              {isOrganizing ? "整理中…" : isAnalyzing ? "复核中…" : "开始复核"}
             </button>
-            <p className="cost-note">
-              资料将先结构化，再进入临床研判；可按 Ctrl+Enter 提交。
-            </p>
+            <kbd className="kbd-hint">Ctrl + Enter</kbd>
           </div>
           </div>
           <MergedStatusPanel
