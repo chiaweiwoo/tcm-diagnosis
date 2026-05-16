@@ -251,9 +251,9 @@ function ResultSection({ title, items }: { title: string; items: string[] }) {
   );
 }
 
-function ResultColumn({ title, icon, children }: { title: string; icon: ReactNode; children: ReactNode }) {
+function ResultColumn({ title, icon, colorVariant, children }: { title: string; icon: ReactNode; colorVariant?: "green" | "blue" | "yellow"; children: ReactNode }) {
   return (
-    <div className="result-column">
+    <div className={`result-column${colorVariant ? ` result-column--${colorVariant}` : ""}`}>
       <div className="result-column__header">
         <span className="result-column__icon">{icon}</span>
         <h3 className="result-column__title">{title}</h3>
@@ -859,6 +859,10 @@ export default function Workbench() {
                 <ResultColumn
                   key={group.title}
                   title={group.title}
+                  colorVariant={
+                    group.title === "判断" ? "green" :
+                    group.title === "方案" ? "blue" : "yellow"
+                  }
                   icon={
                     group.title === "判断" ? (
                       <Brain size={15} />
