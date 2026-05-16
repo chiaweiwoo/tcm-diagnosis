@@ -284,6 +284,20 @@ function ShimmerCard() {
   );
 }
 
+function buildDisplayName(c: ConsultationSummary): string {
+  if (c.consultation_name) return c.consultation_name;
+  if (c.form_data) {
+    const { patientSex, patientAge, chiefComplaint } = c.form_data;
+    const parts = [
+      patientSex,
+      patientAge ? `${patientAge}岁` : null,
+      chiefComplaint || null,
+    ].filter(Boolean) as string[];
+    if (parts.length) return parts.join(" ");
+  }
+  return "未命名病案";
+}
+
 function formatDate(iso: string) {
   const d = new Date(iso);
   const yyyy = d.getFullYear();
@@ -343,7 +357,7 @@ function HistoryPanel({
             onClick={() => onSelect(c.id)}
           >
             <div className="history-item__name">
-              {c.consultation_name || c.form_data?.chiefComplaint || "未命名病案"}
+              {buildDisplayName(c)}
             </div>
             <div className="history-item__meta">
               <span>{formatDate(c.updated_at)}</span>
