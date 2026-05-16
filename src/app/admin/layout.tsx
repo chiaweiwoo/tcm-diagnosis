@@ -24,7 +24,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const Icon = BRANDING.icon;
 
   return (
-    <>
+    <div className="admin-body">
       <header className="admin-bar">
         <Link href="/" className="admin-bar-brand">
           <Icon size={16} strokeWidth={2.25} />
@@ -40,6 +40,6 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <footer className="admin-footer">
         {BRANDING.name} · 后台管理
       </footer>
-    </>
+    </div>
   );
 }
