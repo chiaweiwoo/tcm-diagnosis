@@ -42,34 +42,36 @@ describe("structuredCaseSchema", () => {
     }
   });
 
-  it("enforces chiefComplaint min (2) and max length", () => {
-    expect(parse({ ...MINIMAL_VALID, chiefComplaint: "头" }).success).toBe(false);
-    expect(parse({ ...MINIMAL_VALID, chiefComplaint: "头痛" }).success).toBe(true);
+  it("enforces chiefComplaint non-empty and max length", () => {
+    expect(parse({ ...MINIMAL_VALID, chiefComplaint: "" }).success).toBe(false);
+    expect(parse({ ...MINIMAL_VALID, chiefComplaint: "   " }).success).toBe(false);
+    expect(parse({ ...MINIMAL_VALID, chiefComplaint: "头" }).success).toBe(true);
     expect(parse({ ...MINIMAL_VALID, chiefComplaint: "头".repeat(FIELD_LIMITS.chiefComplaint + 1) }).success).toBe(false);
   });
 
-  it("enforces currentIllness min (5) and max length", () => {
-    expect(parse({ ...MINIMAL_VALID, currentIllness: "短" }).success).toBe(false);
-    expect(parse({ ...MINIMAL_VALID, currentIllness: "头痛3日余。" }).success).toBe(true);
+  it("enforces currentIllness non-empty and max length", () => {
+    expect(parse({ ...MINIMAL_VALID, currentIllness: "" }).success).toBe(false);
+    expect(parse({ ...MINIMAL_VALID, currentIllness: "   " }).success).toBe(false);
+    expect(parse({ ...MINIMAL_VALID, currentIllness: "短" }).success).toBe(true);
     expect(parse({ ...MINIMAL_VALID, currentIllness: "痛".repeat(FIELD_LIMITS.currentIllness + 1) }).success).toBe(false);
   });
 
-  it("enforces diagnosis min (2) and prescription min (3)", () => {
-    expect(parse({ ...MINIMAL_VALID, diagnosis: "头" }).success).toBe(false);
-    expect(parse({ ...MINIMAL_VALID, prescription: "无" }).success).toBe(false);
-    expect(parse({ ...MINIMAL_VALID, prescription: "百会穴" }).success).toBe(true);
+  it("enforces diagnosis and prescription non-empty", () => {
+    expect(parse({ ...MINIMAL_VALID, diagnosis: "" }).success).toBe(false);
+    expect(parse({ ...MINIMAL_VALID, prescription: "" }).success).toBe(false);
+    expect(parse({ ...MINIMAL_VALID, prescription: "推拿" }).success).toBe(true);
   });
 
-  it("requires physicalExam (min 2 chars)", () => {
+  it("requires physicalExam non-empty", () => {
     expect(parse({ ...MINIMAL_VALID, physicalExam: "" }).success).toBe(false);
-    expect(parse({ ...MINIMAL_VALID, physicalExam: "舌" }).success).toBe(false);
-    expect(parse({ ...MINIMAL_VALID, physicalExam: "舌淡红" }).success).toBe(true);
+    expect(parse({ ...MINIMAL_VALID, physicalExam: "   " }).success).toBe(false);
+    expect(parse({ ...MINIMAL_VALID, physicalExam: "舌" }).success).toBe(true);
   });
 
-  it("requires pattern (min 2 chars)", () => {
+  it("requires pattern non-empty", () => {
     expect(parse({ ...MINIMAL_VALID, pattern: "" }).success).toBe(false);
-    expect(parse({ ...MINIMAL_VALID, pattern: "虚" }).success).toBe(false);
-    expect(parse({ ...MINIMAL_VALID, pattern: "气虚" }).success).toBe(true);
+    expect(parse({ ...MINIMAL_VALID, pattern: "   " }).success).toBe(false);
+    expect(parse({ ...MINIMAL_VALID, pattern: "虚" }).success).toBe(true);
   });
 
   it("defaults optional fields to empty string when omitted", () => {

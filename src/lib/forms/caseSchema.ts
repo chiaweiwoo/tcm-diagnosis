@@ -59,14 +59,12 @@ export const structuredCaseSchema = z
       .string()
       .trim()
       .min(1, MSG.REQUIRED)
-      .min(2, MSG.TOO_SHORT)
       .max(FIELD_LIMITS.chiefComplaint, `不超过${FIELD_LIMITS.chiefComplaint}字`),
 
     currentIllness: z
       .string()
       .trim()
       .min(1, MSG.REQUIRED)
-      .min(5, MSG.TOO_SHORT)
       .max(FIELD_LIMITS.currentIllness, `不超过${FIELD_LIMITS.currentIllness}字`),
 
     pastHistory: z
@@ -79,28 +77,24 @@ export const structuredCaseSchema = z
       .string()
       .trim()
       .min(1, MSG.REQUIRED)
-      .min(2, MSG.TOO_SHORT)
       .max(FIELD_LIMITS.physicalExam, `不超过${FIELD_LIMITS.physicalExam}字`),
 
     diagnosis: z
       .string()
       .trim()
       .min(1, MSG.REQUIRED)
-      .min(2, MSG.TOO_SHORT)
       .max(FIELD_LIMITS.diagnosis, `不超过${FIELD_LIMITS.diagnosis}字`),
 
     pattern: z
       .string()
       .trim()
       .min(1, MSG.REQUIRED)
-      .min(2, MSG.TOO_SHORT)
       .max(FIELD_LIMITS.pattern, `不超过${FIELD_LIMITS.pattern}字`),
 
     prescription: z
       .string()
       .trim()
       .min(1, MSG.REQUIRED)
-      .min(3, MSG.TOO_SHORT)
       .max(FIELD_LIMITS.prescription, `不超过${FIELD_LIMITS.prescription}字`),
 
     doctorQuestion: z
