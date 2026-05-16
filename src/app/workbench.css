@@ -222,10 +222,14 @@
 
 .history-item {
   position: relative;
-  padding: 10px 36px 10px 14px;
+  padding: 8px 32px 8px 12px;
   cursor: pointer;
   border-bottom: 1px solid var(--border);
   transition: background 0.12s;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .history-item:last-child {
@@ -241,25 +245,26 @@
 }
 
 .history-item__name {
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 500;
   color: var(--text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  flex: 1;
 }
 
 .history-item__meta {
-  display: flex;
-  gap: 8px;
   font-size: 11px;
   color: var(--text-muted);
-  margin-top: 2px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
 }
 
 .history-item__delete {
   position: absolute;
-  right: 10px;
+  right: 8px;
   top: 50%;
   transform: translateY(-50%);
   border: none;
@@ -272,6 +277,8 @@
   transition: opacity 0.15s;
   display: flex;
   align-items: center;
+  background: var(--surface);
+  box-shadow: -4px 0 8px var(--surface);
 }
 
 .history-item:hover .history-item__delete {
