@@ -1,81 +1,107 @@
 import Link from "next/link";
-import { listAssessmentRuns } from "@/lib/assessmentRuns";
+import RunButton from "./RunButton";
+
+type JobRow = {
+  id: string;
+  triggered_by: string;
+  status: string;
+  sample_count: number | null;
+  created_at: string;
+  completed_at: string | null;
+  synthesis: { verdict?: string } | null;
+};
+
+async function listJobs(): Promise<JobRow[]> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceKey) return [];
+
+  const url = new URL(`${supabaseUrl}/rest/v1/assessment_jobs`);
+  url.searchParams.set("select", "id,triggered_by,status,sample_count,created_at,completed_at,synthesis");
+  url.searchParams.set("order", "created_at.desc");
+
+  const res = await fetch(url, {
+    headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
+    cache: "no-store",
+  });
+  if (!res.ok) return [];
+  return (await res.json()) as JobRow[];
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  running:              "运行中",
+  done:                 "完成",
+  done_no_synthesis:    "完成（无综合审核）",
+  failed:               "失败",
+};
+
+const VERDICT_CLASSES: Record<string, string> = {
+  stable:          "verdict-badge--stable",
+  needs_attention: "verdict-badge--attention",
+  critical:        "verdict-badge--critical",
+};
+
+const VERDICT_LABELS: Record<string, string> = {
+  stable:          "提示稳定",
+  needs_attention: "有待改进",
+  critical:        "需立即处理",
+};
+
+function formatSGT(iso: string) {
+  return new Date(iso).toLocaleString("zh-SG", {
+    timeZone: "Asia/Singapore",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit",
+  });
+}
 
 export default async function AssessmentsPage() {
-  const runs = await listAssessmentRuns();
+  const jobs = await listJobs();
 
   return (
     <main className="admin-page">
       <div className="admin-header">
         <div>
           <p className="eyebrow">后台管理</p>
-          <h1>评估记录</h1>
+          <h1>评估任务</h1>
+          <p className="admin-meta">对所有样本运行分析，综合审核提示质量与幻觉风险</p>
         </div>
-        <Link href="/" className="secondary-button compact-button">← 返回工作台</Link>
+        <RunButton />
       </div>
 
-      {runs.length === 0 ? (
+      {jobs.length === 0 ? (
         <div className="admin-empty">
-          <p>暂无评估记录。运行 <code>npm run assess:run</code> 后记录将自动存入。</p>
+          <p>暂无评估记录。点击"运行新评估"开始第一次评估。</p>
         </div>
       ) : (
-        <table className="admin-table">
-          <thead>
-            <tr>
-              <th>运行 ID</th>
-              <th>时间</th>
-              <th>模式</th>
-              <th>样本数</th>
-              <th>整理成功率</th>
-              <th>分析成功率</th>
-              <th>状态</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {runs.map((run) => {
-              const org = run.organize_stats;
-              const orgRate = org && org.total > 0 ? `${org.success}/${org.total}` : "—";
-
-              // For single-mode runs use run.mode; for old dual-mode runs aggregate both
-              const modeKey = run.mode ?? null;
-              const modeStats = modeKey
-                ? run.mode_stats?.[modeKey]
-                : Object.values(run.mode_stats ?? {}).reduce<{ success: number; count: number } | null>(
-                    (acc, s) => acc
-                      ? { success: acc.success + s.success, count: acc.count + s.count }
-                      : { success: s.success, count: s.count },
-                    null,
-                  );
-              const analyzeRate = modeStats && modeStats.count > 0
-                ? `${modeStats.success}/${modeStats.count}`
-                : "—";
-
-              return (
-                <tr key={run.run_id}>
-                  <td className="run-id-cell"><code>{run.run_id}</code></td>
-                  <td>{new Date(run.created_at).toLocaleString("zh-SG", { timeZone: "Asia/Singapore" })}</td>
-                  <td>
-                    {modeKey
-                      ? <span className="mode-tag">{modeKey === "normal" ? "常规" : "智能"}</span>
-                      : <span className="mode-tag muted">—</span>}
-                  </td>
-                  <td>{run.example_count ?? "—"}</td>
-                  <td>{orgRate}</td>
-                  <td>{analyzeRate}</td>
-                  <td>
-                    <span className={`status-pill ${run.status}`}>{run.status}</span>
-                  </td>
-                  <td>
-                    <Link href={`/admin/assessments/${run.run_id}`} className="secondary-button compact-button">
-                      查看
-                    </Link>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <div className="job-list">
+          {jobs.map((job) => {
+            const verdict = job.synthesis?.verdict;
+            return (
+              <div key={job.id} className="job-row">
+                <div className="job-row__left">
+                  <span className={`status-pill ${job.status}`}>
+                    {STATUS_LABELS[job.status] ?? job.status}
+                  </span>
+                  {verdict && (
+                    <span className={`verdict-badge ${VERDICT_CLASSES[verdict] ?? ""}`}>
+                      {VERDICT_LABELS[verdict] ?? verdict}
+                    </span>
+                  )}
+                </div>
+                <div className="job-row__meta">
+                  <span>{job.sample_count ?? "—"} 个样本</span>
+                  <span>{formatSGT(job.created_at)}</span>
+                </div>
+                {job.status !== "running" && (
+                  <Link href={`/admin/assessments/${job.id}`} className="secondary-button compact-button">
+                    查看报告 →
+                  </Link>
+                )}
+              </div>
+            );
+          })}
+        </div>
       )}
     </main>
   );

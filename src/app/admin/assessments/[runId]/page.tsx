@@ -1,243 +1,298 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getAssessmentRun, type ExampleSummary, type ExampleReview, type SectionReview } from "@/lib/assessmentRuns";
+import type { AssessmentSynthesis } from "@/lib/ai/assessmentReview";
+import type { AnalysisResult } from "@/lib/ai/analysisResult";
+import type { StructuredCaseForm } from "@/lib/forms/caseSchema";
 
-function renderMarkdown(text: string) {
-  const lines = text.split("\n");
-  const elements: React.ReactNode[] = [];
-  let listBuffer: string[] = [];
-  let key = 0;
+// ---------------------------------------------------------------------------
+// Data fetching
+// ---------------------------------------------------------------------------
 
-  function flushList() {
-    if (!listBuffer.length) return;
-    elements.push(
-      <ul key={key++}>
-        {listBuffer.map((item, i) => (
-          <li key={i} dangerouslySetInnerHTML={{ __html: inlineFormat(item) }} />
-        ))}
-      </ul>,
-    );
-    listBuffer = [];
-  }
+type JobDetail = {
+  id: string;
+  status: string;
+  sample_count: number | null;
+  triggered_by: string;
+  created_at: string;
+  completed_at: string | null;
+  synthesis: AssessmentSynthesis | null;
+  review_model: string | null;
+  error_summary: string | null;
+};
 
-  function inlineFormat(line: string) {
-    return line
-      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-      .replace(/`(.+?)`/g, "<code>$1</code>");
-  }
+type ResultRow = {
+  id: string;
+  sample_id: string;
+  form_data: StructuredCaseForm;
+  analysis: AnalysisResult | null;
+  error: string | null;
+  duration_ms: number | null;
+  created_at: string;
+};
 
-  for (const raw of lines) {
-    const line = raw.trimEnd();
-    if (/^### /.test(line)) { flushList(); elements.push(<h3 key={key++}>{line.slice(4)}</h3>); }
-    else if (/^## /.test(line)) { flushList(); elements.push(<h2 key={key++}>{line.slice(3)}</h2>); }
-    else if (/^# /.test(line)) { flushList(); elements.push(<h1 key={key++}>{line.slice(2)}</h1>); }
-    else if (/^[-*] /.test(line)) { listBuffer.push(line.slice(2)); }
-    else if (/^\d+\. /.test(line)) { listBuffer.push(line.replace(/^\d+\. /, "")); }
-    else if (line === "") { flushList(); elements.push(<br key={key++} />); }
-    else { flushList(); elements.push(<p key={key++} dangerouslySetInnerHTML={{ __html: inlineFormat(line) }} />); }
-  }
-  flushList();
-  return elements;
+async function getJob(jobId: string): Promise<JobDetail | null> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceKey) return null;
+
+  const url = new URL(`${supabaseUrl}/rest/v1/assessment_jobs`);
+  url.searchParams.set("id", `eq.${jobId}`);
+  url.searchParams.set("select", "id,status,sample_count,triggered_by,created_at,completed_at,synthesis,review_model,error_summary");
+  url.searchParams.set("limit", "1");
+
+  const res = await fetch(url, {
+    headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
+    cache: "no-store",
+  });
+  if (!res.ok) return null;
+  const rows = (await res.json()) as JobDetail[];
+  return rows[0] ?? null;
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, string> = {
-    success: "badge-success",
-    blocked: "badge-blocked",
-    failed: "badge-failed",
-  };
-  return <span className={`example-badge ${map[status] ?? "badge-default"}`}>{status}</span>;
+async function getResults(jobId: string): Promise<ResultRow[]> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceKey) return [];
+
+  const url = new URL(`${supabaseUrl}/rest/v1/assessment_job_results`);
+  url.searchParams.set("job_id", `eq.${jobId}`);
+  url.searchParams.set("select", "id,sample_id,form_data,analysis,error,duration_ms,created_at");
+  url.searchParams.set("order", "created_at.asc");
+
+  const res = await fetch(url, {
+    headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
+    cache: "no-store",
+  });
+  if (!res.ok) return [];
+  return (await res.json()) as ResultRow[];
 }
 
-function ExampleCard({ ex, index }: { ex: ExampleSummary; index: number }) {
-  const modeKeys = Object.keys(ex.modes ?? {});
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+const VERDICT_META: Record<string, { label: string; cls: string }> = {
+  stable:          { label: "提示稳定",    cls: "verdict-badge--stable" },
+  needs_attention: { label: "有待改进",    cls: "verdict-badge--attention" },
+  critical:        { label: "需立即处理",  cls: "verdict-badge--critical" },
+};
+
+const ISSUE_TYPE_LABELS: Record<string, string> = {
+  hallucination:   "🔴 幻觉风险",
+  guardrail:       "🔴 护栏违规",
+  off_structure:   "🟠 结构失控",
+  tone_drift:      "🟡 角色漂移",
+  generic_content: "🟡 内容泛化",
+  evidence_blur:   "🟡 证据模糊",
+  edge_case_miss:  "🔵 边缘案例",
+};
+
+const SEVERITY_ORDER = { high: 0, medium: 1, low: 2 };
+
+const PRIORITY_META: Record<string, { label: string; cls: string }> = {
+  urgent: { label: "紧急",   cls: "priority--urgent" },
+  medium: { label: "中优先", cls: "priority--medium" },
+  low:    { label: "低优先", cls: "priority--low" },
+};
+
+function formatSGT(iso: string) {
+  return new Date(iso).toLocaleString("zh-SG", {
+    timeZone: "Asia/Singapore",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit",
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
+
+function SynthesisReport({ s }: { s: AssessmentSynthesis }) {
+  const vm = VERDICT_META[s.verdict] ?? { label: s.verdict, cls: "" };
+  const sortedIssues = [...(s.issues ?? [])].sort(
+    (a, b) => (SEVERITY_ORDER[a.severity] ?? 9) - (SEVERITY_ORDER[b.severity] ?? 9),
+  );
+  const sortedRecs = [...(s.prompt_recommendations ?? [])].sort(
+    (a, b) => (PRIORITY_META[a.priority] ? 0 : 1) - (PRIORITY_META[b.priority] ? 0 : 1),
+  );
 
   return (
-    <div className="example-card">
-      <div className="example-card-header">
-        <span className="example-index">#{index + 1}</span>
-        {ex.caseTypeGuess && <span className="example-tag">{ex.caseTypeGuess}</span>}
-        {ex.topicGuess && <span className="example-tag muted">{ex.topicGuess}</span>}
+    <div className="synthesis-report">
+      {/* Verdict + summary */}
+      <div className="synthesis-verdict-row">
+        <span className={`verdict-badge verdict-badge--lg ${vm.cls}`}>{vm.label}</span>
       </div>
+      <p className="synthesis-summary">{s.executive_summary}</p>
 
-      {ex.draftPreview && (
-        <p className="example-draft">{ex.draftPreview}&hellip;</p>
+      {/* Strengths */}
+      {s.strengths?.length > 0 && (
+        <section className="synthesis-section">
+          <h2 className="synthesis-section__title synthesis-section__title--green">✓ 做得好的地方</h2>
+          <ul className="synthesis-bullets synthesis-bullets--green">
+            {s.strengths.map((item, i) => <li key={i}>{item}</li>)}
+          </ul>
+        </section>
       )}
 
-      <div className="example-stages">
-        <div className="example-stage">
-          <span className="stage-label">整理</span>
-          <StatusBadge status={ex.organize.status} />
-        </div>
-
-        {modeKeys.map((modeKey) => {
-          const m = ex.modes[modeKey];
-          if (!m) return null;
-          return (
-            <div key={modeKey} className="example-stage">
-              <span className="stage-label">{modeKey === "normal" ? "常规" : modeKey === "smart" ? "智能" : modeKey}</span>
-              <StatusBadge status={m.status} />
-              {m.repairedJson && <span className="stage-meta warn">已修复 JSON</span>}
-              {m.blockedReasons && m.blockedReasons.length > 0 && (
-                <div className="blocked-reasons">
-                  {m.blockedReasons.map((r, i) => <span key={i} className="blocked-tag">{r}</span>)}
+      {/* Issues */}
+      {sortedIssues.length > 0 && (
+        <section className="synthesis-section">
+          <h2 className="synthesis-section__title">⚠ 发现的问题</h2>
+          <div className="issue-list">
+            {sortedIssues.map((issue, i) => (
+              <div key={i} className={`issue-card issue-card--${issue.severity}`}>
+                <div className="issue-card__header">
+                  <span className="issue-type">{ISSUE_TYPE_LABELS[issue.type] ?? issue.type}</span>
+                  <span className={`issue-severity issue-severity--${issue.severity}`}>
+                    {issue.severity === "high" ? "高" : issue.severity === "medium" ? "中" : "低"}
+                  </span>
                 </div>
-              )}
-              {m.result?.title && (
-                <p className="result-title">{m.result.title}</p>
-              )}
-            </div>
+                <p className="issue-description">{issue.description}</p>
+                {issue.samples?.length > 0 && (
+                  <div className="issue-samples">
+                    {issue.samples.map((s, j) => <span key={j} className="issue-sample-ref">{s}</span>)}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Recommendations */}
+      {sortedRecs.length > 0 && (
+        <section className="synthesis-section">
+          <h2 className="synthesis-section__title">→ 提示改进建议</h2>
+          <div className="rec-list">
+            {sortedRecs.map((rec, i) => {
+              const pm = PRIORITY_META[rec.priority] ?? { label: rec.priority, cls: "" };
+              return (
+                <div key={i} className="rec-card">
+                  <div className="rec-card__header">
+                    <span className={`priority-badge ${pm.cls}`}>{pm.label}</span>
+                    <span className="rec-target">{rec.target}</span>
+                  </div>
+                  <p className="rec-suggestion">{rec.suggestion}</p>
+                  <p className="rec-rationale">{rec.rationale}</p>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* Doctor questions */}
+      {s.doctor_questions?.length > 0 && (
+        <section className="synthesis-section">
+          <h2 className="synthesis-section__title synthesis-section__title--blue">? 需要请教医生的问题</h2>
+          <ul className="synthesis-bullets synthesis-bullets--blue">
+            {s.doctor_questions.map((q, i) => <li key={i}>{q}</li>)}
+          </ul>
+        </section>
+      )}
+    </div>
+  );
+}
+
+function PerSampleResults({ results }: { results: ResultRow[] }) {
+  return (
+    <details className="sample-results-details">
+      <summary className="sample-results-summary">
+        查看各样本详情（{results.length} 条）
+      </summary>
+      <div className="sample-results-body">
+        {results.map((r, i) => {
+          const types = Array.isArray(r.form_data?.prescriptionType)
+            ? r.form_data.prescriptionType.join("+")
+            : r.form_data?.prescriptionType ?? "—";
+          const label = `#${i + 1} ${r.form_data?.patientSex ?? ""}/${r.form_data?.patientAge ?? ""}岁 · ${r.form_data?.chiefComplaint ?? ""}`;
+
+          return (
+            <details key={r.id} className="per-sample-card">
+              <summary className="per-sample-summary">
+                <span className="per-sample-label">{label}</span>
+                <span className="per-sample-meta">{types}</span>
+                {r.error
+                  ? <span className="per-sample-status per-sample-status--error">失败</span>
+                  : <span className="per-sample-status per-sample-status--ok">
+                      {r.duration_ms ? `${(r.duration_ms / 1000).toFixed(1)}s` : "完成"}
+                    </span>
+                }
+              </summary>
+              {r.error ? (
+                <p className="per-sample-error">{r.error}</p>
+              ) : r.analysis ? (
+                <div className="per-sample-analysis">
+                  {r.analysis.keyPoints?.length > 0 && (
+                    <div className="per-sample-field">
+                      <span className="per-sample-field__label">重点结论</span>
+                      <ul>{r.analysis.keyPoints.map((p, j) => <li key={j}>{p}</li>)}</ul>
+                    </div>
+                  )}
+                  {r.analysis.groups?.map((group) =>
+                    group.sections.map((sec) =>
+                      sec.items.length > 0 ? (
+                        <div key={`${group.title}-${sec.title}`} className="per-sample-field">
+                          <span className="per-sample-field__label">{group.title}·{sec.title}</span>
+                          <ul>{sec.items.map((item, j) => <li key={j}>{item}</li>)}</ul>
+                        </div>
+                      ) : null,
+                    ),
+                  )}
+                  {r.analysis.cautions?.length > 0 && (
+                    <div className="per-sample-field">
+                      <span className="per-sample-field__label">风险与提醒</span>
+                      <ul>{r.analysis.cautions.map((c, j) => <li key={j}>{c}</li>)}</ul>
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </details>
           );
         })}
       </div>
-    </div>
+    </details>
   );
 }
 
-function ScorecardCard({ rev, index }: { rev: ExampleReview; index: number }) {
-  return (
-    <div className="scorecard-card">
-      <div className="scorecard-header">
-        <span className="example-index">#{index + 1}</span>
-        <span className="scorecard-id">{rev.id}</span>
-        {rev.error && <span className="stage-meta warn">评审失败</span>}
-      </div>
-      {rev.scorecard
-        ? <pre className="scorecard-body">{rev.scorecard}</pre>
-        : <p className="scorecard-error">{rev.error ?? "未知错误"}</p>}
-    </div>
-  );
-}
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
 
-function SectionCard({ sec }: { sec: SectionReview }) {
-  return (
-    <div className="section-review-card">
-      <div className="section-review-header">{sec.label}</div>
-      {sec.analysis
-        ? <div className="section-review-body admin-markdown">{renderMarkdown(sec.analysis)}</div>
-        : <p className="scorecard-error">{sec.error ?? "未知错误"}</p>}
-    </div>
-  );
-}
-
-export default async function AssessmentRunPage({
-  params,
-}: {
-  params: Promise<{ runId: string }>;
-}) {
+export default async function AssessmentJobPage({ params }: { params: Promise<{ runId: string }> }) {
   const { runId } = await params;
-  const run = await getAssessmentRun(runId);
-  if (!run) notFound();
+  const [job, results] = await Promise.all([getJob(runId), getResults(runId)]);
 
-  const org = run.organize_stats;
-  const modeKey = run.mode ?? null;
-  const modeLabel = modeKey === "normal" ? "常规" : modeKey === "smart" ? "智能" : null;
-  const examples = run.raw_results?.aggregate?.examples ?? [];
+  if (!job) notFound();
 
-  // Collect which modes actually have stats
-  const activeModesWithStats = Object.entries(run.mode_stats ?? {}).filter(([, s]) => s && s.count > 0);
+  const successCount = results.filter((r) => !r.error).length;
 
   return (
     <main className="admin-page">
       <div className="admin-header">
         <div>
-          <p className="eyebrow">评估详情</p>
-          <h1><code>{run.run_id}</code></h1>
+          <p className="eyebrow">评估任务</p>
+          <h1>质量审核报告</h1>
           <p className="admin-meta">
-            {new Date(run.created_at).toLocaleString("zh-SG", { timeZone: "Asia/Singapore" })} ·{" "}
-            {run.example_count ?? 0} 个样本
-            {modeLabel && <> · 模式：{modeLabel}</>}
+            {formatSGT(job.created_at)}
+            {" · "}{successCount}/{job.sample_count ?? results.length} 成功
+            {job.review_model && <> · 综合审核：{job.review_model.replace("deepseek-", "DeepSeek ")}</>}
           </p>
-        </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-          <span className={`status-pill ${run.status}`}>{run.status}</span>
-          <Link href="/admin/assessments" className="secondary-button compact-button">← 返回列表</Link>
         </div>
       </div>
 
-      {/* Stats summary */}
-      <section className="admin-section">
-        <h2>稳定性摘要</h2>
-        <div className="admin-stats-grid">
-          {org && (
-            <div className="admin-stat-card">
-              <span className="stat-label">整理成功</span>
-              <span className="stat-value">{org.success}/{org.total}</span>
-              <span className="stat-sub">失败 {org.failed}</span>
-            </div>
-          )}
-          {activeModesWithStats.map(([mode, s]) => (
-            <div key={mode} className="admin-stat-card">
-              <span className="stat-label">{mode === "normal" ? "常规" : "智能"} 成功</span>
-              <span className="stat-value">{s.success}/{s.count}</span>
-              <span className="stat-sub">阻断 {s.blocked} · 失败 {s.failed}{s.repairTriggered > 0 ? ` · 修复 ${s.repairTriggered}` : ""}</span>
-            </div>
-          ))}
+      {job.error_summary && !job.synthesis && (
+        <div className="admin-empty" style={{ marginBottom: 24 }}>
+          <p>综合审核失败：{job.error_summary}</p>
         </div>
-      </section>
-
-      {/* Final reviewer commentary — top of report, most important */}
-      {run.reviewer_text ? (
-        <section className="admin-section">
-          <h2>综合评审报告</h2>
-          <div className="admin-markdown">{renderMarkdown(run.reviewer_text)}</div>
-        </section>
-      ) : (
-        <section className="admin-section">
-          <div className="admin-empty" style={{ padding: 20 }}>
-            <p>评审尚未生成。触发 GitHub Actions → <strong>Assess</strong> 运行后将自动填入。</p>
-            <p style={{ marginTop: 8 }}><code>{run.run_id}</code></p>
-          </div>
-        </section>
       )}
 
-      {/* Per-example scorecards */}
-      {run.example_reviews && run.example_reviews.length > 0 && (
-        <section className="admin-section">
-          <h2>逐条病案评分</h2>
-          <div className="scorecard-list">
-            {run.example_reviews.map((rev, i) => (
-              <ScorecardCard key={rev.id ?? i} rev={rev} index={i} />
-            ))}
-          </div>
-        </section>
-      )}
+      {job.synthesis ? (
+        <SynthesisReport s={job.synthesis} />
+      ) : job.status === "running" ? (
+        <div className="admin-empty"><p>任务运行中，请稍后刷新。</p></div>
+      ) : null}
 
-      {/* Per-section consistency analyses */}
-      {run.section_reviews && run.section_reviews.length > 0 && (
-        <section className="admin-section">
-          <h2>输出栏目一致性</h2>
-          <div className="section-review-list">
-            {run.section_reviews.map((sec) => (
-              <SectionCard key={sec.key} sec={sec} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Blocked reason groups */}
-      {run.blocked_reason_groups && Object.keys(run.blocked_reason_groups).length > 0 && (
-        <section className="admin-section">
-          <h2>阻断原因分布</h2>
-          <ul className="admin-reason-list">
-            {Object.entries(run.blocked_reason_groups).map(([reason, count]) => (
-              <li key={reason}><strong>×{count}</strong> {reason}</li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {/* Per-example pipeline breakdown — detail reference */}
-      {examples.length > 0 && (
-        <section className="admin-section">
-          <h2>样本明细</h2>
-          <div className="example-list">
-            {examples.map((ex, i) => (
-              <ExampleCard key={ex.id ?? i} ex={ex} index={i} />
-            ))}
-          </div>
-        </section>
-      )}
+      {results.length > 0 && <PerSampleResults results={results} />}
     </main>
   );
 }
