@@ -815,12 +815,7 @@ export default function Workbench() {
                     <LoaderCircle size={18} className="spin" />
                     分析中…
                   </>
-                ) : (
-                  <>
-                    <Brain size={18} />
-                    开始复核
-                  </>
-                )}
+                ) : "开始分析"}
               </button>
             </div>
           </div>
