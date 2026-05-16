@@ -3,6 +3,7 @@
 import { ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
+import { BRANDING } from "@/lib/branding";
 import "../workbench.css";
 
 const reasonMessages: Record<string, string> = {
@@ -45,12 +46,19 @@ export default function LoginPage() {
     }
   }
 
+  const Icon = BRANDING.icon;
+
   return (
     <main className="login-page">
       <div className="login-card">
         <div className="login-brand">
-          <span className="login-brand-mark">中</span>
-          <span className="login-brand-text">TCM 研判工作台</span>
+          <span className="login-brand-mark">
+            <Icon size={20} />
+          </span>
+          <div className="login-brand-text-group">
+            <span className="login-brand-text">{BRANDING.name}</span>
+            <span className="login-brand-sub">{BRANDING.subtitle}</span>
+          </div>
         </div>
 
         <p className="login-intro">使用已授权的 Google 账号进入工作台。仅开放给指定医生名单。</p>

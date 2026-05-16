@@ -16,6 +16,7 @@ import {
 import { ReactNode, useEffect, useRef, useState } from "react";
 import { StructuredCaseForm, structuredCaseSchema, PRESCRIPTION_TYPES, SEX_VALUES } from "@/lib/forms/caseSchema";
 import { AnalysisResult, ensureAnalysisResult, normalizePrescriptionType } from "@/lib/ai/analysisResult";
+import { BRANDING } from "@/lib/branding";
 import "./workbench.css";
 
 // ---------------------------------------------------------------------------
@@ -551,6 +552,8 @@ export default function Workbench() {
   // Render
   // ---------------------------------------------------------------------------
 
+  const Icon = BRANDING.icon;
+
   return (
     <div className="workbench">
       {/* Header */}
@@ -558,11 +561,11 @@ export default function Workbench() {
         <div className="workbench__header-inner">
           <div className="workbench__brand">
             <div className="workbench__brand-mark" aria-hidden>
-              <Brain size={18} strokeWidth={2.25} />
+              <Icon size={18} strokeWidth={2.25} />
             </div>
             <div className="workbench__brand-text">
-              <span className="workbench__brand-title">中医临床复核</span>
-              <span className="workbench__brand-sub">Clinical Review</span>
+              <span className="workbench__brand-title">{BRANDING.name}</span>
+              <span className="workbench__brand-sub">{BRANDING.subtitle}</span>
             </div>
           </div>
           <div className="workbench__actions">

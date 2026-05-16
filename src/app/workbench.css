@@ -852,25 +852,36 @@
   gap: 12px;
 }
 
+.login-brand-text-group {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
 .login-brand-mark {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   background: var(--brand);
   color: #fff;
-  border-radius: 8px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 17px;
-  font-weight: 700;
   flex-shrink: 0;
 }
 
 .login-brand-text {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
   color: var(--text);
   letter-spacing: -0.01em;
+}
+
+.login-brand-sub {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
 }
 
 .login-intro {
