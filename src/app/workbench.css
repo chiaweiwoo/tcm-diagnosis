@@ -459,6 +459,70 @@
   justify-content: center;
 }
 
+/* ---------- Status bar ---------- */
+
+.form-status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 20px;
+  padding: 8px 4px 0;
+  border-top: 1px solid var(--border);
+  gap: 12px;
+  min-height: 28px;
+}
+
+.status-bar__name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.status-bar__state {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.status-bar__state--new {
+  color: var(--text-muted);
+}
+
+.status-bar__state--unsaved {
+  color: #B45309;
+  font-weight: 500;
+}
+
+.status-bar__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #B45309;
+  flex-shrink: 0;
+}
+
+.status-bar__state--saving {
+  color: var(--text-muted);
+}
+
+.status-bar__state--saved {
+  color: #15803D;
+}
+
+.status-bar__state--analyzing {
+  color: var(--brand);
+}
+
 /* ---------- Result section ---------- */
 
 .result-section-wrap {

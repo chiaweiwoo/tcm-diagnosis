@@ -51,6 +51,8 @@ type ToastState = { message: string; tone: "success" | "error" | "info" };
 
 type FormErrors = Partial<Record<keyof StructuredCaseForm, string>>;
 
+type SaveStatus = "new" | "unsaved" | "saving" | "saved";
+
 // ---------------------------------------------------------------------------
 // Defaults
 // ---------------------------------------------------------------------------
@@ -305,6 +307,85 @@ function formatDate(iso: string) {
   return `${yyyy}-${mm}-${dd} ${strTime}`;
 }
 
+function formatSavedTime(d: Date) {
+  let h = d.getHours();
+  const m = String(d.getMinutes()).padStart(2, "0");
+  const period = h >= 12 ? "下午" : "上午";
+  h = h % 12 || 12;
+  return `${period} ${h}:${m}`;
+}
+
+// ---------------------------------------------------------------------------
+// Status bar
+// ---------------------------------------------------------------------------
+
+function StatusBar({
+  saveStatus,
+  savedAt,
+  analyzing,
+  form,
+}: {
+  saveStatus: SaveStatus;
+  savedAt: Date | null;
+  analyzing: boolean;
+  form: StructuredCaseForm;
+}) {
+  const hasIdentity = !!(form.patientAge || form.chiefComplaint);
+  const parts = [
+    hasIdentity ? form.patientSex : null,
+    form.patientAge ? `${form.patientAge}岁` : null,
+    form.chiefComplaint || null,
+  ].filter(Boolean) as string[];
+  const displayName = parts.length ? parts.join(" · ") : null;
+
+  let indicator: ReactNode;
+  if (analyzing) {
+    indicator = (
+      <span className="status-bar__state status-bar__state--analyzing">
+        <LoaderCircle size={11} className="spin" />
+        分析中…
+      </span>
+    );
+  } else if (saveStatus === "saving") {
+    indicator = (
+      <span className="status-bar__state status-bar__state--saving">
+        <LoaderCircle size={11} className="spin" />
+        保存中…
+      </span>
+    );
+  } else if (saveStatus === "saved" && savedAt) {
+    indicator = (
+      <span className="status-bar__state status-bar__state--saved">
+        <CheckCircle2 size={11} />
+        已保存 {formatSavedTime(savedAt)}
+      </span>
+    );
+  } else if (saveStatus === "unsaved") {
+    indicator = (
+      <span className="status-bar__state status-bar__state--unsaved">
+        <span className="status-bar__dot" aria-hidden />
+        未保存更改
+      </span>
+    );
+  } else {
+    indicator = (
+      <span className="status-bar__state status-bar__state--new">
+        新病案
+      </span>
+    );
+  }
+
+  return (
+    <div className="form-status-bar">
+      <span className="status-bar__name">
+        <FileText size={12} />
+        {displayName ?? "未命名病案"}
+      </span>
+      {indicator}
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // History panel
 // ---------------------------------------------------------------------------
@@ -378,6 +459,8 @@ export default function Workbench() {
   const [form, setForm] = useState<StructuredCaseForm>(EMPTY_FORM);
   const [touched, setTouched] = useState<Set<keyof StructuredCaseForm>>(new Set());
   const liveErrors = useMemo(() => getFormErrors(form), [form]);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("new");
+  const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [meta, setMeta] = useState<ApiMeta | null>(null);
   const [rawResult, setRawResult] = useState<unknown>(null);
@@ -407,6 +490,7 @@ export default function Workbench() {
 
   function setField<K extends keyof StructuredCaseForm>(key: K, value: StructuredCaseForm[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
+    setSaveStatus((prev) => prev === "saving" ? prev : "unsaved");
   }
 
   function markTouched(key: keyof StructuredCaseForm) {
@@ -421,6 +505,8 @@ export default function Workbench() {
     setRawResult(null);
     setActiveId(null);
     setHistoryOpen(false);
+    setSaveStatus("new");
+    setSavedAt(null);
   }
 
   async function handleSelectHistory(id: string) {
@@ -442,6 +528,8 @@ export default function Workbench() {
       setRawResult(record.analysis_raw ?? null);
       setActiveId(id);
       setHistoryOpen(false);
+      setSaveStatus("saved");
+      setSavedAt(new Date(record.updated_at));
     } catch {
       showToast("读取病案记录失败。", "error");
     }
@@ -485,6 +573,7 @@ export default function Workbench() {
           promptVersion: data.promptVersion,
           durationSeconds,
         };
+        setSaveStatus("saving");
         if (activeId) {
           const updated = await apiUpdateConsultation(activeId, {
             formData: form,
@@ -505,8 +594,11 @@ export default function Workbench() {
           setActiveId(saved.id);
           setConsultations((prev) => [saved, ...prev]);
         }
+        setSaveStatus("saved");
+        setSavedAt(new Date());
       } catch {
         // Auto-save failure is non-blocking; doctor can retry via save button
+        setSaveStatus("unsaved");
         showToast("分析完成，自动保存失败，请手动保存。", "info");
       }
     } catch (error) {
@@ -519,6 +611,7 @@ export default function Workbench() {
   async function handleSave() {
     if (!result) return;
     setSaving(true);
+    setSaveStatus("saving");
     try {
       const saveMeta: ApiMeta = meta ?? {};
       if (activeId) {
@@ -542,8 +635,12 @@ export default function Workbench() {
         setActiveId(saved.id);
         setConsultations((prev) => [saved, ...prev]);
       }
+      const now = new Date();
+      setSaveStatus("saved");
+      setSavedAt(now);
       showToast("已保存。", "success");
     } catch {
+      setSaveStatus("unsaved");
       showToast("保存失败，请稍后重试。", "error");
     } finally {
       setSaving(false);
@@ -805,6 +902,14 @@ export default function Workbench() {
                 ) : "开始分析"}
               </button>
             </div>
+
+            {/* Status bar */}
+            <StatusBar
+              saveStatus={saveStatus}
+              savedAt={savedAt}
+              analyzing={analyzing}
+              form={form}
+            />
           </div>
         </section>
 
