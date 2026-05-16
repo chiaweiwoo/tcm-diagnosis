@@ -263,7 +263,7 @@ function ResultSection({ title, items }: { title: string; items: string[] }) {
   );
 }
 
-function ResultColumn({ title, icon, colorVariant, children }: { title: string; icon: ReactNode; colorVariant?: "green" | "blue" | "yellow"; children: ReactNode }) {
+function ResultColumn({ title, icon, colorVariant, children }: { title: string; icon: ReactNode; colorVariant?: "green" | "slate" | "teal"; children: ReactNode }) {
   return (
     <div className={`result-column${colorVariant ? ` result-column--${colorVariant}` : ""}`}>
       <div className="result-column__header">
@@ -1089,7 +1089,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
                   title={group.title}
                   colorVariant={
                     group.title === "判断" ? "green" :
-                    group.title === "方案" ? "blue" : "yellow"
+                    group.title === "方案" ? "slate" : "teal"
                   }
                   icon={
                     group.title === "判断" ? (
@@ -1120,6 +1120,13 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
           </section>
         )}
       </main>
+
+      {/* Footer */}
+      <footer className="workbench-footer">
+        <span>Chia Wei</span>
+        <span className="workbench-footer__sep">·</span>
+        <span>Powered by DeepSeek</span>
+      </footer>
 
       {/* Toast */}
       {toast && <Toast toast={toast} onClose={() => setToast(null)} />}
