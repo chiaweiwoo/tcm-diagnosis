@@ -89,14 +89,14 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 async function fillRequiredFields(user: ReturnType<typeof userEvent.setup>) {
-  await user.type(screen.getByPlaceholderText(/最需处理的主要问题/), "头痛眩晕反复发作");
+  await user.type(screen.getByPlaceholderText(/头痛眩晕反复发作/), "头痛眩晕反复发作");
   await user.type(
-    screen.getByPlaceholderText(/发病经过/),
+    screen.getByPlaceholderText(/头痛3个月余/),
     "头痛3个月余，伴轻度眩晕，无发热，劳累后加重。",
   );
-  await user.type(screen.getByPlaceholderText(/西医\/中医诊断/), "头痛");
+  await user.type(screen.getByPlaceholderText(/头痛 \/ 眩晕/), "头痛");
   await user.type(
-    screen.getByPlaceholderText(/穴位与操作方式|方药内容及剂量/),
+    screen.getByPlaceholderText(/天麻钩藤饮|百会、太冲|穴位 \+ 方药/),
     "天麻钩藤饮加减10g",
   );
   // Age field
@@ -148,9 +148,9 @@ describe("Form field interactions", () => {
   it("updates chief complaint field on input", async () => {
     const user = userEvent.setup();
     render(<Workbench />);
-    await waitFor(() => screen.getByPlaceholderText(/最需处理的主要问题/));
+    await waitFor(() => screen.getByPlaceholderText(/头痛眩晕反复发作/));
 
-    const input = screen.getByPlaceholderText(/最需处理的主要问题/);
+    const input = screen.getByPlaceholderText(/头痛眩晕反复发作/);
     await user.type(input, "头痛眩晕");
     expect(input).toHaveValue("头痛眩晕");
   });
@@ -180,7 +180,7 @@ describe("Form field interactions", () => {
 
     await user.click(screen.getByText("针灸"));
     await waitFor(() =>
-      expect(screen.getByPlaceholderText(/穴位与操作方式/)).toBeInTheDocument(),
+      expect(screen.getByPlaceholderText(/百会、太冲、风池/)).toBeInTheDocument(),
     );
   });
 });
@@ -219,7 +219,7 @@ describe("Form validation", () => {
     await user.click(screen.getByText("开始复核"));
     await waitFor(() => expect(document.querySelectorAll(".field-error").length).toBeGreaterThan(0));
 
-    const chiefInput = screen.getByPlaceholderText(/最需处理的主要问题/);
+    const chiefInput = screen.getByPlaceholderText(/头痛眩晕反复发作/);
     await user.type(chiefInput, "头痛");
     // Error for chiefComplaint should be gone (field has content now)
     expect(chiefInput).not.toHaveAttribute("aria-invalid");

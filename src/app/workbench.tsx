@@ -522,8 +522,13 @@ export default function Workbench() {
       <header className="workbench__header">
         <div className="workbench__header-inner">
           <div className="workbench__brand">
-            <Brain size={20} />
-            <span>中医临床复核</span>
+            <div className="workbench__brand-mark" aria-hidden>
+              <Brain size={18} strokeWidth={2.25} />
+            </div>
+            <div className="workbench__brand-text">
+              <span className="workbench__brand-title">中医临床复核</span>
+              <span className="workbench__brand-sub">Clinical Review</span>
+            </div>
           </div>
           <div className="workbench__actions">
             <button
@@ -583,7 +588,7 @@ export default function Workbench() {
                 <input
                   className="form-input"
                   type="text"
-                  placeholder="例：陈小姐 PCOS 调理"
+                  placeholder="例：王女士头痛复诊"
                   value={form.consultationName}
                   onChange={(e) => setField("consultationName", e.target.value)}
                   maxLength={60}
@@ -610,7 +615,7 @@ export default function Workbench() {
             {/* Row 2: Age + Sex */}
             <div className="form-row form-row--2col">
               <div className="form-group">
-                <label className="form-label">年龄</label>
+                <label className="form-label form-label--required">年龄</label>
                 <input
                   className={`form-input form-input--sm ${errors.patientAge ? "form-input--error" : ""}`}
                   type="text"
@@ -642,14 +647,11 @@ export default function Workbench() {
 
             {/* Row 3: Chief complaint */}
             <div className="form-group">
-              <label className="form-label">
-                主诉
-                <span className="form-label__required">必填</span>
-              </label>
+              <label className="form-label form-label--required">主诉</label>
               <input
                 className={`form-input ${errors.chiefComplaint ? "form-input--error" : ""}`}
                 type="text"
-                placeholder="最需处理的主要问题，简明扼要"
+                placeholder="例：头痛眩晕反复发作"
                 value={form.chiefComplaint}
                 onChange={(e) => setField("chiefComplaint", e.target.value)}
                 maxLength={200}
@@ -659,13 +661,10 @@ export default function Workbench() {
 
             {/* Row 4: Current illness */}
             <div className="form-group">
-              <label className="form-label">
-                现病史
-                <span className="form-label__required">必填</span>
-              </label>
+              <label className="form-label form-label--required">现病史</label>
               <textarea
                 className={`form-textarea ${errors.currentIllness ? "form-input--error" : ""}`}
-                placeholder="发病经过、症状演变、持续时间、加重/缓解因素等"
+                placeholder="例：头痛3个月余，伴轻度眩晕，劳累后加重"
                 value={form.currentIllness}
                 onChange={(e) => setField("currentIllness", e.target.value)}
                 rows={4}
@@ -680,7 +679,7 @@ export default function Workbench() {
                 <label className="form-label form-label--optional">既往史</label>
                 <textarea
                   className="form-textarea"
-                  placeholder="既往疾病、手术、用药史等"
+                  placeholder="例：高血压病史5年，规律服药"
                   value={form.pastHistory}
                   onChange={(e) => setField("pastHistory", e.target.value)}
                   rows={3}
@@ -691,7 +690,7 @@ export default function Workbench() {
                 <label className="form-label form-label--optional">体格检查 / 舌脉</label>
                 <textarea
                   className="form-textarea"
-                  placeholder="舌象、脉象、局部检查等"
+                  placeholder="舌脉、查体重点"
                   value={form.physicalExam}
                   onChange={(e) => setField("physicalExam", e.target.value)}
                   rows={3}
@@ -703,14 +702,11 @@ export default function Workbench() {
             {/* Row 6: Diagnosis + Pattern (2 cols) */}
             <div className="form-row form-row--2col">
               <div className="form-group">
-                <label className="form-label">
-                  诊断
-                  <span className="form-label__required">必填</span>
-                </label>
+                <label className="form-label form-label--required">诊断</label>
                 <input
                   className={`form-input ${errors.diagnosis ? "form-input--error" : ""}`}
                   type="text"
-                  placeholder="西医/中医诊断"
+                  placeholder="例：头痛 / 眩晕"
                   value={form.diagnosis}
                   onChange={(e) => setField("diagnosis", e.target.value)}
                   maxLength={100}
@@ -722,7 +718,7 @@ export default function Workbench() {
                 <input
                   className="form-input"
                   type="text"
-                  placeholder="中医证型"
+                  placeholder="例：肝阳上亢"
                   value={form.pattern}
                   onChange={(e) => setField("pattern", e.target.value)}
                   maxLength={100}
@@ -732,16 +728,15 @@ export default function Workbench() {
 
             {/* Row 7: Prescription */}
             <div className="form-group">
-              <label className="form-label">
-                处方
-                <span className="form-label__required">必填</span>
-              </label>
+              <label className="form-label form-label--required">处方</label>
               <textarea
                 className={`form-textarea form-textarea--tall ${errors.prescription ? "form-input--error" : ""}`}
                 placeholder={
                   form.prescriptionType === "针灸"
-                    ? "穴位与操作方式，例：足三里、三阴交，平补平泻，留针20分钟"
-                    : "方药内容及剂量，例：黄芪15g 白术10g 茯苓10g…"
+                    ? "例：百会、太冲、风池，平补平泻，留针20分钟"
+                    : form.prescriptionType === "综合调理"
+                    ? "例：穴位 + 方药 + 生活调摄建议"
+                    : "例：天麻钩藤饮加减，天麻10g 钩藤15g…"
                 }
                 value={form.prescription}
                 onChange={(e) => setField("prescription", e.target.value)}
@@ -757,7 +752,7 @@ export default function Workbench() {
               <input
                 className="form-input"
                 type="text"
-                placeholder="本次最想确认的问题（可留空，系统将默认按当前方案复核）"
+                placeholder="本次最想确认的方向（可留空）"
                 value={form.doctorQuestion}
                 onChange={(e) => setField("doctorQuestion", e.target.value)}
                 maxLength={500}
@@ -860,6 +855,17 @@ export default function Workbench() {
                 {result.evidence.map((e, i) => (
                   <span key={i}>{e}</span>
                 ))}
+              </div>
+            )}
+
+            {/* Result metadata */}
+            {meta && (
+              <div className="result-meta">
+                {meta.durationSeconds != null && (
+                  <span>耗时 {meta.durationSeconds.toFixed(1)} 秒</span>
+                )}
+                {meta.model && <span>{meta.model.replace("deepseek-", "")}</span>}
+                {meta.promptVersion && <span>{meta.promptVersion}</span>}
               </div>
             )}
           </section>

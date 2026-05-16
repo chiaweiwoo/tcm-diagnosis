@@ -50,13 +50,13 @@ export const structuredCaseSchema = z
     chiefComplaint: z
       .string()
       .trim()
-      .min(5, "主诉至少需要5个字。")
+      .min(2, "主诉至少需要2个字。")
       .max(FIELD_LIMITS.chiefComplaint, `主诉不超过${FIELD_LIMITS.chiefComplaint}字`),
 
     currentIllness: z
       .string()
       .trim()
-      .min(10, "现病史至少需要10个字。")
+      .min(5, "现病史至少需要5个字。")
       .max(FIELD_LIMITS.currentIllness, `现病史不超过${FIELD_LIMITS.currentIllness}字`),
 
     pastHistory: z
@@ -86,7 +86,7 @@ export const structuredCaseSchema = z
     prescription: z
       .string()
       .trim()
-      .min(5, "处方至少需要5个字。")
+      .min(3, "处方至少需要3个字。")
       .max(FIELD_LIMITS.prescription, `处方不超过${FIELD_LIMITS.prescription}字`),
 
     doctorQuestion: z
