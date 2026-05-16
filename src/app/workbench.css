@@ -798,9 +798,46 @@
   }
 }
 
-@media (max-width: 600px) {
+/* ---- Responsive: brand subtitle class (hidden on small screens) ---- */
+.workbench__brand-sub {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-muted);
+  letter-spacing: 0.01em;
+}
+
+@media (max-width: 640px) {
   .workbench__header-inner {
-    padding: 0 16px;
+    padding: 0 14px;
+    height: 56px;
+  }
+
+  .workbench__brand-title {
+    font-size: 14px;
+  }
+
+  /* Header action buttons: icons only — hide text labels */
+  .workbench__actions .btn > span:not(.sr-only) {
+    display: none;
+  }
+
+  .btn--sm {
+    padding: 6px 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .workbench__brand-sub {
+    display: none;
+  }
+
+  .workbench__brand-mark {
+    width: 28px;
+    height: 28px;
+  }
+
+  .workbench__brand-title {
+    font-size: 13px;
   }
 }
 
