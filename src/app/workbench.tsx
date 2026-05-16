@@ -7,6 +7,7 @@ import {
   ChevronDown,
   Clock,
   FileText,
+  FlaskConical,
   LoaderCircle,
   LogOut,
   Plus,
@@ -48,6 +49,14 @@ type ConsultationRecord = ConsultationSummary & {
 };
 
 type ToastState = { message: string; tone: "success" | "error" | "info" };
+
+type AssessmentSample = {
+  id: string;
+  label: string;
+  form_data: StructuredCaseForm;
+  notes: string | null;
+  sort_order: number;
+};
 
 type FormErrors = Partial<Record<keyof StructuredCaseForm, string>>;
 
@@ -387,6 +396,50 @@ function StatusBar({
 }
 
 // ---------------------------------------------------------------------------
+// Samples panel (admin only)
+// ---------------------------------------------------------------------------
+
+function SamplesPanel({
+  samples,
+  loading,
+  onLoad,
+}: {
+  samples: AssessmentSample[];
+  loading: boolean;
+  onLoad: (sample: AssessmentSample) => void;
+}) {
+  return (
+    <div className="history-panel">
+      <div className="history-panel__header">
+        <span className="history-panel__title">
+          <FlaskConical size={14} />
+          评估样本
+        </span>
+      </div>
+      <div className="history-panel__list">
+        {loading && <div className="history-panel__empty">加载中…</div>}
+        {!loading && samples.length === 0 && (
+          <div className="history-panel__empty">暂无样本（请先运行 SQL 迁移）</div>
+        )}
+        {samples.map((s) => (
+          <div
+            key={s.id}
+            className="history-item"
+            onClick={() => onLoad(s)}
+            title={s.notes ?? undefined}
+          >
+            <div className="history-item__name">{s.label}</div>
+            <div className="history-item__meta">
+              <span>{s.form_data.diagnosis} · {s.form_data.pattern}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // History panel
 // ---------------------------------------------------------------------------
 
@@ -455,7 +508,7 @@ function HistoryPanel({
 // Main Workbench
 // ---------------------------------------------------------------------------
 
-export default function Workbench() {
+export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
   const [form, setForm] = useState<StructuredCaseForm>(EMPTY_FORM);
   const [touched, setTouched] = useState<Set<keyof StructuredCaseForm>>(new Set());
   const liveErrors = useMemo(() => getFormErrors(form), [form]);
@@ -472,6 +525,10 @@ export default function Workbench() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyOpen, setHistoryOpen] = useState(false);
+
+  const [samples, setSamples] = useState<AssessmentSample[]>([]);
+  const [samplesOpen, setSamplesOpen] = useState(false);
+  const [samplesLoading, setSamplesLoading] = useState(false);
 
   const [toast, setToast] = useState<ToastState | null>(null);
   const resultRef = useRef<HTMLDivElement>(null);
@@ -507,6 +564,42 @@ export default function Workbench() {
     setHistoryOpen(false);
     setSaveStatus("new");
     setSavedAt(null);
+  }
+
+  async function handleToggleSamples() {
+    if (!samplesOpen && samples.length === 0) {
+      setSamplesLoading(true);
+      try {
+        const res = await fetch("/api/admin/samples", { cache: "no-store" });
+        if (!res.ok) throw new Error();
+        const data = (await res.json()) as { samples: AssessmentSample[] };
+        setSamples(data.samples);
+      } catch {
+        showToast("读取样本失败。", "error");
+      } finally {
+        setSamplesLoading(false);
+      }
+    }
+    setSamplesOpen((o) => !o);
+    setHistoryOpen(false);
+  }
+
+  function handleLoadSample(sample: AssessmentSample) {
+    const parsed = structuredCaseSchema.safeParse(sample.form_data);
+    if (!parsed.success) {
+      showToast("样本数据格式有误。", "error");
+      return;
+    }
+    setForm(parsed.data);
+    setTouched(new Set(REQUIRED_FIELDS));
+    setResult(null);
+    setMeta(null);
+    setRawResult(null);
+    setActiveId(null);
+    setSaveStatus("new");
+    setSavedAt(null);
+    setSamplesOpen(false);
+    showToast(`已加载：${sample.label}`, "success");
   }
 
   async function handleSelectHistory(id: string) {
@@ -671,9 +764,20 @@ export default function Workbench() {
             </div>
           </div>
           <div className="workbench__actions">
+            {isAdmin && (
+              <button
+                className="btn btn--ghost btn--sm"
+                onClick={() => void handleToggleSamples()}
+                title="评估样本"
+              >
+                <FlaskConical size={15} />
+                <span>样本</span>
+                <ChevronDown size={13} className={samplesOpen ? "rotate-180" : ""} />
+              </button>
+            )}
             <button
               className="btn btn--ghost btn--sm"
-              onClick={() => setHistoryOpen((o) => !o)}
+              onClick={() => { setHistoryOpen((o) => !o); setSamplesOpen(false); }}
               title="历史记录"
             >
               <Clock size={15} />
@@ -702,6 +806,17 @@ export default function Workbench() {
           </div>
         </div>
       </header>
+
+      {/* Samples panel dropdown (admin only) */}
+      {samplesOpen && isAdmin && (
+        <div className="history-dropdown">
+          <SamplesPanel
+            samples={samples}
+            loading={samplesLoading}
+            onLoad={handleLoadSample}
+          />
+        </div>
+      )}
 
       {/* History panel dropdown */}
       {historyOpen && (
