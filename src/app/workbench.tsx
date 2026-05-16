@@ -1117,15 +1117,6 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
               </div>
             )}
 
-            {/* Result metadata */}
-            {meta && (
-              <div className="result-meta">
-                {meta.durationSeconds != null && (
-                  <span>耗时 {meta.durationSeconds.toFixed(1)} 秒</span>
-                )}
-                {meta.model && <span>{meta.model.replace("deepseek-", "")}</span>}
-              </div>
-            )}
           </section>
         )}
       </main>
