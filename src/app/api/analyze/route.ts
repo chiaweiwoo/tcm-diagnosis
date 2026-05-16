@@ -52,23 +52,30 @@ export async function POST(request: NextRequest) {
     const latencyMs = Date.now() - startedAt;
 
     after(async () => {
-      // Langfuse: tokens + metadata only. Clinical text stays in Supabase.
+      // Langfuse: tokens + cost only. NO clinical text — form fields and AI
+      // output stay in Supabase exclusively.
       if (langfuse && trace) {
         trace.generation({
           name: "deepseek-analyze",
           model: result.model,
           startTime: new Date(deepseekStartedAt),
           endTime: new Date(),
-          usage: {
-            input: result.usage?.prompt_tokens ?? 0,
-            output: result.usage?.completion_tokens ?? 0,
+          // usageDetails / costDetails are the v3 API (usage is deprecated)
+          usageDetails: {
+            input:    result.usage?.prompt_tokens       ?? 0,
+            output:   result.usage?.completion_tokens   ?? 0,
+            total:    result.usage?.total_tokens        ?? 0,
+            cacheHit: result.costDetail.cacheHitTokens  ?? 0,
+            cacheMiss:result.costDetail.cacheMissTokens ?? 0,
+          },
+          costDetails: {
+            total: result.costUsd,
           },
           metadata: {
             prescriptionType: form.prescriptionType,
-            repairedJson: result.repairedJson ?? false,
+            repairedJson:     result.repairedJson ?? false,
             latencyMs,
-            costUsd: result.costUsd,
-            promptVersion: TCM_ANALYSIS_PROMPT_VERSION,
+            promptVersion:    TCM_ANALYSIS_PROMPT_VERSION,
           },
         });
         try { await langfuse.flushAsync(); } catch { /* non-critical */ }
