@@ -94,7 +94,8 @@ Helps registered TCM doctors:
 ## Stack
 
 - Frontend: Next.js + TypeScript on Vercel
-- UI: focused CSS + `lucide-react`
+- UI: focused CSS (`workbench.css`, `admin/admin.css`) + `lucide-react` icons
+- Branding: `src/lib/branding.ts` — `BRANDING.name/subtitle/icon` used in header and login
 - Validation: `zod` schema in `src/lib/forms/caseSchema.ts` (`structuredCaseSchema`, `StructuredCaseForm`)
 - Auth and data: Supabase (Google OAuth, allowlist, JSONB storage)
 - AI provider: DeepSeek only, through server-side routes (`src/app/api/`)
@@ -108,14 +109,17 @@ Doctor (browser)
   └── POST /api/analyze     → DeepSeek flash model → clinical review JSON (3-column layout)
   └── /api/consultations/*  → Supabase (save / load / delete history)
 
-Calibration CLI (local machine) — TEMPORARILY BROKEN after structured-form pivot
+Calibration CLI (local machine) — BROKEN: backend.mjs still calls /api/organize (deleted)
   └── assess:run   → hits live Vercel app with X-Assessment-Key → saves raw_results to DB
   └── assess:review (GitHub Actions) → reads DB → 3-stage DeepSeek pro review → updates DB
 
-Admin UI
+Admin UI (persistent nav bar, all links in header)
+  └── /admin                  → redirects to /admin/assessments
   └── /admin/assessments      → calibration run list
   └── /admin/assessments/[id] → full report (pipeline stats + scorecards + final synthesis)
-  └── /admin/usage            → api_call_logs cost/token view
+  └── /admin/activity         → doctor activity log (login, analyze events)
+  └── /admin/examples         → doctor example library (read-only)
+  └── /admin/usage            → Langfuse redirect (token usage migrated out)
 ```
 
 ---
@@ -133,11 +137,11 @@ Admin UI
 
 ## Structured Form Fields
 
-Doctor fills 9 clinical fields + 2 meta fields. All validated by `structuredCaseSchema` in `src/lib/forms/caseSchema.ts`.
+Doctor fills 8 visible fields. All validated by `structuredCaseSchema` in `src/lib/forms/caseSchema.ts`.
 
 Required fields (hard-block if missing/invalid):
 - `prescriptionType`: `PrescriptionType[]` — array of "方药" | "针灸" | "综合调理", min 1 item (multi-select chip toggle)
-- `patientAge`: numeric string 1-120
+- `patientAge`: numeric 1-120
 - `patientSex`: "男" | "女"
 - `chiefComplaint`: 2-200 chars
 - `currentIllness`: 5-2000 chars
@@ -146,7 +150,9 @@ Required fields (hard-block if missing/invalid):
 - `pattern`: 2-100 chars (证型)
 - `prescription`: 3-2000 chars
 
-Optional fields: `consultationName`, `pastHistory`, `doctorQuestion`
+Optional fields (in schema but not shown in form UI): `consultationName`, `pastHistory`, `doctorQuestion`
+
+History item display name: auto-built from `patientSex + patientAge岁 + chiefComplaint` (no stored name field).
 
 **Validation pipeline (three layers):**
 1. Structural: zod schema (hard-block)
