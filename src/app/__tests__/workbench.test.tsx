@@ -196,43 +196,54 @@ describe("Form field interactions", () => {
 });
 
 describe("Form validation", () => {
-  it("shows field error when submitting with empty required fields", async () => {
+  it("submit button is disabled when required fields are empty", async () => {
+    render(<Workbench />);
+    await waitFor(() => screen.getByText("开始分析"));
+    expect(screen.getByText("开始分析").closest("button")).toBeDisabled();
+  });
+
+  it("shows field error on blur when a required field is left empty", async () => {
     const user = userEvent.setup();
     render(<Workbench />);
     await waitFor(() => screen.getByText("开始分析"));
 
-    await user.click(screen.getByText("开始分析"));
+    // Focus then blur an empty required field
+    const chiefInput = screen.getByPlaceholderText(/头痛眩晕反复发作/);
+    await user.click(chiefInput);
+    await user.tab();
     await waitFor(() => {
-      // At least one validation error should appear
       const errors = document.querySelectorAll(".field-error");
       expect(errors.length).toBeGreaterThan(0);
     });
   });
 
   it("does not call /api/analyze when required fields are missing", async () => {
-    const user = userEvent.setup();
     render(<Workbench />);
     await waitFor(() => screen.getByText("开始分析"));
 
-    await user.click(screen.getByText("开始分析"));
-
+    // Button is disabled — no click possible; fetch must not be called
     const fetchMock = vi.mocked(global.fetch);
     const analyzeCalls = fetchMock.mock.calls.filter(([url]) => url === "/api/analyze");
     expect(analyzeCalls).toHaveLength(0);
   });
 
-  it("clears error on field change after failed submit", async () => {
+  it("clears error after field is filled following a blur", async () => {
     const user = userEvent.setup();
     render(<Workbench />);
     await waitFor(() => screen.getByText("开始分析"));
 
-    await user.click(screen.getByText("开始分析"));
+    // Trigger error: blur an empty field
+    const chiefInput = screen.getByPlaceholderText(/头痛眩晕反复发作/);
+    await user.click(chiefInput);
+    await user.tab();
     await waitFor(() => expect(document.querySelectorAll(".field-error").length).toBeGreaterThan(0));
 
-    const chiefInput = screen.getByPlaceholderText(/头痛眩晕反复发作/);
+    // Fill the field — error should disappear
     await user.type(chiefInput, "头痛");
-    // Error for chiefComplaint should be gone (field has content now)
-    expect(chiefInput).not.toHaveAttribute("aria-invalid");
+    await waitFor(() => {
+      const fieldError = chiefInput.closest(".form-group")?.querySelector(".field-error");
+      expect(fieldError).toBeNull();
+    });
   });
 });
 

@@ -795,7 +795,7 @@ export default function Workbench() {
               <button
                 className="btn btn--primary btn--lg"
                 onClick={() => void handleAnalyze()}
-                disabled={analyzing}
+                disabled={analyzing || Object.keys(liveErrors).length > 0}
               >
                 {analyzing ? (
                   <>
@@ -822,35 +822,36 @@ export default function Workbench() {
         {/* Result */}
         {!analyzing && result && (
           <section className="result-section-wrap" ref={resultRef}>
-            {/* Key points banner */}
-            {result.keyPoints.length > 0 && (
-              <div className="keypoints-banner">
-                <div className="keypoints-banner__label">
-                  <FileText size={14} />
-                  重点结论
+            {/* Key points + cautions — side-by-side */}
+            <div className="top-banners">
+              {result.keyPoints.length > 0 && (
+                <div className="keypoints-banner">
+                  <div className="keypoints-banner__label">
+                    <FileText size={14} />
+                    重点结论
+                  </div>
+                  <ul className="keypoints-banner__list">
+                    {result.keyPoints.map((kp, i) => (
+                      <li key={i}>{kp}</li>
+                    ))}
+                  </ul>
                 </div>
-                <ul className="keypoints-banner__list">
-                  {result.keyPoints.map((kp, i) => (
-                    <li key={i}>{kp}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
+              )}
 
-            {/* Cautions banner */}
-            {result.cautions.length > 0 && !result.cautions.every((c) => c.includes("请结合面诊")) && (
-              <div className="cautions-banner">
-                <div className="cautions-banner__label">
-                  <AlertTriangle size={14} />
-                  风险与提醒
+              {result.cautions.length > 0 && !result.cautions.every((c) => c.includes("请结合面诊")) && (
+                <div className="cautions-banner">
+                  <div className="cautions-banner__label">
+                    <AlertTriangle size={14} />
+                    风险与提醒
+                  </div>
+                  <ul className="cautions-banner__list">
+                    {result.cautions.map((c, i) => (
+                      <li key={i}>{c}</li>
+                    ))}
+                  </ul>
                 </div>
-                <ul className="cautions-banner__list">
-                  {result.cautions.map((c, i) => (
-                    <li key={i}>{c}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
+              )}
+            </div>
 
             {/* 3-column grid */}
             <div className="result-grid">
@@ -891,7 +892,6 @@ export default function Workbench() {
                   <span>耗时 {meta.durationSeconds.toFixed(1)} 秒</span>
                 )}
                 {meta.model && <span>{meta.model.replace("deepseek-", "")}</span>}
-                {meta.promptVersion && <span>{meta.promptVersion}</span>}
               </div>
             )}
           </section>
