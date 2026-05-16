@@ -11,12 +11,7 @@ export default async function AssessmentsPage() {
           <p className="eyebrow">后台管理</p>
           <h1>评估记录</h1>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <Link href="/admin/activity" className="secondary-button compact-button">用户活动</Link>
-          <Link href="/admin/examples" className="secondary-button compact-button">样本库</Link>
-          <Link href="/admin/usage" className="secondary-button compact-button">Token 用量</Link>
-          <Link href="/" className="secondary-button compact-button">← 返回工作台</Link>
-        </div>
+        <Link href="/" className="secondary-button compact-button">← 返回工作台</Link>
       </div>
 
       {runs.length === 0 ? (

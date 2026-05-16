@@ -9,7 +9,7 @@ export default function AdminUsagePage() {
           <h1>Token 用量</h1>
           <p className="admin-meta">已迁移至 Langfuse</p>
         </div>
-        <Link href="/admin/assessments" className="secondary-button compact-button">← 评估列表</Link>
+        <Link href="/" className="secondary-button compact-button">← 返回工作台</Link>
       </div>
       <section className="admin-section">
         <p style={{ color: "var(--meta-color)", marginBottom: "1rem" }}>

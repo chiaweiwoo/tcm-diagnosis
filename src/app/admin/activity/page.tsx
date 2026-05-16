@@ -49,8 +49,11 @@ function MetaSummary({ log }: { log: ActivityLog }) {
     return short ? <span className="activity-meta">{short}</span> : null;
   }
   if (log.event_type === "analyze") {
-    // Support both old format (caseType/reviewMode) and new format (prescriptionType)
-    const typeLabel = (m.prescriptionType as string | undefined) ?? (m.caseType as string | undefined);
+    // Support both old format (caseType/reviewMode) and new format (prescriptionType — now array)
+    const rawPt = m.prescriptionType;
+    const typeLabel = Array.isArray(rawPt)
+      ? rawPt.join("、")
+      : (rawPt as string | undefined) ?? (m.caseType as string | undefined);
     const modeLabel =
       m.reviewMode === "normal" ? "常规" : m.reviewMode === "smart" ? "智能" : null;
     const parts = [typeLabel, modeLabel].filter(Boolean).join(" · ");
@@ -74,10 +77,7 @@ export default async function ActivityPage() {
             最近 {logs.length} 条事件 · {summaries.length} 个账号
           </p>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <Link href="/admin/assessments" className="secondary-button compact-button">评估记录</Link>
-          <Link href="/" className="secondary-button compact-button">← 返回工作台</Link>
-        </div>
+        <Link href="/" className="secondary-button compact-button">← 返回工作台</Link>
       </div>
 
       {/* Per-doctor summary */}

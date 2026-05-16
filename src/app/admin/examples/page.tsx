@@ -42,10 +42,7 @@ export default async function ExamplesPage() {
             {" · "}通过 <code>npm run assess:seed</code> 从本地 .md 文件同步
           </p>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <Link href="/admin/assessments" className="secondary-button compact-button">评估记录</Link>
-          <Link href="/" className="secondary-button compact-button">← 返回工作台</Link>
-        </div>
+        <Link href="/" className="secondary-button compact-button">← 返回工作台</Link>
       </div>
 
       {examples.length === 0 ? (
