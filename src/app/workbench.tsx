@@ -73,6 +73,20 @@ const EMPTY_FORM: StructuredCaseForm = {
 // API helpers
 // ---------------------------------------------------------------------------
 
+type ApiErrorBody = {
+  code?: string;
+  error?: string;
+  details?: { issues?: Array<{ field: string; message: string }> };
+};
+
+class SemanticValidationError extends Error {
+  issues: Array<{ field: string; message: string }>;
+  constructor(message: string, issues: Array<{ field: string; message: string }>) {
+    super(message);
+    this.issues = issues;
+  }
+}
+
 async function readApiError(response: Response): Promise<string> {
   try {
     const body = (await response.json()) as { error?: string };
@@ -94,7 +108,17 @@ async function apiAnalyze(form: StructuredCaseForm): Promise<{
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ form }),
   });
-  if (!response.ok) throw new Error(await readApiError(response));
+  if (!response.ok) {
+    let body: ApiErrorBody = {};
+    try { body = (await response.json()) as ApiErrorBody; } catch { /* ignore */ }
+    if (body.code === "SEMANTIC_INVALID" && body.details?.issues?.length) {
+      throw new SemanticValidationError(
+        body.error || "病案内容未通过语义校验。",
+        body.details.issues,
+      );
+    }
+    throw new Error(body.error || "请求失败，请稍后重试。");
+  }
   return response.json() as Promise<{
     result: AnalysisResult;
     raw: unknown;
@@ -472,7 +496,18 @@ export default function Workbench() {
         showToast("分析完成，自动保存失败，请手动保存。", "info");
       }
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "分析失败，请稍后重试。", "error");
+      if (error instanceof SemanticValidationError) {
+        // Map per-field semantic issues into inline field errors
+        const semanticErrors: FormErrors = {};
+        for (const issue of error.issues) {
+          const key = issue.field as keyof StructuredCaseForm;
+          semanticErrors[key] = issue.message;
+        }
+        setErrors(semanticErrors);
+        showToast("请修正标注的字段后再提交。", "error");
+      } else {
+        showToast(error instanceof Error ? error.message : "分析失败，请稍后重试。", "error");
+      }
     } finally {
       setAnalyzing(false);
     }

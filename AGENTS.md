@@ -136,15 +136,25 @@ Admin UI
 Doctor fills 9 clinical fields + 2 meta fields. All validated by `structuredCaseSchema` in `src/lib/forms/caseSchema.ts`.
 
 Required fields (hard-block if missing/invalid):
-- `prescriptionType`: "方药" | "针灸" | "综合调理"
+- `prescriptionType`: `PrescriptionType[]` — array of "方药" | "针灸" | "综合调理", min 1 item (multi-select chip toggle)
 - `patientAge`: numeric string 1-120
 - `patientSex`: "男" | "女"
-- `chiefComplaint`: 5-200 chars
-- `currentIllness`: 10-2000 chars
+- `chiefComplaint`: 2-200 chars
+- `currentIllness`: 5-2000 chars
+- `physicalExam`: 2-1000 chars (tongue + pulse required)
 - `diagnosis`: 2-100 chars
-- `prescription`: 5-2000 chars
+- `pattern`: 2-100 chars (证型)
+- `prescription`: 3-2000 chars
 
-Optional fields: `consultationName`, `pastHistory`, `physicalExam`, `pattern`, `doctorQuestion`
+Optional fields: `consultationName`, `pastHistory`, `doctorQuestion`
+
+**Validation pipeline (three layers):**
+1. Structural: zod schema (hard-block)
+2. Semantic: `src/lib/ai/semanticValidator.ts` — DeepSeek flash call, checks 主诉 has recognisable time duration. Fail-open: if validator throws, allow through.
+3. Main analysis: `src/lib/ai/prompts.ts` → DeepSeek flash
+
+Semantic errors return HTTP 400 with `code: "SEMANTIC_INVALID"` and `details.issues[]` (per-field).
+UI maps issues into inline field errors.
 
 Block patterns (hard-reject across combined text): guaranteed efficacy (`保证`, `治愈`, `包好`), patient self-use (`我是患者`, `我自己可以吃`).
 

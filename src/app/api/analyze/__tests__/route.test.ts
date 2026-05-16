@@ -46,6 +46,10 @@ vi.mock("@/lib/activityLog", () => ({
   logActivity: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock("@/lib/ai/semanticValidator", () => ({
+  validateCaseSemantics: vi.fn().mockResolvedValue({ valid: true, issues: [] }),
+}));
+
 vi.mock("next/server", async (importOriginal) => {
   const actual = await importOriginal<typeof import("next/server")>();
   return { ...actual, after: (fn: () => void) => fn() };
@@ -80,6 +84,7 @@ import { POST } from "../route";
 import { NextRequest } from "next/server";
 import { requireApiAuth } from "@/lib/apiAuth";
 import { callDeepSeekJson } from "@/lib/ai/deepseek";
+import { validateCaseSemantics } from "@/lib/ai/semanticValidator";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -167,6 +172,24 @@ describe("POST /api/analyze", () => {
     expect(response.status).toBe(400);
     const body = await parseResponse(response);
     expect(body).toMatchObject({ code: "INVALID_INPUT" });
+  });
+
+  it("returns 400 with SEMANTIC_INVALID when semantic validator rejects", async () => {
+    vi.mocked(validateCaseSemantics).mockResolvedValueOnce({
+      valid: false,
+      issues: [{ field: "chiefComplaint", message: "主诉未注明症状持续时长。" }],
+    });
+    const response = await POST(makeRequest({ form: MINIMAL_VALID }));
+    expect(response.status).toBe(400);
+    const body = await parseResponse(response);
+    expect(body).toMatchObject({ code: "SEMANTIC_INVALID" });
+  });
+
+  it("proceeds when semantic validator throws (fail-open)", async () => {
+    vi.mocked(validateCaseSemantics).mockRejectedValueOnce(new Error("validator timeout"));
+    const response = await POST(makeRequest({ form: MINIMAL_VALID }));
+    // Should still succeed (fail-open)
+    expect(response.status).toBe(200);
   });
 
   it("returns 401 when auth fails", async () => {
