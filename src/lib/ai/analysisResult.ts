@@ -1,5 +1,12 @@
 import { PrescriptionType } from "@/lib/forms/caseSchema";
 
+/** Normalise prescriptionType from DB — old rows store a string, new rows store an array. */
+export function normalizePrescriptionType(value: unknown): PrescriptionType[] {
+  if (Array.isArray(value)) return value as PrescriptionType[];
+  if (typeof value === "string" && value) return [value as PrescriptionType];
+  return ["方药"];
+}
+
 export type AnalysisJson = {
   重点结论?: unknown;
   当前思路?: {
@@ -125,9 +132,9 @@ function normalizeStoredGroups(groups: unknown): ResultGroup[] {
 // Build from fresh AI response
 // ---------------------------------------------------------------------------
 
-export function buildAnalysisResult(data: AnalysisJson, prescriptionType: PrescriptionType): AnalysisResult {
+export function buildAnalysisResult(data: AnalysisJson, prescriptionType: PrescriptionType[]): AnalysisResult {
   return {
-    title: `${prescriptionType}研判`,
+    title: `${prescriptionType.join("+")}研判`,
     keyPoints: withFallback(
       data.重点结论,
       "当前方案仍可继续结合面诊信息复核，系统未提炼出更高优先级的结论。",
@@ -163,7 +170,7 @@ export function buildAnalysisResult(data: AnalysisJson, prescriptionType: Prescr
 
 export function ensureAnalysisResult(
   value: unknown,
-  prescriptionType: PrescriptionType = "方药",
+  prescriptionType: PrescriptionType[] = ["方药"],
 ): AnalysisResult | null {
   if (!value || typeof value !== "object") return null;
 
@@ -177,7 +184,7 @@ export function ensureAnalysisResult(
 
   if (Array.isArray(record.groups)) {
     return {
-      title: normalizeText(record.title) || `${prescriptionType}研判`,
+      title: normalizeText(record.title) || `${prescriptionType.join("+")}研判`,
       keyPoints: withFallback(
         record.keyPoints,
         "当前方案仍可继续结合面诊信息复核，系统未提炼出更高优先级的结论。",

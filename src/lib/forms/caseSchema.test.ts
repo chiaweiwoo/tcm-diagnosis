@@ -15,8 +15,21 @@ describe("structuredCaseSchema", () => {
     }
   });
 
-  it("rejects unknown prescription type", () => {
-    expect(parse({ ...MINIMAL_VALID, prescriptionType: "推拿" }).success).toBe(false);
+  it("accepts single and multi-value prescriptionType arrays", () => {
+    expect(parse({ ...MINIMAL_VALID, prescriptionType: ["方药"] }).success).toBe(true);
+    expect(parse({ ...MINIMAL_VALID, prescriptionType: ["针灸", "综合调理"] }).success).toBe(true);
+  });
+
+  it("rejects empty prescriptionType array", () => {
+    expect(parse({ ...MINIMAL_VALID, prescriptionType: [] }).success).toBe(false);
+  });
+
+  it("rejects unknown prescription type value in array", () => {
+    expect(parse({ ...MINIMAL_VALID, prescriptionType: ["推拿"] }).success).toBe(false);
+  });
+
+  it("rejects non-array prescriptionType", () => {
+    expect(parse({ ...MINIMAL_VALID, prescriptionType: "方药" }).success).toBe(false);
   });
 
   it("rejects unknown sex value", () => {
@@ -47,16 +60,26 @@ describe("structuredCaseSchema", () => {
     expect(parse({ ...MINIMAL_VALID, prescription: "百会穴" }).success).toBe(true);
   });
 
+  it("requires physicalExam (min 2 chars)", () => {
+    expect(parse({ ...MINIMAL_VALID, physicalExam: "" }).success).toBe(false);
+    expect(parse({ ...MINIMAL_VALID, physicalExam: "舌" }).success).toBe(false);
+    expect(parse({ ...MINIMAL_VALID, physicalExam: "舌淡红" }).success).toBe(true);
+  });
+
+  it("requires pattern (min 2 chars)", () => {
+    expect(parse({ ...MINIMAL_VALID, pattern: "" }).success).toBe(false);
+    expect(parse({ ...MINIMAL_VALID, pattern: "虚" }).success).toBe(false);
+    expect(parse({ ...MINIMAL_VALID, pattern: "气虚" }).success).toBe(true);
+  });
+
   it("defaults optional fields to empty string when omitted", () => {
-    const { consultationName, pastHistory, physicalExam, pattern, doctorQuestion, ...required } = MINIMAL_VALID;
-    void consultationName; void pastHistory; void physicalExam; void pattern; void doctorQuestion;
+    const { consultationName, pastHistory, doctorQuestion, ...required } = MINIMAL_VALID;
+    void consultationName; void pastHistory; void doctorQuestion;
     const result = parse(required);
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.consultationName).toBe("");
       expect(result.data.pastHistory).toBe("");
-      expect(result.data.physicalExam).toBe("");
-      expect(result.data.pattern).toBe("");
       expect(result.data.doctorQuestion).toBe("");
     }
   });

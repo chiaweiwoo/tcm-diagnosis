@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { ReactNode, useEffect, useRef, useState } from "react";
 import { StructuredCaseForm, structuredCaseSchema, PRESCRIPTION_TYPES, SEX_VALUES } from "@/lib/forms/caseSchema";
-import { AnalysisResult, ensureAnalysisResult } from "@/lib/ai/analysisResult";
+import { AnalysisResult, ensureAnalysisResult, normalizePrescriptionType } from "@/lib/ai/analysisResult";
 import "./workbench.css";
 
 // ---------------------------------------------------------------------------
@@ -56,7 +56,7 @@ type FormErrors = Partial<Record<keyof StructuredCaseForm, string>>;
 
 const EMPTY_FORM: StructuredCaseForm = {
   consultationName: "",
-  prescriptionType: "方药",
+  prescriptionType: ["方药"],
   patientAge: "",
   patientSex: "女",
   chiefComplaint: "",
@@ -395,7 +395,7 @@ export default function Workbench() {
       }
       const analysis = ensureAnalysisResult(
         record.analysis_result,
-        (record.form_data as StructuredCaseForm | null)?.prescriptionType ?? "方药",
+        normalizePrescriptionType((record.form_data as StructuredCaseForm | null)?.prescriptionType),
       );
       setResult(analysis);
       setMeta(record.model_meta ?? null);
@@ -612,19 +612,29 @@ export default function Workbench() {
                 <FieldError message={errors.patientAge} />
               </div>
               <div className="form-group">
-                <label className="form-label">处方类型</label>
+                <label className="form-label form-label--required">处方类型</label>
                 <div className="segmented-control">
-                  {PRESCRIPTION_TYPES.map((pt) => (
-                    <button
-                      key={pt}
-                      className={`segmented-btn ${form.prescriptionType === pt ? "segmented-btn--active" : ""}`}
-                      onClick={() => setField("prescriptionType", pt)}
-                      type="button"
-                    >
-                      {pt}
-                    </button>
-                  ))}
+                  {PRESCRIPTION_TYPES.map((pt) => {
+                    const selected = form.prescriptionType.includes(pt);
+                    return (
+                      <button
+                        key={pt}
+                        className={`segmented-btn ${selected ? "segmented-btn--active" : ""}`}
+                        onClick={() => {
+                          const current = form.prescriptionType;
+                          const next = selected
+                            ? current.filter((t) => t !== pt)
+                            : [...current, pt];
+                          setField("prescriptionType", next.length ? next : [pt]);
+                        }}
+                        type="button"
+                      >
+                        {pt}
+                      </button>
+                    );
+                  })}
                 </div>
+                <FieldError message={errors.prescriptionType as string | undefined} />
               </div>
             </div>
 
@@ -670,15 +680,16 @@ export default function Workbench() {
                 />
               </div>
               <div className="form-group">
-                <label className="form-label">体格检查 / 舌脉</label>
+                <label className="form-label form-label--required">体格检查 / 舌脉</label>
                 <textarea
-                  className="form-textarea"
+                  className={`form-textarea ${errors.physicalExam ? "form-input--error" : ""}`}
                   placeholder="舌脉、查体重点"
                   value={form.physicalExam}
                   onChange={(e) => setField("physicalExam", e.target.value)}
                   rows={3}
                   maxLength={1000}
                 />
+                <FieldError message={errors.physicalExam} />
               </div>
             </div>
 
@@ -697,15 +708,16 @@ export default function Workbench() {
                 <FieldError message={errors.diagnosis} />
               </div>
               <div className="form-group">
-                <label className="form-label">证型</label>
+                <label className="form-label form-label--required">证型</label>
                 <input
-                  className="form-input"
+                  className={`form-input ${errors.pattern ? "form-input--error" : ""}`}
                   type="text"
                   placeholder="例：肝阳上亢"
                   value={form.pattern}
                   onChange={(e) => setField("pattern", e.target.value)}
                   maxLength={100}
                 />
+                <FieldError message={errors.pattern} />
               </div>
             </div>
 
@@ -715,9 +727,9 @@ export default function Workbench() {
               <textarea
                 className={`form-textarea form-textarea--tall ${errors.prescription ? "form-input--error" : ""}`}
                 placeholder={
-                  form.prescriptionType === "针灸"
+                  form.prescriptionType.includes("针灸") && !form.prescriptionType.includes("方药")
                     ? "例：百会、太冲、风池，平补平泻，留针20分钟"
-                    : form.prescriptionType === "综合调理"
+                    : form.prescriptionType.includes("综合调理") && !form.prescriptionType.includes("方药")
                     ? "例：穴位 + 方药 + 生活调摄建议"
                     : "例：天麻钩藤饮加减，天麻10g 钩藤15g…"
                 }

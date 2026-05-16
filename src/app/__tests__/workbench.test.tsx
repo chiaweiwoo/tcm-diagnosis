@@ -94,7 +94,9 @@ async function fillRequiredFields(user: ReturnType<typeof userEvent.setup>) {
     screen.getByPlaceholderText(/头痛3个月余/),
     "头痛3个月余，伴轻度眩晕，无发热，劳累后加重。",
   );
+  await user.type(screen.getByPlaceholderText(/舌脉、查体重点/), "舌淡红苔薄白，脉弦细");
   await user.type(screen.getByPlaceholderText(/头痛 \/ 眩晕/), "头痛");
+  await user.type(screen.getByPlaceholderText(/肝阳上亢/), "肝阳上亢");
   await user.type(
     screen.getByPlaceholderText(/天麻钩藤饮|百会、太冲|穴位 \+ 方药/),
     "天麻钩藤饮加减10g",
@@ -155,13 +157,19 @@ describe("Form field interactions", () => {
     expect(input).toHaveValue("头痛眩晕");
   });
 
-  it("switches prescription type on click", async () => {
+  it("toggles prescription type chips on click", async () => {
     const user = userEvent.setup();
     render(<Workbench />);
     await waitFor(() => screen.getByText("针灸"));
 
+    // 方药 is active by default
+    expect(screen.getByText("方药").closest("button")).toHaveClass("segmented-btn--active");
+
+    // Click 针灸 to add it
     await user.click(screen.getByText("针灸"));
     expect(screen.getByText("针灸").closest("button")).toHaveClass("segmented-btn--active");
+    // 方药 still active (multi-select)
+    expect(screen.getByText("方药").closest("button")).toHaveClass("segmented-btn--active");
   });
 
   it("switches sex on click", async () => {
@@ -173,12 +181,14 @@ describe("Form field interactions", () => {
     expect(screen.getByText("男").closest("button")).toHaveClass("segmented-btn--active");
   });
 
-  it("placeholder changes with prescription type", async () => {
+  it("placeholder changes when only 针灸 is selected", async () => {
     const user = userEvent.setup();
     render(<Workbench />);
     await waitFor(() => screen.getByText("针灸"));
 
+    // Add 针灸, then remove 方药 → only 针灸 selected
     await user.click(screen.getByText("针灸"));
+    await user.click(screen.getByText("方药"));
     await waitFor(() =>
       expect(screen.getByPlaceholderText(/百会、太冲、风池/)).toBeInTheDocument(),
     );

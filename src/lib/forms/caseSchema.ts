@@ -33,7 +33,9 @@ export const structuredCaseSchema = z
       .optional()
       .default(""),
 
-    prescriptionType: z.enum(PRESCRIPTION_TYPES, { error: "请选择处方类型。" }),
+    prescriptionType: z
+      .array(z.enum(PRESCRIPTION_TYPES))
+      .min(1, "请至少选择一种处方类型。"),
 
     patientAge: z
       .string()
@@ -67,9 +69,9 @@ export const structuredCaseSchema = z
 
     physicalExam: z
       .string()
-      .max(FIELD_LIMITS.physicalExam, `体格检查不超过${FIELD_LIMITS.physicalExam}字`)
-      .optional()
-      .default(""),
+      .trim()
+      .min(2, "体格检查至少需要2个字（请填写舌诊及脉诊）。")
+      .max(FIELD_LIMITS.physicalExam, `体格检查不超过${FIELD_LIMITS.physicalExam}字`),
 
     diagnosis: z
       .string()
@@ -79,9 +81,9 @@ export const structuredCaseSchema = z
 
     pattern: z
       .string()
-      .max(FIELD_LIMITS.pattern, `证型不超过${FIELD_LIMITS.pattern}字`)
-      .optional()
-      .default(""),
+      .trim()
+      .min(2, "请填写证型（至少2个字）。")
+      .max(FIELD_LIMITS.pattern, `证型不超过${FIELD_LIMITS.pattern}字`),
 
     prescription: z
       .string()
