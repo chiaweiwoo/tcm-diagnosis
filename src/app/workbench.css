@@ -396,6 +396,11 @@
   border-color: var(--error);
 }
 
+.form-input--valid,
+.form-textarea.form-input--valid {
+  border-color: #16A34A;
+}
+
 .form-input--sm {
   width: 120px;
 }

@@ -13,7 +13,7 @@ import {
   Save,
   Trash2,
 } from "lucide-react";
-import { ReactNode, useEffect, useRef, useState } from "react";
+import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { StructuredCaseForm, structuredCaseSchema, PRESCRIPTION_TYPES, SEX_VALUES } from "@/lib/forms/caseSchema";
 import { AnalysisResult, ensureAnalysisResult, normalizePrescriptionType } from "@/lib/ai/analysisResult";
 import { BRANDING } from "@/lib/branding";
@@ -54,6 +54,11 @@ type FormErrors = Partial<Record<keyof StructuredCaseForm, string>>;
 // ---------------------------------------------------------------------------
 // Defaults
 // ---------------------------------------------------------------------------
+
+const REQUIRED_FIELDS: (keyof StructuredCaseForm)[] = [
+  "patientAge", "prescriptionType", "chiefComplaint", "currentIllness",
+  "physicalExam", "diagnosis", "pattern", "prescription",
+];
 
 const EMPTY_FORM: StructuredCaseForm = {
   consultationName: "",
@@ -371,7 +376,8 @@ function HistoryPanel({
 
 export default function Workbench() {
   const [form, setForm] = useState<StructuredCaseForm>(EMPTY_FORM);
-  const [errors, setErrors] = useState<FormErrors>({});
+  const [touched, setTouched] = useState<Set<keyof StructuredCaseForm>>(new Set());
+  const liveErrors = useMemo(() => getFormErrors(form), [form]);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [meta, setMeta] = useState<ApiMeta | null>(null);
   const [rawResult, setRawResult] = useState<unknown>(null);
@@ -400,17 +406,16 @@ export default function Workbench() {
   }, []);
 
   function setField<K extends keyof StructuredCaseForm>(key: K, value: StructuredCaseForm[K]) {
-    setForm((prev) => {
-      const next = { ...prev, [key]: value };
-      // Clear error for this field on change
-      if (errors[key]) setErrors((e) => ({ ...e, [key]: undefined }));
-      return next;
-    });
+    setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function markTouched(key: keyof StructuredCaseForm) {
+    setTouched((prev) => new Set([...prev, key]));
   }
 
   function handleNew() {
     setForm(EMPTY_FORM);
-    setErrors({});
+    setTouched(new Set());
     setResult(null);
     setMeta(null);
     setRawResult(null);
@@ -425,7 +430,7 @@ export default function Workbench() {
         const parsed = structuredCaseSchema.safeParse(record.form_data);
         if (parsed.success) {
           setForm(parsed.data);
-          setErrors({});
+          setTouched(new Set(REQUIRED_FIELDS));
         }
       }
       const analysis = ensureAnalysisResult(
@@ -454,14 +459,12 @@ export default function Workbench() {
   }
 
   async function handleAnalyze() {
-    const validationErrors = getFormErrors(form);
-    if (Object.keys(validationErrors).length > 0) {
-      setErrors(validationErrors);
+    setTouched(new Set(REQUIRED_FIELDS));
+    if (Object.keys(liveErrors).length > 0) {
       showToast("请先补全必填字段。", "error");
       return;
     }
 
-    setErrors({});
     setAnalyzing(true);
     setResult(null);
     const startedAt = Date.now();
@@ -640,15 +643,16 @@ export default function Workbench() {
               <div className="form-group">
                 <label className="form-label form-label--required">年龄 Age</label>
                 <input
-                  className={`form-input form-input--sm ${errors.patientAge ? "form-input--error" : ""}`}
+                  className={`form-input form-input--sm ${touched.has("patientAge") ? (liveErrors.patientAge ? "form-input--error" : "form-input--valid") : ""}`}
                   type="number"
                   placeholder="岁"
                   value={form.patientAge}
                   onChange={(e) => setField("patientAge", e.target.value)}
+                  onBlur={() => markTouched("patientAge")}
                   min={1}
                   max={120}
                 />
-                <FieldError message={errors.patientAge} />
+                <FieldError message={touched.has("patientAge") ? liveErrors.patientAge : undefined} />
               </div>
               <div className="form-group">
                 <label className="form-label form-label--required">处方类型 Prescription Type</label>
@@ -673,7 +677,7 @@ export default function Workbench() {
                     );
                   })}
                 </div>
-                <FieldError message={errors.prescriptionType as string | undefined} />
+                <FieldError message={touched.has("prescriptionType") ? liveErrors.prescriptionType as string | undefined : undefined} />
               </div>
             </div>
 
@@ -681,28 +685,30 @@ export default function Workbench() {
             <div className="form-group">
               <label className="form-label form-label--required">主诉 Presenting Complaint</label>
               <input
-                className={`form-input ${errors.chiefComplaint ? "form-input--error" : ""}`}
+                className={`form-input ${touched.has("chiefComplaint") ? (liveErrors.chiefComplaint ? "form-input--error" : "form-input--valid") : ""}`}
                 type="text"
                 placeholder="例：头痛眩晕反复发作"
                 value={form.chiefComplaint}
                 onChange={(e) => setField("chiefComplaint", e.target.value)}
+                onBlur={() => markTouched("chiefComplaint")}
                 maxLength={200}
               />
-              <FieldError message={errors.chiefComplaint} />
+              <FieldError message={touched.has("chiefComplaint") ? liveErrors.chiefComplaint : undefined} />
             </div>
 
             {/* Row 4: Current illness */}
             <div className="form-group">
               <label className="form-label form-label--required">现病史 History of Presenting Complaint</label>
               <textarea
-                className={`form-textarea ${errors.currentIllness ? "form-input--error" : ""}`}
+                className={`form-textarea ${touched.has("currentIllness") ? (liveErrors.currentIllness ? "form-input--error" : "form-input--valid") : ""}`}
                 placeholder="例：头痛3个月余，伴轻度眩晕，劳累后加重"
                 value={form.currentIllness}
                 onChange={(e) => setField("currentIllness", e.target.value)}
+                onBlur={() => markTouched("currentIllness")}
                 rows={4}
                 maxLength={2000}
               />
-              <FieldError message={errors.currentIllness} />
+              <FieldError message={touched.has("currentIllness") ? liveErrors.currentIllness : undefined} />
             </div>
 
             {/* Row 5: Past history + Physical exam (2 cols) */}
@@ -721,14 +727,15 @@ export default function Workbench() {
               <div className="form-group">
                 <label className="form-label form-label--required">体格检查 Medical Examination</label>
                 <textarea
-                  className={`form-textarea ${errors.physicalExam ? "form-input--error" : ""}`}
+                  className={`form-textarea ${touched.has("physicalExam") ? (liveErrors.physicalExam ? "form-input--error" : "form-input--valid") : ""}`}
                   placeholder="舌脉、查体重点"
                   value={form.physicalExam}
                   onChange={(e) => setField("physicalExam", e.target.value)}
+                  onBlur={() => markTouched("physicalExam")}
                   rows={3}
                   maxLength={1000}
                 />
-                <FieldError message={errors.physicalExam} />
+                <FieldError message={touched.has("physicalExam") ? liveErrors.physicalExam : undefined} />
               </div>
             </div>
 
@@ -737,26 +744,28 @@ export default function Workbench() {
               <div className="form-group">
                 <label className="form-label form-label--required">诊断 Diagnosis</label>
                 <input
-                  className={`form-input ${errors.diagnosis ? "form-input--error" : ""}`}
+                  className={`form-input ${touched.has("diagnosis") ? (liveErrors.diagnosis ? "form-input--error" : "form-input--valid") : ""}`}
                   type="text"
                   placeholder="例：头痛 / 眩晕"
                   value={form.diagnosis}
                   onChange={(e) => setField("diagnosis", e.target.value)}
+                  onBlur={() => markTouched("diagnosis")}
                   maxLength={100}
                 />
-                <FieldError message={errors.diagnosis} />
+                <FieldError message={touched.has("diagnosis") ? liveErrors.diagnosis : undefined} />
               </div>
               <div className="form-group">
                 <label className="form-label form-label--required">证型 Pattern</label>
                 <input
-                  className={`form-input ${errors.pattern ? "form-input--error" : ""}`}
+                  className={`form-input ${touched.has("pattern") ? (liveErrors.pattern ? "form-input--error" : "form-input--valid") : ""}`}
                   type="text"
                   placeholder="例：肝阳上亢"
                   value={form.pattern}
                   onChange={(e) => setField("pattern", e.target.value)}
+                  onBlur={() => markTouched("pattern")}
                   maxLength={100}
                 />
-                <FieldError message={errors.pattern} />
+                <FieldError message={touched.has("pattern") ? liveErrors.pattern : undefined} />
               </div>
             </div>
 
@@ -764,7 +773,7 @@ export default function Workbench() {
             <div className="form-group">
               <label className="form-label form-label--required">处方 Treatment</label>
               <textarea
-                className={`form-textarea form-textarea--tall ${errors.prescription ? "form-input--error" : ""}`}
+                className={`form-textarea form-textarea--tall ${touched.has("prescription") ? (liveErrors.prescription ? "form-input--error" : "form-input--valid") : ""}`}
                 placeholder={
                   form.prescriptionType.includes("针灸") && !form.prescriptionType.includes("方药")
                     ? "例：百会、太冲、风池，平补平泻，留针20分钟"
@@ -774,10 +783,11 @@ export default function Workbench() {
                 }
                 value={form.prescription}
                 onChange={(e) => setField("prescription", e.target.value)}
+                onBlur={() => markTouched("prescription")}
                 rows={5}
                 maxLength={2000}
               />
-              <FieldError message={errors.prescription} />
+              <FieldError message={touched.has("prescription") ? liveErrors.prescription : undefined} />
             </div>
 
             {/* Submit */}
