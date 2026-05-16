@@ -564,8 +564,7 @@ export default function Workbench() {
               <Icon size={18} strokeWidth={2.25} />
             </div>
             <div className="workbench__brand-text">
-              <span className="workbench__brand-title">{BRANDING.name}</span>
-              <span className="workbench__brand-sub">{BRANDING.subtitle}</span>
+              <span className="workbench__brand-title">{BRANDING.name} {BRANDING.subtitle}</span>
             </div>
           </div>
           <div className="workbench__actions">

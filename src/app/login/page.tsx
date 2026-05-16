@@ -56,8 +56,7 @@ export default function LoginPage() {
             <Icon size={20} />
           </span>
           <div className="login-brand-text-group">
-            <span className="login-brand-text">{BRANDING.name}</span>
-            <span className="login-brand-sub">{BRANDING.subtitle}</span>
+            <span className="login-brand-text">{BRANDING.name} {BRANDING.subtitle}</span>
           </div>
         </div>
 
