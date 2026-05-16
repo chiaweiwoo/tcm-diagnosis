@@ -2,10 +2,12 @@
 .admin-bar {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 24px;
-  border-bottom: 2px solid var(--clinic-red);
-  background: var(--paper);
+  gap: 10px;
+  padding: 0 28px;
+  height: 60px;
+  background: var(--surface, #fff);
+  border-bottom: 1px solid var(--border, #EAE6E2);
+  box-shadow: 0 1px 0 rgba(155, 34, 38, 0.04);
   font-size: 13px;
   position: sticky;
   top: 0;
@@ -13,9 +15,14 @@
 }
 
 .admin-bar-brand {
-  font-weight: 800;
-  color: var(--clinic-red);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--brand, #9B2226);
   text-decoration: none;
+  flex-shrink: 0;
 }
 
 .admin-bar-brand:hover {
@@ -25,6 +32,14 @@
 .admin-bar-sep {
   color: var(--muted);
   font-size: 11px;
+  flex-shrink: 0;
+}
+
+.admin-bar-section {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  flex-shrink: 0;
 }
 
 .admin-bar-label {
@@ -35,23 +50,39 @@
 .admin-bar-nav {
   display: flex;
   align-items: center;
-  gap: 4px;
-  margin-left: 4px;
+  gap: 2px;
+  margin-left: auto;
 }
 
 .admin-bar-link {
-  padding: 3px 10px;
-  border-radius: 4px;
+  padding: 5px 12px;
+  border-radius: 6px;
   color: var(--muted);
   text-decoration: none;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   transition: background 0.15s, color 0.15s;
 }
 
 .admin-bar-link:hover {
-  background: var(--line);
-  color: var(--text, #1a1a1a);
+  background: var(--brand-light, #FDF4F4);
+  color: var(--brand, #9B2226);
+}
+
+.admin-bar-link--active {
+  background: var(--brand-light, #FDF4F4);
+  color: var(--brand, #9B2226);
+  font-weight: 600;
+}
+
+/* ── Admin footer ── */
+.admin-footer {
+  margin-top: 48px;
+  padding: 20px 28px;
+  border-top: 1px solid var(--border, #EAE6E2);
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
 }
 
 .admin-page {

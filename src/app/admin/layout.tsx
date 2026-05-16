@@ -3,6 +3,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getDevBypassDoctorEmail, isAdminDoctorEmail } from "@/lib/auth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { BRANDING } from "@/lib/branding";
+import AdminNav from "./AdminNav";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const bypassEmail = getDevBypassDoctorEmail();
@@ -19,19 +21,25 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     redirect("/?reason=not_admin");
   }
 
+  const Icon = BRANDING.icon;
+
   return (
     <>
       <header className="admin-bar">
-        <Link href="/" className="admin-bar-brand">临床复核伙伴</Link>
-        <span className="admin-bar-sep">/</span>
-        <nav className="admin-bar-nav">
-          <Link href="/admin/assessments" className="admin-bar-link">评估记录</Link>
-          <Link href="/admin/activity" className="admin-bar-link">用户活动</Link>
-          <Link href="/admin/examples" className="admin-bar-link">样本库</Link>
-          <Link href="/admin/usage" className="admin-bar-link">Token 用量</Link>
-        </nav>
+        <Link href="/" className="admin-bar-brand">
+          <Icon size={16} strokeWidth={2.25} />
+          {BRANDING.name}
+        </Link>
+        <span className="admin-bar-sep" aria-hidden>·</span>
+        <span className="admin-bar-section">后台</span>
+        <AdminNav />
       </header>
+
       {children}
+
+      <footer className="admin-footer">
+        {BRANDING.name} · 后台管理
+      </footer>
     </>
   );
 }

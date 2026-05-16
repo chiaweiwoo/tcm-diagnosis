@@ -12,11 +12,11 @@ export default function AdminUsagePage() {
         <Link href="/" className="secondary-button compact-button">← 返回工作台</Link>
       </div>
       <section className="admin-section">
-        <p style={{ color: "var(--meta-color)", marginBottom: "1rem" }}>
+        <p className="admin-meta" style={{ marginBottom: "1rem" }}>
           调用监控已迁移至 Langfuse。Token 用量、延迟、成本请在 Langfuse 控制台查看。
         </p>
         <a
-          href="https://cloud.langfuse.com"
+          href="https://jp.cloud.langfuse.com"
           target="_blank"
           rel="noopener noreferrer"
           className="secondary-button"
