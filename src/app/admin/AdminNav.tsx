@@ -5,9 +5,7 @@ import { usePathname } from "next/navigation";
 
 const NAV_LINKS = [
   { href: "/admin/assessments", label: "评估记录" },
-  { href: "/admin/activity",    label: "用户活动" },
   { href: "/admin/examples",    label: "样本库" },
-  { href: "/admin/usage",       label: "Token 用量" },
 ];
 
 export default function AdminNav() {

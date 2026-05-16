@@ -35,6 +35,8 @@ Never push the worktree branch itself. Never use `--force`.
 Neither → 401. Enforced by `src/lib/apiAuth.ts` called at the top of both routes.
 `ASSESSMENT_API_KEY` must be set in Vercel env vars, `.env.local`, and GitHub Actions secrets.
 
+`/api/admin/*` routes require a valid Supabase session AND `is_admin = true` on `doctor_allowlist`. Returns 403 otherwise.
+
 ### 4. DEV_AUTH_BYPASS must never reach production
 
 Guard is in `src/lib/auth.ts → assertDevBypassIsLocalOnly()`. It throws if `NODE_ENV !== "development"`. Never remove this check. Never add `NEXT_PUBLIC_DEV_AUTH_BYPASS`.
@@ -67,6 +69,10 @@ Enforced by code convention in `src/lib/langfuse.ts` and `src/app/api/analyze/ro
 ### 9. Update AGENTS.md and README.md when behavior changes
 
 Any meaningful change to product behavior, architecture, security rules, or calibration workflow must be reflected in this file before the session ends. README updates are required when user-visible behavior changes.
+
+### 10. Assessment samples live in DB only — never in the codebase
+
+Sample records for testing are stored exclusively in the `assessment_samples` Supabase table. The CSV source file is local-only and gitignored. Do not add sample data to any TypeScript file or config file.
 
 ---
 
@@ -106,21 +112,28 @@ Helps registered TCM doctors:
 
 ```
 Doctor (browser)
-  └── POST /api/analyze     → DeepSeek flash model → clinical review JSON (3-column layout)
-  └── /api/consultations/*  → Supabase (save / load / delete history)
+  └── POST /api/analyze        → DeepSeek flash model → clinical review JSON (3-column layout)
+  └── /api/consultations/*     → Supabase (save / load / delete history)
 
-Calibration CLI (local machine) — BROKEN: backend.mjs still calls /api/organize (deleted)
-  └── assess:run   → hits live Vercel app with X-Assessment-Key → saves raw_results to DB
-  └── assess:review (GitHub Actions) → reads DB → 3-stage DeepSeek pro review → updates DB
+Admin (browser, is_admin=true only)
+  └── GET /api/admin/samples   → returns assessment_samples rows
+  └── /admin/assessments       → assessment job list (future: trigger runs)
+  └── /admin/examples          → read-only sample library view
 
-Admin UI (persistent nav bar, all links in header)
-  └── /admin                  → redirects to /admin/assessments
-  └── /admin/assessments      → calibration run list
-  └── /admin/assessments/[id] → full report (pipeline stats + scorecards + final synthesis)
-  └── /admin/activity         → doctor activity log (login, analyze events)
-  └── /admin/examples         → doctor example library (read-only)
-  └── /admin/usage            → Langfuse redirect (token usage migrated out)
+Workbench header (admin only):
+  └── ⚙ Settings2 icon → /admin
+  └── 🧪 样本 button  → samples panel (lazy-loads /api/admin/samples, populates form)
 ```
+
+---
+
+## CSS Architecture
+
+- `src/app/globals.css` — shared brand tokens (`--brand`, `--brand-dark`, `--brand-mid`, `--brand-light`, `--brand-tint`, `--surface`, `--border`, `--border-strong`). Must be the canonical source so admin routes (which don't load `workbench.css`) can use brand colors.
+- `src/app/workbench.css` — workbench-only styles. Loaded only on `/` route.
+- `src/app/admin/admin.css` — admin UI styles. Relies on tokens from `globals.css`.
+
+Never define brand tokens only in `workbench.css` — admin pages won't see them.
 
 ---
 
@@ -132,6 +145,13 @@ Admin UI (persistent nav bar, all links in header)
 - Analyze output reading order: 重点结论 → 当前思路 → 建议优化 → 可选思路 → 风险与提醒 → 随访监测 → 证据状态.
 - UI result layout: 3 columns — 判断 (当前思路) / 方案 (建议优化+可选) / 随访监测. Plus 重点结论 banner and 风险与提醒 warning box at top.
 - Saved history must pass through the same normalization path as fresh analysis (`ensureAnalysisResult` in `src/lib/ai/analysisResult.ts`).
+
+### Result color coding
+- `重点结论` banner: green (`#F0FDF4` bg, `#16A34A` border)
+- `风险与提醒` banner: yellow (`#FEFCE8` bg, `#CA8A04` border)
+- 判断 column: green header (`result-column--green`)
+- 方案 column: blue header (`result-column--blue`)
+- 随访监测 column: yellow header (`result-column--yellow`)
 
 ---
 
@@ -154,133 +174,114 @@ Optional fields (in schema but not shown in form UI): `consultationName`, `pastH
 
 History item display name: auto-built from `patientSex + patientAge岁 + chiefComplaint` (no stored name field).
 
-**Validation pipeline (three layers):**
-1. Structural: zod schema (hard-block)
-2. Semantic: `src/lib/ai/semanticValidator.ts` — DeepSeek flash call, checks 主诉 has recognisable time duration. Fail-open: if validator throws, allow through.
-3. Main analysis: `src/lib/ai/prompts.ts` → DeepSeek flash
+**Validation:** Single-layer zod schema (hard-block). Block patterns (hard-reject): guaranteed efficacy (`保证`, `治愈`, `包好`), patient self-use (`我是患者`, `我自己可以吃`).
 
-Semantic errors return HTTP 400 with `code: "SEMANTIC_INVALID"` and `details.issues[]` (per-field).
-UI maps issues into inline field errors.
-
-Block patterns (hard-reject across combined text): guaranteed efficacy (`保证`, `治愈`, `包好`), patient self-use (`我是患者`, `我自己可以吃`).
+**Live validation UI:** `liveErrors` via `useMemo(() => getFormErrors(form), [form])`. Errors show once field is touched (`touched` set). Submit button disabled when any live error present. Fields show green border when valid, red when errored.
 
 ---
 
-## Clinical Style
+## CRUD State Machine (Status Bar)
 
-- Persona: senior, pragmatic, supportive TCM colleague. Not a grader.
-- Preserve reasonable parts first, then suggest improvements.
-- Prefer 1-3 high-impact suggestions over long lists.
-- No guaranteed cure language. No fabricated citations.
+`SaveStatus = "new" | "unsaved" | "saving" | "saved"`
+
+| Trigger | Transition |
+|---|---|
+| `handleNew()` | → `"new"`, `savedAt = null` |
+| `setField(...)` | → `"unsaved"` (unless currently `"saving"`) |
+| `handleSelectHistory` success | → `"saved"`, `savedAt = record.updated_at` |
+| `handleLoadSample` | → `"new"`, `savedAt = null` (not a consultation yet) |
+| `handleAnalyze` / `handleSave` start | → `"saving"` |
+| save success | → `"saved"`, `savedAt = new Date()` |
+| save failure | → `"unsaved"` |
+
+Status bar renders below submit button inside `form-card`. Toast fires on: analyze error, save success/failure, delete, history load success/failure, sample load.
+
+---
+
+## Admin UI
+
+Admin entry point: `⚙` icon (Settings2) in workbench header, visible only when `isAdmin=true`.
+
+Admin guard: `src/app/admin/layout.tsx` — server-side, redirects to `/?reason=not_admin` if not admin.
+
+Admin nav (2 tabs, `src/app/admin/AdminNav.tsx`):
+- **评估记录** — `/admin/assessments` — assessment job list
+- **样本库** — `/admin/examples` — read-only sample library
+
+`AdminNav` is a client component (needs `usePathname()` for active link highlighting). Admin layout is a server component.
+
+Token usage: tracked in Langfuse only. No admin page for it.
+Activity logs: written to Supabase `activity_logs` but no admin UI page for now.
+
+Only `chiaweiwoo123@gmail.com` is seeded as admin.
+
+---
+
+## Assessment Samples
+
+10 real doctor case samples for pipeline testing. Live in `assessment_samples` Supabase table only.
+
+**To seed:** Run `supabase/migrations/013_assessment_samples.sql` once in Supabase SQL editor.
+**To add/disable:** Edit rows directly in Supabase table editor (`is_active = false` to hide without deleting).
+**Never store sample data in the codebase** — no TypeScript arrays, no CSV in git.
+
+Admin shortcut in workbench:
+- `🧪 样本` button (header, admin only) → opens samples panel
+- Panel lazy-loads from `GET /api/admin/samples` on first open
+- Clicking a sample populates all form fields; `saveStatus` resets to `"new"`; toast confirms load
+- Doctor can then submit immediately for analysis
 
 ---
 
 ## Database Schema
 
-Migrations: `supabase/migrations/` (numbered, idempotent SQL). Applied manually in Supabase SQL editor.
+Migrations: `supabase/migrations/` (numbered SQL). Applied manually in Supabase SQL editor.
 
 | Table | Purpose |
 |---|---|
-| `consultations` | Doctor history — form_data JSONB (StructuredCaseForm), analysis JSON, model meta |
-| `api_call_logs` | Per-call operational metrics — model, tokens, cost, latency, rates_snapshot JSONB |
-| `error_logs` | Pipeline errors |
-| `doctor_allowlist` | `email`, `is_active`, `is_admin` — source of truth for access control |
-| `assessment_runs` | Calibration runs — see columns below |
-
-`assessment_runs` columns:
-- `run_id`, `mode` (`normal`\|`smart`), `triggered_by`, `status` (`raw`→`reviewed`)
-- `organize_stats`, `mode_stats`, `blocked_reason_groups` — aggregate stats JSONB
-- `raw_results` — full per-example pipeline data (organize response + analyze result per example)
-- `example_reviews` — per-example DeepSeek pro scorecards (stage 1)
-- `section_reviews` — per-section consistency analyses (stage 2)
-- `reviewer_text` — final synthesis with doctor brief (stage 3)
-- `reviewer_model`, `base_url`, `example_count`, `created_at`
+| `consultations` | Doctor history — form_data JSONB, analysis JSON, model meta |
+| `api_call_logs` | Per-call operational metrics — model, tokens, cost, latency |
+| `error_logs` | Pipeline errors (no form field values) |
+| `doctor_allowlist` | `email`, `is_active`, `is_admin` — access control source of truth |
+| `activity_logs` | Doctor activity events (login, analyze) — no UI for now |
+| `assessment_samples` | Test case library (migration 013) — seeded from CSV, admin-only read |
+| `assessment_jobs` | Assessment run tracking (migration 013) — future use |
+| `assessment_job_results` | Per-sample results per job (migration 013) — future use |
+| `assessment_runs` | Old calibration runs (legacy — not actively used) |
+| `doctor_examples` | Old example library (legacy — superseded by assessment_samples) |
 
 All tables: service_role key only. No anon/user RLS. Never expose service_role key to browser.
 
 ---
 
-## Admin Role
+## Langfuse Integration
 
-- `is_admin` boolean on `doctor_allowlist`.
-- Admin check: `isAdminDoctorEmail()` in `src/lib/auth.ts`.
-- Admin guard: `src/app/admin/layout.tsx` — server-side, redirects to `/?reason=not_admin`.
-- Admin pages: `/admin/assessments`, `/admin/assessments/[runId]`, `/admin/usage`.
-- Only `chiaweiwoo123@gmail.com` is seeded as admin.
+SDK v3 API. Per analyze call, Langfuse receives:
+- `usageDetails`: `{ input, output, total, cacheHit, cacheMiss }` (token counts)
+- `costDetails`: `{ total }` (USD cost)
+- `metadata`: model, latency, prompt version, prescriptionType label, repairedJson flag
 
----
+**No clinical text ever reaches Langfuse.** Token usage and cost are monitored at `jp.cloud.langfuse.com`.
 
-## Calibration Workflow
-
-Calibration = running the pipeline on real doctor examples, reviewing outputs with AI, using the report to improve prompts. Internal only — not doctor-facing.
-
-**Philosophy:** Developer is not a TCM expert. AI does the heavy reading, finds patterns, and produces a report the developer can act on. The report also includes a doctor-ready brief so expert consultation is focused and efficient. Each run tightens the loop: run → AI reviews → developer reads → developer + AI refine prompts → re-run → compare.
-
-### Step 1 — `npm run assess:run` (local)
-
-```bash
-npm run assess:run -- --mode normal   # or --mode smart
-```
-
-- Reads examples from `doctor_examples` Supabase table (seed with `npm run assess:seed` first)
-- Hits live Vercel app (`ASSESS_BASE_URL`) with `X-Assessment-Key` header
-- Runs organize → analyze for all examples in parallel (`Promise.all`)
-- Run ID format: `assessment-YYYY-MM-DD_HH-MM-SS-SGT-{mode}`
-- Saves raw results to `assessment_runs` with `status: raw`
-- Prints `run_id` — use in Step 2
-
-Run once per mode to compare. Two rows in DB, two reports in admin UI.
-
-### Step 2 — GitHub Actions "Assess Review"
-
-Triggered via `workflow_dispatch` → input `run_id`. Three stages:
-
-**Stage 1 + 2 (parallel — `Promise.all`):**
-- Per-example scorecards: full output for each example → DeepSeek pro → compact structured verdict (整理质量, 分析量, 实用性, 内部重复, 情感基调, 整体判断, 具体问题)
-- Per-section consistency: each output section across all examples → DeepSeek pro → sentiment drift, templating, depth variance
-
-**Stage 3 (after 1+2):**
-- Final synthesis → DeepSeek pro → executive summary, main findings, cross-example patterns, prompt improvement directions, priority actions (urgent/medium/good to have), doctor brief
-
-All review calls use DeepSeek pro. Plain `Promise.all` — no orchestration framework.
-
-Saves `example_reviews`, `section_reviews`, `reviewer_text` to DB. Status → `reviewed`.
-
----
-
-## Doctor Examples
-
-Examples live in the `doctor_examples` Supabase table. Admin read-only at `/admin/examples`.
-
-Seed workflow (run once when examples change):
-```bash
-npm run assess:seed -- --file local-data/real-doctor-examples.md
-```
-
-- `assess:run` reads exclusively from DB — throws if table is empty
-- `local-data/real-doctor-examples.md` is gitignored, kept only as the seed source
-- `local-data/real-doctor-examples-notes.md` — supporting notes (gitignored, local only)
-- To disable an example without deleting: set `is_active = false` directly in Supabase table editor
+Env var: `LANGFUSE_BASE_URL` — defaults to `https://jp.cloud.langfuse.com` if not set.
 
 ---
 
 ## Model And Pricing Rules
 
-- Organize: fast model (`DEEPSEEK_MODEL_FAST`)
-- Analyze: `DEEPSEEK_MODEL_ANALYZE`, fallback to `DEEPSEEK_MODEL_FAST`
-- Calibration review: all stages use DeepSeek pro
-- AI pricing is hardcoded in `config/rates.json`. Updated automatically by `.github/workflows/update-rates.yml` (daily, Claude web search). When updating manually, update the `_comment` date field.
+- Analyze: `DEEPSEEK_MODEL_FAST` (flash). No other model exposed to doctors.
+- AI pricing is hardcoded in `config/rates.json`. Updated automatically by `.github/workflows/update-rates.yml` (daily). When updating manually, update the `_comment` date field.
 - Token usage and cost are internal only — never shown to doctors.
 
 ---
 
 ## Logging Rules
 
-Per analyze call, Langfuse receives: model, token counts (input/output), latency, cost, prompt version, prescriptionType, repairedJson flag. **No clinical text.**
+Per analyze call, Langfuse receives token counts, cost, latency, prompt version, prescriptionType, repairedJson flag. **No clinical text.**
 
-Error events (DeepSeek failures, parse errors) go to `error_logs` in Supabase via `logServerEvent`. Error details must not include form field values.
+Error events go to `error_logs` in Supabase via `logServerEvent`. Must not include form field values.
 
-Doctor activity events (login, analyze) go to `activity_logs` in Supabase via `logActivity`.
+Doctor activity events (login, analyze) go to `activity_logs` in Supabase via `logActivity`. No admin UI for activity logs currently.
 
 Logging must not block doctor-facing responses (use `after()` from Next.js).
 
@@ -299,16 +300,16 @@ git stash && git rebase origin/main && git stash pop && git push origin HEAD:mai
 ```
 
 **`ASSESSMENT_API_KEY` missing in CLI**
-The assessment HTTP client (`scripts/lib/assessment/http.mjs`) throws early if the key is absent. Add it to `.env.local`.
+The assessment HTTP client throws early if the key is absent. Add it to `.env.local`.
 
 **DeepSeek returns malformed JSON**
 Expected — repair is built in. Check `repairedJson: true` in logs. If repair triggers consistently, the prompt output format needs tightening.
 
-**Organize succeeds but analyze returns 401**
-Both routes require auth. If running assess:run against a Vercel deployment that doesn't yet have `ASSESSMENT_API_KEY` set, redeploy after adding the env var.
+**Admin pages can't see brand CSS variables**
+Brand tokens (`--brand`, etc.) must be defined in `globals.css`, not only in `workbench.css`. `workbench.css` only loads on `/` route.
 
-**`assess:run` throws "No active examples found in DB"**
-Run `npm run assess:seed -- --file local-data/real-doctor-examples.md` to populate the `doctor_examples` table. Examples now live in DB, not in the local file.
+**`assessment_samples` table missing**
+Run `supabase/migrations/013_assessment_samples.sql` in Supabase SQL editor.
 
 ---
 
@@ -323,13 +324,14 @@ Run `npm run assess:seed -- --file local-data/real-doctor-examples.md` to popula
 
 ## Audit Checklist Before Saying "Done"
 
-1. Fresh run path (organize → analyze → save)
-2. Load saved history path
-3. Blocked stage-one path
-4. Partial organize path (organize ok, analyze blocked)
-5. Final analysis path
-6. Docs synced (AGENTS.md + README if needed)
-7. CI green (`gh run list --limit 1`)
+1. Fresh run path (form fill → analyze → auto-save)
+2. Load saved history path (status bar → "已保存", toast fires)
+3. Load sample path (admin only, form populated, status → "新病案")
+4. Blocked path (invalid form → submit disabled)
+5. Save/delete via toolbar
+6. Admin nav accessible from workbench header (⚙ icon, admin only)
+7. Docs synced (AGENTS.md + README if needed)
+8. CI green (`gh run list --limit 1`)
 
 Do not say done until the changed path is verified, not merely coded.
 
@@ -339,5 +341,5 @@ Do not say done until the changed path is verified, not merely coded.
 
 1. Doctor feedback capture — accepted/rejected suggestion tracking
 2. External citation retrieval layer
-3. Side-by-side calibration run comparison view (normal vs smart)
-4. Scheduled calibration runs (currently manual trigger)
+3. Assessment job runner — admin triggers a run from `/admin/assessments`, results saved to `assessment_jobs` + `assessment_job_results`
+4. Assessment results UI — `/admin/assessments/[jobId]` showing per-sample analysis output

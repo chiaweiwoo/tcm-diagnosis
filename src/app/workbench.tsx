@@ -12,6 +12,7 @@ import {
   LogOut,
   Plus,
   Save,
+  Settings2,
   Trash2,
 } from "lucide-react";
 import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
@@ -798,6 +799,12 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
                 {saving ? <LoaderCircle size={15} className="spin" /> : <Save size={15} />}
                 <span>保存</span>
               </button>
+            )}
+            {isAdmin && (
+              <a className="btn btn--ghost btn--sm" href="/admin" title="后台管理">
+                <Settings2 size={15} />
+                <span className="sr-only">后台管理</span>
+              </a>
             )}
             <a className="btn btn--ghost btn--sm" href="/auth/signout" title="退出">
               <LogOut size={15} />
