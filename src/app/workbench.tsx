@@ -619,7 +619,7 @@ export default function Workbench() {
             {/* Row 1: Meta strip — sex / age / prescription type */}
             <div className="form-row--meta">
               <div className="form-group">
-                <label className="form-label">性别</label>
+                <label className="form-label">性别 Gender</label>
                 <div className="segmented-control">
                   {SEX_VALUES.map((sex) => (
                     <button
@@ -634,7 +634,7 @@ export default function Workbench() {
                 </div>
               </div>
               <div className="form-group">
-                <label className="form-label form-label--required">年龄</label>
+                <label className="form-label form-label--required">年龄 Age</label>
                 <input
                   className={`form-input form-input--sm ${errors.patientAge ? "form-input--error" : ""}`}
                   type="text"
@@ -647,7 +647,7 @@ export default function Workbench() {
                 <FieldError message={errors.patientAge} />
               </div>
               <div className="form-group">
-                <label className="form-label form-label--required">处方类型</label>
+                <label className="form-label form-label--required">处方类型 Prescription Type</label>
                 <div className="segmented-control">
                   {PRESCRIPTION_TYPES.map((pt) => {
                     const selected = form.prescriptionType.includes(pt);
@@ -675,7 +675,7 @@ export default function Workbench() {
 
             {/* Row 2: Chief complaint */}
             <div className="form-group">
-              <label className="form-label form-label--required">主诉</label>
+              <label className="form-label form-label--required">主诉 Presenting Complaint</label>
               <input
                 className={`form-input ${errors.chiefComplaint ? "form-input--error" : ""}`}
                 type="text"
@@ -689,7 +689,7 @@ export default function Workbench() {
 
             {/* Row 4: Current illness */}
             <div className="form-group">
-              <label className="form-label form-label--required">现病史</label>
+              <label className="form-label form-label--required">现病史 History of Presenting Complaint</label>
               <textarea
                 className={`form-textarea ${errors.currentIllness ? "form-input--error" : ""}`}
                 placeholder="例：头痛3个月余，伴轻度眩晕，劳累后加重"
@@ -704,7 +704,7 @@ export default function Workbench() {
             {/* Row 5: Past history + Physical exam (2 cols) */}
             <div className="form-row form-row--2col">
               <div className="form-group">
-                <label className="form-label">既往史</label>
+                <label className="form-label">既往史 Past Medical History</label>
                 <textarea
                   className="form-textarea"
                   placeholder="例：高血压病史5年，规律服药"
@@ -715,7 +715,7 @@ export default function Workbench() {
                 />
               </div>
               <div className="form-group">
-                <label className="form-label form-label--required">体格检查 / 舌脉</label>
+                <label className="form-label form-label--required">体格检查 Medical Examination</label>
                 <textarea
                   className={`form-textarea ${errors.physicalExam ? "form-input--error" : ""}`}
                   placeholder="舌脉、查体重点"
@@ -731,7 +731,7 @@ export default function Workbench() {
             {/* Row 6: Diagnosis + Pattern (2 cols) */}
             <div className="form-row form-row--2col">
               <div className="form-group">
-                <label className="form-label form-label--required">诊断</label>
+                <label className="form-label form-label--required">诊断 Diagnosis</label>
                 <input
                   className={`form-input ${errors.diagnosis ? "form-input--error" : ""}`}
                   type="text"
@@ -743,7 +743,7 @@ export default function Workbench() {
                 <FieldError message={errors.diagnosis} />
               </div>
               <div className="form-group">
-                <label className="form-label form-label--required">证型</label>
+                <label className="form-label form-label--required">证型 Pattern</label>
                 <input
                   className={`form-input ${errors.pattern ? "form-input--error" : ""}`}
                   type="text"
@@ -758,7 +758,7 @@ export default function Workbench() {
 
             {/* Row 7: Prescription */}
             <div className="form-group">
-              <label className="form-label form-label--required">处方</label>
+              <label className="form-label form-label--required">处方 Treatment</label>
               <textarea
                 className={`form-textarea form-textarea--tall ${errors.prescription ? "form-input--error" : ""}`}
                 placeholder={
@@ -778,7 +778,7 @@ export default function Workbench() {
 
             {/* Row 8: Doctor question */}
             <div className="form-group">
-              <label className="form-label">医生问题</label>
+              <label className="form-label">医生问题 Physician's Question</label>
               <input
                 className="form-input"
                 type="text"
