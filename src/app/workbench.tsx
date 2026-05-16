@@ -530,6 +530,7 @@ export default function Workbench() {
       setHistoryOpen(false);
       setSaveStatus("saved");
       setSavedAt(new Date(record.updated_at));
+      showToast("已加载病案。", "success");
     } catch {
       showToast("读取病案记录失败。", "error");
     }
