@@ -116,10 +116,10 @@ describe("Workbench rendering", () => {
     render(<Workbench />);
     await waitFor(() => expect(screen.getByText("中医临床复核")).toBeInTheDocument());
 
-    expect(screen.getByText("主诉")).toBeInTheDocument();
-    expect(screen.getByText("现病史")).toBeInTheDocument();
-    expect(screen.getByText("诊断")).toBeInTheDocument();
-    expect(screen.getByText("处方")).toBeInTheDocument();
+    expect(screen.getByText(/主诉 Presenting Complaint/)).toBeInTheDocument();
+    expect(screen.getByText(/现病史 History of Presenting Complaint/)).toBeInTheDocument();
+    expect(screen.getByText(/诊断 Diagnosis/)).toBeInTheDocument();
+    expect(screen.getByText(/处方 Treatment/)).toBeInTheDocument();
   });
 
   it("renders prescription type segmented control with all 3 options", async () => {

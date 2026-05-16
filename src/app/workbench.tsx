@@ -776,19 +776,6 @@ export default function Workbench() {
               <FieldError message={errors.prescription} />
             </div>
 
-            {/* Row 8: Doctor question */}
-            <div className="form-group">
-              <label className="form-label">医生问题 Physician's Question</label>
-              <input
-                className="form-input"
-                type="text"
-                placeholder="本次最想确认的方向"
-                value={form.doctorQuestion}
-                onChange={(e) => setField("doctorQuestion", e.target.value)}
-                maxLength={500}
-              />
-            </div>
-
             {/* Submit */}
             <div className="form-submit">
               <button
