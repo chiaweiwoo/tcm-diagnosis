@@ -141,8 +141,8 @@ describe("Workbench rendering", () => {
 
   it("renders the analyze button", async () => {
     render(<Workbench />);
-    await waitFor(() => screen.getByText("开始复核"));
-    expect(screen.getByText("开始复核")).toBeInTheDocument();
+    await waitFor(() => screen.getByText("开始分析"));
+    expect(screen.getByText("开始分析")).toBeInTheDocument();
   });
 });
 
@@ -199,9 +199,9 @@ describe("Form validation", () => {
   it("shows field error when submitting with empty required fields", async () => {
     const user = userEvent.setup();
     render(<Workbench />);
-    await waitFor(() => screen.getByText("开始复核"));
+    await waitFor(() => screen.getByText("开始分析"));
 
-    await user.click(screen.getByText("开始复核"));
+    await user.click(screen.getByText("开始分析"));
     await waitFor(() => {
       // At least one validation error should appear
       const errors = document.querySelectorAll(".field-error");
@@ -212,9 +212,9 @@ describe("Form validation", () => {
   it("does not call /api/analyze when required fields are missing", async () => {
     const user = userEvent.setup();
     render(<Workbench />);
-    await waitFor(() => screen.getByText("开始复核"));
+    await waitFor(() => screen.getByText("开始分析"));
 
-    await user.click(screen.getByText("开始复核"));
+    await user.click(screen.getByText("开始分析"));
 
     const fetchMock = vi.mocked(global.fetch);
     const analyzeCalls = fetchMock.mock.calls.filter(([url]) => url === "/api/analyze");
@@ -224,9 +224,9 @@ describe("Form validation", () => {
   it("clears error on field change after failed submit", async () => {
     const user = userEvent.setup();
     render(<Workbench />);
-    await waitFor(() => screen.getByText("开始复核"));
+    await waitFor(() => screen.getByText("开始分析"));
 
-    await user.click(screen.getByText("开始复核"));
+    await user.click(screen.getByText("开始分析"));
     await waitFor(() => expect(document.querySelectorAll(".field-error").length).toBeGreaterThan(0));
 
     const chiefInput = screen.getByPlaceholderText(/头痛眩晕反复发作/);
@@ -240,10 +240,10 @@ describe("Analyze flow", () => {
   it("calls /api/analyze with form data after filling required fields", async () => {
     const user = userEvent.setup();
     render(<Workbench />);
-    await waitFor(() => screen.getByText("开始复核"));
+    await waitFor(() => screen.getByText("开始分析"));
 
     await fillRequiredFields(user);
-    await user.click(screen.getByText("开始复核"));
+    await user.click(screen.getByText("开始分析"));
 
     const fetchMock = vi.mocked(global.fetch);
     await waitFor(() => {
@@ -260,10 +260,10 @@ describe("Analyze flow", () => {
   it("renders result sections after successful analyze", async () => {
     const user = userEvent.setup();
     render(<Workbench />);
-    await waitFor(() => screen.getByText("开始复核"));
+    await waitFor(() => screen.getByText("开始分析"));
 
     await fillRequiredFields(user);
-    await user.click(screen.getByText("开始复核"));
+    await user.click(screen.getByText("开始分析"));
 
     await waitFor(() => {
       expect(screen.getByText("重点结论")).toBeInTheDocument();
@@ -279,10 +279,10 @@ describe("Analyze flow", () => {
   it("shows cautions banner when cautions contain non-generic content", async () => {
     const user = userEvent.setup();
     render(<Workbench />);
-    await waitFor(() => screen.getByText("开始复核"));
+    await waitFor(() => screen.getByText("开始分析"));
 
     await fillRequiredFields(user);
-    await user.click(screen.getByText("开始复核"));
+    await user.click(screen.getByText("开始分析"));
 
     await waitFor(() => screen.getByText("风险与提醒"));
     expect(screen.getByText("注意肝功能")).toBeInTheDocument();
@@ -294,10 +294,10 @@ describe("Analyze flow", () => {
 
     const user = userEvent.setup();
     render(<Workbench />);
-    await waitFor(() => screen.getByText("开始复核"));
+    await waitFor(() => screen.getByText("开始分析"));
 
     await fillRequiredFields(user);
-    await user.click(screen.getByText("开始复核"));
+    await user.click(screen.getByText("开始分析"));
 
     await waitFor(() => {
       expect(screen.getByRole("alert")).toBeInTheDocument();
