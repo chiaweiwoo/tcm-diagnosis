@@ -28,7 +28,7 @@ Never push the worktree branch itself. Never use `--force`.
 
 ### 3. API routes require authentication
 
-`/api/organize` and `/api/analyze` require either:
+`/api/analyze` and `/api/consultations/*` require either:
 - A valid Supabase session cookie (doctor via browser), OR
 - `X-Assessment-Key` header matching `ASSESSMENT_API_KEY` env var (calibration CLI)
 
@@ -43,9 +43,9 @@ Guard is in `src/lib/auth.ts → assertDevBypassIsLocalOnly()`. It throws if `NO
 
 Read from Supabase `doctor_allowlist` table first. Fall back to `ALLOWED_DOCTOR_EMAILS` env var only when Supabase is unreachable. Signed-in but non-allowlisted users must be signed out immediately with a Chinese message.
 
-### 6. Organize draft ceiling is 8000 characters
+### 6. Field limits are defined in src/lib/forms/limits.ts
 
-Enforced by `src/lib/inputLimits.ts → validateDraftLength()`. Reject before any AI call. Do not raise this limit without reviewing prompt token budgets.
+`FIELD_LIMITS` in `src/lib/forms/caseSchema.ts` defines per-field character ceilings. Enforced by zod schema before any AI call. Do not raise limits without reviewing prompt token budgets.
 
 ### 7. Prompt contract is strict JSON — repair before failing
 
@@ -62,10 +62,8 @@ Any meaningful change to product behavior, architecture, security rules, or cali
 Doctor-facing TCM clinical workbench. Not patient-facing.
 
 Helps registered TCM doctors:
-- Write or paste rough case drafts
-- Organize drafts into structured clinical context
-- See completeness guidance before analysis goes too far
-- Receive simplified-Chinese clinical review output
+- Fill in a structured 9-field clinical form (no free-text draft)
+- Receive simplified-Chinese clinical review output directly
 - Save consultation history for later comparison
 
 ---
@@ -84,7 +82,7 @@ Helps registered TCM doctors:
 
 - Frontend: Next.js + TypeScript on Vercel
 - UI: focused CSS + `lucide-react`
-- Validation: `zod` plus dedicated guardrail helpers in `src/lib/caseValidation.ts`
+- Validation: `zod` schema in `src/lib/forms/caseSchema.ts` (`structuredCaseSchema`, `StructuredCaseForm`)
 - Auth and data: Supabase (Google OAuth, allowlist, JSONB storage)
 - AI provider: DeepSeek only, through server-side routes (`src/app/api/`)
 
@@ -94,11 +92,10 @@ Helps registered TCM doctors:
 
 ```
 Doctor (browser)
-  └── POST /api/organize    → DeepSeek fast model → structured form + completeness hints
-  └── POST /api/analyze     → DeepSeek analyze model → clinical review JSON
+  └── POST /api/analyze     → DeepSeek flash model → clinical review JSON (3-column layout)
   └── /api/consultations/*  → Supabase (save / load / delete history)
 
-Calibration CLI (local machine)
+Calibration CLI (local machine) — TEMPORARILY BROKEN after structured-form pivot
   └── assess:run   → hits live Vercel app with X-Assessment-Key → saves raw_results to DB
   └── assess:review (GitHub Actions) → reads DB → 3-stage DeepSeek pro review → updates DB
 
@@ -112,29 +109,31 @@ Admin UI
 
 ## Clinical Pipeline Rules
 
-- Two-step pipeline always: `organize` → `analyze`. Never skip organize.
-- Doctor-facing UI always uses `常规` (normal) mode. `智能` (smart) mode is internal-only — calibration and future admin use only. Do not expose the mode selector to doctors.
-- Organize uses fast model. Analyze uses `DEEPSEEK_MODEL_ANALYZE`, falls back to `DEEPSEEK_MODEL_FAST`.
+- Single-step pipeline: doctor fills structured form → POST /api/analyze → result. No organize step.
+- Analyze always uses `DEEPSEEK_MODEL_FAST` (flash). No mode selector exposed to doctors.
 - Core analysis sections must be structurally stable — all sections always present, even if empty with a fallback string.
-- Analyze output reading order: 重点结论 → 病案摘要 → 资料完整性 → 当前思路 → 建议优化 → 可选思路 → 风险与提醒 → 随访监测 → 证据状态.
+- Analyze output reading order: 重点结论 → 当前思路 → 建议优化 → 可选思路 → 风险与提醒 → 随访监测 → 证据状态.
+- UI result layout: 3 columns — 判断 (当前思路) / 方案 (建议优化+可选) / 随访监测. Plus 重点结论 banner and 风险与提醒 warning box at top.
 - Saved history must pass through the same normalization path as fresh analysis (`ensureAnalysisResult` in `src/lib/ai/analysisResult.ts`).
 
 ---
 
-## Stage-One Clinical Guardrails
+## Structured Form Fields
 
-Hard-block minimum before analysis:
-- `主诉`
-- `当前方案`
-- At least one timeline clue: `病程` or `病史与治疗反应`
-- Either an explicit `医生问题`, or a reviewable treatment plan with enough clinical basis
+Doctor fills 9 clinical fields + 2 meta fields. All validated by `structuredCaseSchema` in `src/lib/forms/caseSchema.ts`.
 
-Type-specific:
-- `方药分析`: must include `方药内容`
-- `针灸方案`: must include `穴位与操作` OR concrete manual treatment in `当前方案`
-- `综合调理`: must include herbs, acupoints, OR concrete manual/physical treatment
+Required fields (hard-block if missing/invalid):
+- `prescriptionType`: "方药" | "针灸" | "综合调理"
+- `patientAge`: numeric string 1-120
+- `patientSex`: "男" | "女"
+- `chiefComplaint`: 5-200 chars
+- `currentIllness`: 10-2000 chars
+- `diagnosis`: 2-100 chars
+- `prescription`: 5-2000 chars
 
-Block patterns: vague prompts (`帮我看看`), guaranteed efficacy (`保证`, `治愈`, `包好`), patient self-use (`我是患者`, `我自己`, `我可以吃`).
+Optional fields: `consultationName`, `pastHistory`, `physicalExam`, `pattern`, `doctorQuestion`
+
+Block patterns (hard-reject across combined text): guaranteed efficacy (`保证`, `治愈`, `包好`), patient self-use (`我是患者`, `我自己可以吃`).
 
 ---
 
@@ -153,7 +152,7 @@ Migrations: `supabase/migrations/` (numbered, idempotent SQL). Applied manually 
 
 | Table | Purpose |
 |---|---|
-| `consultations` | Doctor history — draft, organized JSON, analysis JSON, validation result, model meta |
+| `consultations` | Doctor history — form_data JSONB (StructuredCaseForm), analysis JSON, model meta |
 | `api_call_logs` | Per-call operational metrics — model, tokens, cost, latency, rates_snapshot JSONB |
 | `error_logs` | Pipeline errors |
 | `doctor_allowlist` | `email`, `is_active`, `is_admin` — source of truth for access control |

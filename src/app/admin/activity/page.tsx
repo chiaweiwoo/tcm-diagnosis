@@ -49,8 +49,11 @@ function MetaSummary({ log }: { log: ActivityLog }) {
     return short ? <span className="activity-meta">{short}</span> : null;
   }
   if (log.event_type === "analyze") {
-    const parts = [m.caseType, m.reviewMode === "normal" ? "常规" : m.reviewMode === "smart" ? "智能" : null]
-      .filter(Boolean).join(" · ");
+    // Support both old format (caseType/reviewMode) and new format (prescriptionType)
+    const typeLabel = (m.prescriptionType as string | undefined) ?? (m.caseType as string | undefined);
+    const modeLabel =
+      m.reviewMode === "normal" ? "常规" : m.reviewMode === "smart" ? "智能" : null;
+    const parts = [typeLabel, modeLabel].filter(Boolean).join(" · ");
     return parts ? <span className="activity-meta">{parts}</span> : null;
   }
   return null;

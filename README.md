@@ -3,9 +3,9 @@
 > 面向中医师的临床工作台
 > **Live: [tcm.chiawei.me](https://tcm.chiawei.me)**
 
-把自由书写的病案草稿整理成结构化临床脉络，在分析深入前先验证资料完整性，再给出中医临床参考建议，并保存可回顾的诊次历史。
+医生填写结构化病案表单（9 个临床字段），系统即时给出中医临床复核建议，并自动保存可回顾的诊次历史。
 
-医生写下病情、当前处理与想确认的问题，系统先整理草稿、提示缺失资料，资料足够时继续给出判断与随访提醒。结果自动保存，可重新打开、修改、重新生成或删除。
+结果以三栏呈现：判断（当前思路）/ 方案（建议优化）/ 随访监测，顶部附重点结论与风险提醒。记录可重新打开、修改、重新复核或删除。
 
 ## 技术栈
 
@@ -21,12 +21,11 @@
 
 | Route | 用途 |
 |---|---|
-| `POST /api/organize` | 整理草稿，输出结构化病案与完整性提示 |
-| `POST /api/analyze` | 生成临床复核建议 |
+| `POST /api/analyze` | 接收结构化病案表单，生成临床复核建议 |
 | `GET /api/consultations` | 列出当前医师的历史记录 |
 | `POST /api/consultations` | 新建病案记录 |
 | `GET /api/consultations/[id]` | 读取单条病案 |
-| `PATCH /api/consultations/[id]` | 更新草稿、整理快照、复核结果或记录名称 |
+| `PATCH /api/consultations/[id]` | 更新表单数据、复核结果或记录名称 |
 | `DELETE /api/consultations/[id]` | 删除单条病案 |
 | `GET /auth/callback` | Google OAuth 回调与允许名单验证 |
 | `GET /auth/signout` | 登出并跳转登录页 |

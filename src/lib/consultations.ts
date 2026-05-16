@@ -2,13 +2,11 @@ export type ConsultationRecord = {
   id: string;
   doctor_email: string;
   consultation_name: string | null;
-  draft: string;
-  organized_case: unknown | null;
+  form_data: unknown | null;
   analysis_result: unknown | null;
   analysis_raw: unknown | null;
-  validation_result: unknown | null;
   model_meta: unknown | null;
-  analysis_status: "draft" | "ready" | "stale";
+  analysis_status: "draft" | "analyzed";
   created_at: string;
   updated_at: string;
   analyzed_at: string | null;
@@ -18,11 +16,9 @@ type ConsultationPatch = Partial<
   Pick<
     ConsultationRecord,
     | "consultation_name"
-    | "draft"
-    | "organized_case"
+    | "form_data"
     | "analysis_result"
     | "analysis_raw"
-    | "validation_result"
     | "model_meta"
     | "analysis_status"
     | "analyzed_at"
@@ -70,7 +66,7 @@ export async function listConsultations(doctorEmail: string) {
   url.searchParams.set("doctor_email", `eq.${doctorEmail}`);
   url.searchParams.set(
     "select",
-    "id,doctor_email,consultation_name,draft,analysis_status,created_at,updated_at,analyzed_at",
+    "id,doctor_email,consultation_name,form_data,analysis_status,created_at,updated_at,analyzed_at",
   );
   url.searchParams.set("order", "updated_at.desc");
 
@@ -99,7 +95,7 @@ export async function getConsultation(id: string, doctorEmail: string) {
 export async function createConsultation(input: {
   doctorEmail: string;
   consultationName?: string | null;
-  draft: string;
+  formData?: unknown;
 }) {
   const { baseUrl, headers } = getSupabaseRestConfig();
   const response = await fetch(baseUrl, {
@@ -108,7 +104,7 @@ export async function createConsultation(input: {
     body: JSON.stringify({
       doctor_email: input.doctorEmail,
       consultation_name: input.consultationName || null,
-      draft: input.draft,
+      form_data: input.formData ?? null,
       analysis_status: "draft",
     }),
   });

@@ -32,34 +32,25 @@ export async function POST(request: Request) {
     const doctorEmail = await getCurrentDoctorEmail();
     const body = (await request.json()) as {
       consultationName?: unknown;
-      draft?: unknown;
-      organizedCase?: unknown;
+      formData?: unknown;
       analysisResult?: unknown;
       analysisRaw?: unknown;
-      validationResult?: unknown;
       modelMeta?: unknown;
       analysisStatus?: unknown;
     };
-    const draft = typeof body.draft === "string" ? body.draft.trim() : "";
-
-    if (!draft) {
-      return apiError(400, "INVALID_INPUT", "请先输入病案记录。");
-    }
 
     const record = await createConsultation({
       doctorEmail,
       consultationName: normalizeName(body.consultationName),
-      draft,
+      formData: body.formData ?? null,
     });
 
-    if (body.analysisStatus === "ready") {
+    if (body.analysisStatus === "analyzed") {
       const saved = await updateConsultation(record.id, doctorEmail, {
-        organized_case: body.organizedCase ?? null,
         analysis_result: body.analysisResult ?? null,
         analysis_raw: body.analysisRaw ?? null,
-        validation_result: body.validationResult ?? null,
         model_meta: body.modelMeta ?? null,
-        analysis_status: "ready",
+        analysis_status: "analyzed",
         analyzed_at: new Date().toISOString(),
       });
       return NextResponse.json({ record: saved });

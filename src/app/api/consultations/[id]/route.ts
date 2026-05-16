@@ -12,10 +12,6 @@ function normalizeName(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
-function normalizeDraft(value: unknown) {
-  return typeof value === "string" ? value.trim() : undefined;
-}
-
 function isUnauthorized(error: unknown) {
   return error instanceof Error && error.message === "Unauthorized";
 }
@@ -57,44 +53,42 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     const body = (await request.json()) as {
       consultationName?: unknown;
-      draft?: unknown;
-      organizedCase?: unknown;
+      formData?: unknown;
       analysisResult?: unknown;
       analysisRaw?: unknown;
-      validationResult?: unknown;
       modelMeta?: unknown;
       analysisStatus?: unknown;
     };
-    const draft = normalizeDraft(body.draft);
-    const draftChanged = draft !== undefined && draft !== existing.draft.trim();
+
+    // Detect whether form data changed to reset analysis state
+    const newFormData = Object.hasOwn(body, "formData") ? (body.formData ?? null) : undefined;
+    const formDataChanged =
+      newFormData !== undefined &&
+      JSON.stringify(newFormData) !== JSON.stringify(existing.form_data);
 
     const record = await updateConsultation(id, doctorEmail, {
       consultation_name: Object.hasOwn(body, "consultationName")
         ? normalizeName(body.consultationName)
         : existing.consultation_name,
-      ...(draft !== undefined
+      ...(newFormData !== undefined
         ? {
-            draft,
-            analysis_status: draftChanged ? "stale" : existing.analysis_status,
-            ...(draftChanged
+            form_data: newFormData,
+            analysis_status: formDataChanged ? "draft" : existing.analysis_status,
+            ...(formDataChanged
               ? {
-                  organized_case: null,
                   analysis_result: null,
                   analysis_raw: null,
-                  validation_result: null,
                   model_meta: null,
                   analyzed_at: null,
                 }
               : {}),
           }
         : {}),
-      ...(Object.hasOwn(body, "organizedCase") ? { organized_case: body.organizedCase ?? null } : {}),
       ...(Object.hasOwn(body, "analysisResult") ? { analysis_result: body.analysisResult ?? null } : {}),
       ...(Object.hasOwn(body, "analysisRaw") ? { analysis_raw: body.analysisRaw ?? null } : {}),
-      ...(Object.hasOwn(body, "validationResult") ? { validation_result: body.validationResult ?? null } : {}),
       ...(Object.hasOwn(body, "modelMeta") ? { model_meta: body.modelMeta ?? null } : {}),
-      ...(body.analysisStatus === "ready"
-        ? { analysis_status: "ready", analyzed_at: new Date().toISOString() }
+      ...(body.analysisStatus === "analyzed"
+        ? { analysis_status: "analyzed", analyzed_at: new Date().toISOString() }
         : {}),
     });
 
