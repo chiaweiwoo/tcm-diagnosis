@@ -3,7 +3,6 @@ import { after } from "next/server";
 import { callDeepSeekJson, DeepSeekError, getDeepSeekFastModel } from "@/lib/ai/deepseek";
 import { apiError } from "@/lib/apiResponses";
 import { buildTcmAnalysisUserPrompt, TCM_ANALYSIS_PROMPT_VERSION, TCM_ANALYSIS_SYSTEM_PROMPT } from "@/lib/ai/prompts";
-import { validateCaseSemantics } from "@/lib/ai/semanticValidator";
 import { structuredCaseSchema } from "@/lib/forms/caseSchema";
 import { logServerEvent } from "@/lib/logging";
 import { logActivity } from "@/lib/activityLog";
@@ -35,23 +34,6 @@ export async function POST(request: NextRequest) {
     }
 
     const form = parsed.data;
-
-    // Semantic validation — fail-open: if validator throws, skip and proceed
-    try {
-      const semantic = await validateCaseSemantics(form);
-      if (!semantic.valid && semantic.issues.length > 0) {
-        return apiError(400, "SEMANTIC_INVALID", "病案内容未通过语义校验，请检查标注字段。", {
-          issues: semantic.issues,
-        });
-      }
-    } catch {
-      // Validator failure is non-blocking — log silently and continue
-      void logServerEvent({
-        source: "api/analyze",
-        message: "语义校验调用失败（已跳过）",
-        details: { stage: "semantic_validation" },
-      });
-    }
 
     const deepseekStartedAt = Date.now();
 
