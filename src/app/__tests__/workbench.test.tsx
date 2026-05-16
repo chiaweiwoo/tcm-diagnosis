@@ -114,7 +114,7 @@ async function fillRequiredFields(user: ReturnType<typeof userEvent.setup>) {
 describe("Workbench rendering", () => {
   it("renders the form with required field labels", async () => {
     render(<Workbench />);
-    await waitFor(() => expect(screen.getByText("中医临床复核")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/中医临床智伴/)).toBeInTheDocument());
 
     expect(screen.getByText(/主诉 Presenting Complaint/)).toBeInTheDocument();
     expect(screen.getByText(/现病史 History of Presenting Complaint/)).toBeInTheDocument();
