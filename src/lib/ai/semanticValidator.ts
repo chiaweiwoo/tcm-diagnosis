@@ -18,13 +18,14 @@ export type SemanticValidationResult = {
   issues: SemanticIssue[];
 };
 
-export const TCM_VALIDATOR_PROMPT_VERSION = "tcm-validator-v0.1";
+export const TCM_VALIDATOR_PROMPT_VERSION = "tcm-validator-v0.2";
 
 export const TCM_VALIDATOR_SYSTEM_PROMPT = `
 你是中医病案结构审核助手。仅做格式与信息完整性检查，不做临床判断。
+只根据输入内容判断，不推断或补全未提及的信息。
 
 任务：
-检查以下病案字段是否满足最低信息要求。输出 JSON，不要任何其他文字。
+检查以下病案字段是否满足最低信息要求。当前版本仅检查主诉（chiefComplaint）一项。输出 JSON，不要任何其他文字。
 
 检查规则：
 1. 主诉（chiefComplaint）：必须包含可辨认的症状持续时长（如"2周"、"3个月"、"半年余"、"多年"等）。

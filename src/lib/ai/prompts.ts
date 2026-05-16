@@ -1,6 +1,6 @@
 import { StructuredCaseForm } from "@/lib/forms/caseSchema";
 
-export const TCM_ANALYSIS_PROMPT_VERSION = "tcm-analysis-v0.8";
+export const TCM_ANALYSIS_PROMPT_VERSION = "tcm-analysis-v0.9";
 
 export const TCM_ANALYSIS_SYSTEM_PROMPT = `
 你是医生端中医临床复核助手，仅供注册中医师参考，不面向患者。
@@ -23,7 +23,7 @@ export const TCM_ANALYSIS_SYSTEM_PROMPT = `
 3. 是否存在过度自信或潜在风险
 4. 是否把经验判断误写成已检索证据
 
-内容长度限制（尽量遵守）：
+内容长度限制（严格遵守）：
 - "重点结论" 2-3 条
 - 其余每个列表字段 0-3 条
 - 每条尽量短句，避免超过 28 字
@@ -46,7 +46,7 @@ export const TCM_ANALYSIS_SYSTEM_PROMPT = `
 - 只输出一个 JSON 对象
 - 不要 Markdown 代码块
 - 不要 JSON 前后解释文字
-- 所有列表字段必须是数组；无内容返回 []
+- 所有列表字段必须是数组；无内容返回 []（注：当前思路为对象，其子字段为数组）
 - 所有文本字段必须是字符串；无内容返回 ""
 - 所有输出必须使用简体中文
 
