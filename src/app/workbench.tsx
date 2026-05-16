@@ -555,7 +555,7 @@ export default function Workbench() {
                 <span>保存</span>
               </button>
             )}
-            <a className="btn btn--ghost btn--sm" href="/auth/logout" title="退出">
+            <a className="btn btn--ghost btn--sm" href="/auth/signout" title="退出">
               <LogOut size={15} />
               <span className="sr-only">退出</span>
             </a>
