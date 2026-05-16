@@ -581,18 +581,35 @@ export default function Workbench() {
       <main className="workbench__main">
         <section className="form-section">
           <div className="form-card">
-            {/* Row 1: Case name + prescription type */}
-            <div className="form-row form-row--2col">
+            {/* Row 1: Meta strip — sex / age / prescription type */}
+            <div className="form-row--meta">
               <div className="form-group">
-                <label className="form-label form-label--optional">会诊名称</label>
+                <label className="form-label">性别</label>
+                <div className="segmented-control">
+                  {SEX_VALUES.map((sex) => (
+                    <button
+                      key={sex}
+                      className={`segmented-btn ${form.patientSex === sex ? "segmented-btn--active" : ""}`}
+                      onClick={() => setField("patientSex", sex)}
+                      type="button"
+                    >
+                      {sex}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="form-group">
+                <label className="form-label form-label--required">年龄</label>
                 <input
-                  className="form-input"
+                  className={`form-input form-input--sm ${errors.patientAge ? "form-input--error" : ""}`}
                   type="text"
-                  placeholder="例：王女士头痛复诊"
-                  value={form.consultationName}
-                  onChange={(e) => setField("consultationName", e.target.value)}
-                  maxLength={60}
+                  inputMode="numeric"
+                  placeholder="岁"
+                  value={form.patientAge}
+                  onChange={(e) => setField("patientAge", e.target.value)}
+                  maxLength={3}
                 />
+                <FieldError message={errors.patientAge} />
               </div>
               <div className="form-group">
                 <label className="form-label">处方类型</label>
@@ -608,44 +625,10 @@ export default function Workbench() {
                     </button>
                   ))}
                 </div>
-                <FieldError message={errors.prescriptionType} />
               </div>
             </div>
 
-            {/* Row 2: Age + Sex */}
-            <div className="form-row form-row--2col">
-              <div className="form-group">
-                <label className="form-label form-label--required">年龄</label>
-                <input
-                  className={`form-input form-input--sm ${errors.patientAge ? "form-input--error" : ""}`}
-                  type="text"
-                  inputMode="numeric"
-                  placeholder="岁"
-                  value={form.patientAge}
-                  onChange={(e) => setField("patientAge", e.target.value)}
-                  maxLength={3}
-                />
-                <FieldError message={errors.patientAge} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">性别</label>
-                <div className="segmented-control">
-                  {SEX_VALUES.map((sex) => (
-                    <button
-                      key={sex}
-                      className={`segmented-btn ${form.patientSex === sex ? "segmented-btn--active" : ""}`}
-                      onClick={() => setField("patientSex", sex)}
-                      type="button"
-                    >
-                      {sex}
-                    </button>
-                  ))}
-                </div>
-                <FieldError message={errors.patientSex} />
-              </div>
-            </div>
-
-            {/* Row 3: Chief complaint */}
+            {/* Row 2: Chief complaint */}
             <div className="form-group">
               <label className="form-label form-label--required">主诉</label>
               <input
@@ -676,7 +659,7 @@ export default function Workbench() {
             {/* Row 5: Past history + Physical exam (2 cols) */}
             <div className="form-row form-row--2col">
               <div className="form-group">
-                <label className="form-label form-label--optional">既往史</label>
+                <label className="form-label">既往史</label>
                 <textarea
                   className="form-textarea"
                   placeholder="例：高血压病史5年，规律服药"
@@ -687,7 +670,7 @@ export default function Workbench() {
                 />
               </div>
               <div className="form-group">
-                <label className="form-label form-label--optional">体格检查 / 舌脉</label>
+                <label className="form-label">体格检查 / 舌脉</label>
                 <textarea
                   className="form-textarea"
                   placeholder="舌脉、查体重点"
@@ -714,7 +697,7 @@ export default function Workbench() {
                 <FieldError message={errors.diagnosis} />
               </div>
               <div className="form-group">
-                <label className="form-label form-label--optional">证型</label>
+                <label className="form-label">证型</label>
                 <input
                   className="form-input"
                   type="text"
@@ -748,11 +731,11 @@ export default function Workbench() {
 
             {/* Row 8: Doctor question */}
             <div className="form-group">
-              <label className="form-label form-label--optional">医生问题</label>
+              <label className="form-label">医生问题</label>
               <input
                 className="form-input"
                 type="text"
-                placeholder="本次最想确认的方向（可留空）"
+                placeholder="本次最想确认的方向"
                 value={form.doctorQuestion}
                 onChange={(e) => setField("doctorQuestion", e.target.value)}
                 maxLength={500}
