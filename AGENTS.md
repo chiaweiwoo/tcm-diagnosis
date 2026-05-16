@@ -51,7 +51,20 @@ Read from Supabase `doctor_allowlist` table first. Fall back to `ALLOWED_DOCTOR_
 
 If DeepSeek returns malformed JSON, attempt syntax-only repair before returning an error. Never silently drop data. `repairedJson: true` flag must be logged when repair occurs.
 
-### 8. Update AGENTS.md and README.md when behavior changes
+### 8. Clinical data never leaves Supabase — no exceptions
+
+Clinical text (doctor form inputs + AI analysis output) must only be stored in Supabase (`consultations` table). It must **never** be sent to any external observability or analytics service.
+
+The only permitted external recipient of clinical content is **DeepSeek** (the AI provider — intentional).
+
+Concretely:
+- Langfuse receives **tokens, model, latency, cost, metadata only** — never form fields or AI response text.
+- Error logs (`error_logs` table in Supabase) must not include form field values.
+- Any new logging, tracing, or analytics integration must be reviewed against this rule before merging.
+
+Enforced by code convention in `src/lib/langfuse.ts` and `src/app/api/analyze/route.ts`.
+
+### 9. Update AGENTS.md and README.md when behavior changes
 
 Any meaningful change to product behavior, architecture, security rules, or calibration workflow must be reflected in this file before the session ends. README updates are required when user-visible behavior changes.
 
@@ -241,14 +254,17 @@ npm run assess:seed -- --file local-data/real-doctor-examples.md
 - Analyze: `DEEPSEEK_MODEL_ANALYZE`, fallback to `DEEPSEEK_MODEL_FAST`
 - Calibration review: all stages use DeepSeek pro
 - AI pricing is hardcoded in `config/rates.json`. Updated automatically by `.github/workflows/update-rates.yml` (daily, Claude web search). When updating manually, update the `_comment` date field.
-- Cost logging uses `rates_snapshot` JSONB per `api_call_logs` row — captures exact rate at call time. Never derive cost retroactively from current rates.
 - Token usage and cost are internal only — never shown to doctors.
 
 ---
 
 ## Logging Rules
 
-Log per API call: route, model, success, latency, token counts (prompt/completion/cache hit/miss), cost, rates snapshot, prompt version, metadata. Do not log draft content or analysis output in `api_call_logs` — that belongs in `consultations`.
+Per analyze call, Langfuse receives: model, token counts (input/output), latency, cost, prompt version, prescriptionType, repairedJson flag. **No clinical text.**
+
+Error events (DeepSeek failures, parse errors) go to `error_logs` in Supabase via `logServerEvent`. Error details must not include form field values.
+
+Doctor activity events (login, analyze) go to `activity_logs` in Supabase via `logActivity`.
 
 Logging must not block doctor-facing responses (use `after()` from Next.js).
 

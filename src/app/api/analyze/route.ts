@@ -4,10 +4,11 @@ import { callDeepSeekJson, DeepSeekError, getDeepSeekFastModel } from "@/lib/ai/
 import { apiError } from "@/lib/apiResponses";
 import { buildTcmAnalysisUserPrompt, TCM_ANALYSIS_PROMPT_VERSION, TCM_ANALYSIS_SYSTEM_PROMPT } from "@/lib/ai/prompts";
 import { structuredCaseSchema } from "@/lib/forms/caseSchema";
-import { logApiCall, logServerEvent } from "@/lib/logging";
+import { logServerEvent } from "@/lib/logging";
 import { logActivity } from "@/lib/activityLog";
 import { AnalysisJson, buildAnalysisResult } from "@/lib/ai/analysisResult";
 import { requireApiAuth } from "@/lib/apiAuth";
+import { getLangfuse } from "@/lib/langfuse";
 
 export async function POST(request: NextRequest) {
   const auth = await requireApiAuth(request);
@@ -15,6 +16,12 @@ export async function POST(request: NextRequest) {
   const { doctorEmail, isCli } = auth;
 
   const startedAt = Date.now();
+  const langfuse = getLangfuse();
+  // Trace created here so it is accessible in both success and error paths
+  const trace = langfuse?.trace({
+    name: "analyze",
+    metadata: { isCli, promptVersion: TCM_ANALYSIS_PROMPT_VERSION },
+  });
 
   try {
     const body = (await request.json()) as { form?: unknown };
@@ -27,6 +34,7 @@ export async function POST(request: NextRequest) {
     }
 
     const form = parsed.data;
+    const deepseekStartedAt = Date.now();
 
     const result = await callDeepSeekJson<AnalysisJson>({
       messages: [
@@ -42,22 +50,28 @@ export async function POST(request: NextRequest) {
     const output = buildAnalysisResult(result.data, form.prescriptionType);
     const latencyMs = Date.now() - startedAt;
 
-    after(() => {
-      void logApiCall({
-        route: "api/analyze",
-        callName: "analyze",
-        success: true,
-        model: result.model,
-        latencyMs,
-        usage: result.usage,
-        costUsd: result.costUsd,
-        ratesSnapshot: result.costDetail.rates,
-        promptVersion: TCM_ANALYSIS_PROMPT_VERSION,
-        metadata: {
-          prescriptionType: form.prescriptionType,
-          repairedJson: result.repairedJson ?? false,
-        },
-      });
+    after(async () => {
+      // Langfuse: tokens + metadata only. Clinical text stays in Supabase.
+      if (langfuse && trace) {
+        trace.generation({
+          name: "deepseek-analyze",
+          model: result.model,
+          startTime: new Date(deepseekStartedAt),
+          endTime: new Date(),
+          usage: {
+            input: result.usage?.prompt_tokens ?? 0,
+            output: result.usage?.completion_tokens ?? 0,
+          },
+          metadata: {
+            prescriptionType: form.prescriptionType,
+            repairedJson: result.repairedJson ?? false,
+            latencyMs,
+            costUsd: result.costUsd,
+            promptVersion: TCM_ANALYSIS_PROMPT_VERSION,
+          },
+        });
+        try { await langfuse.flushAsync(); } catch { /* non-critical */ }
+      }
       if (doctorEmail && !isCli) {
         void logActivity({
           doctorEmail,
@@ -78,43 +92,31 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     if (error instanceof DeepSeekError) {
-      after(() =>
-        logApiCall({
-          route: "api/analyze",
-          success: false,
-          latencyMs: Date.now() - startedAt,
-          errorMessage: error.message,
-          promptVersion: TCM_ANALYSIS_PROMPT_VERSION,
-          metadata: { stage: "failed", reason: "deepseek_call", ...(error.details ?? {}) },
-        }),
-      );
-      after(() =>
-        logServerEvent({
+      after(async () => {
+        if (langfuse && trace) {
+          trace.update({ metadata: { error: error.message, stage: "deepseek_call", success: false } });
+          try { await langfuse.flushAsync(); } catch { /* non-critical */ }
+        }
+        void logServerEvent({
           source: "api/analyze",
           message: error.message,
           details: { status: error.status, stage: "deepseek_call", ...(error.details ?? {}) },
-        }),
-      );
+        });
+      });
       return apiError(error.status, "AI_REQUEST_FAILED", error.message, error.details);
     }
 
-    after(() =>
-      logApiCall({
-        route: "api/analyze",
-        success: false,
-        latencyMs: Date.now() - startedAt,
-        errorMessage: error instanceof Error ? error.message : String(error),
-        promptVersion: TCM_ANALYSIS_PROMPT_VERSION,
-        metadata: { stage: "failed", reason: "normalize_or_map" },
-      }),
-    );
-    after(() =>
-      logServerEvent({
+    after(async () => {
+      if (langfuse && trace) {
+        trace.update({ metadata: { stage: "normalize_or_map", success: false } });
+        try { await langfuse.flushAsync(); } catch { /* non-critical */ }
+      }
+      void logServerEvent({
         source: "api/analyze",
         message: "生成分析失败，请稍后重试。",
         details: { error: error instanceof Error ? error.message : String(error), stage: "normalize_or_map" },
-      }),
-    );
+      });
+    });
     return apiError(500, "INTERNAL_ERROR", "生成分析失败，请稍后重试。");
   }
 }

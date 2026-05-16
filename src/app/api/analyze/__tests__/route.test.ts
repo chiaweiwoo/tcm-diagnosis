@@ -35,8 +35,11 @@ vi.mock("@/lib/apiAuth", () => ({
 }));
 
 vi.mock("@/lib/logging", () => ({
-  logApiCall: vi.fn().mockResolvedValue(undefined),
   logServerEvent: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("@/lib/langfuse", () => ({
+  getLangfuse: vi.fn().mockReturnValue(null),
 }));
 
 vi.mock("@/lib/activityLog", () => ({
