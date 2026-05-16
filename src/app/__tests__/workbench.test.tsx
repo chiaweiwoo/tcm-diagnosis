@@ -234,21 +234,6 @@ describe("Form validation", () => {
     // Error for chiefComplaint should be gone (field has content now)
     expect(chiefInput).not.toHaveAttribute("aria-invalid");
   });
-
-  it("shows age error for non-numeric input", async () => {
-    const user = userEvent.setup();
-    render(<Workbench />);
-    await waitFor(() => screen.getByPlaceholderText("岁"));
-
-    const ageInput = screen.getByPlaceholderText("岁");
-    await user.type(ageInput, "三十");
-    await user.click(screen.getByText("开始复核"));
-
-    await waitFor(() => {
-      const errors = [...document.querySelectorAll(".field-error")].map((e) => e.textContent);
-      expect(errors.some((e) => e?.includes("数字"))).toBe(true);
-    });
-  });
 });
 
 describe("Analyze flow", () => {

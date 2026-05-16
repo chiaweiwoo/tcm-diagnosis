@@ -637,12 +637,12 @@ export default function Workbench() {
                 <label className="form-label form-label--required">年龄 Age</label>
                 <input
                   className={`form-input form-input--sm ${errors.patientAge ? "form-input--error" : ""}`}
-                  type="text"
-                  inputMode="numeric"
+                  type="number"
                   placeholder="岁"
                   value={form.patientAge}
                   onChange={(e) => setField("patientAge", e.target.value)}
-                  maxLength={3}
+                  min={1}
+                  max={120}
                 />
                 <FieldError message={errors.patientAge} />
               </div>
