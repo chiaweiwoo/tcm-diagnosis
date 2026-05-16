@@ -46,50 +46,37 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="app-shell">
-      <section className="hero-panel">
-        <div className="hero-head">
-          <div>
-            <p className="eyebrow">安全访问</p>
-            <h1>医生登录</h1>
-            <p className="hero-copy">使用已授权的 Google 账号进入工作台。当前阶段仅开放给指定医生名单。</p>
-          </div>
-        </div>
-      </section>
-
-      <section className="notice-bar">
-        <ShieldCheck size={18} />
-        <span>仅允许白名单内账号登录，未获授权的账号将被自动拒绝。</span>
-      </section>
-
-      <section className="panel login-panel">
-        <div className="login-copy">
-          <ShieldCheck size={20} />
-          <div>
-            <h2>Google OAuth</h2>
-            <p>登录成功后，系统会再次校验邮箱是否在允许名单中。未通过者不会进入工作台。</p>
-          </div>
+    <main className="login-page">
+      <div className="login-card">
+        <div className="login-brand">
+          <span className="login-brand-mark">中</span>
+          <span className="login-brand-text">TCM 研判工作台</span>
         </div>
 
-        {reasonMessage ? (
-          <div className="blocked-box">
-            <strong>登录受限</strong>
-            <span>{reasonMessage}</span>
+        <p className="login-intro">使用已授权的 Google 账号进入工作台。仅开放给指定医生名单。</p>
+
+        {(reasonMessage || errorMessage) ? (
+          <div className="login-error">
+            <strong>{reasonMessage ? "登录受限" : "登录失败"}</strong>
+            <span>{reasonMessage || errorMessage}</span>
           </div>
         ) : null}
 
-        {errorMessage ? (
-          <div className="blocked-box">
-            <strong>登录失败</strong>
-            <span>{errorMessage}</span>
-          </div>
-        ) : null}
-
-        <button className="primary-button" type="button" onClick={handleGoogleSignIn} disabled={isSubmitting}>
-          <ShieldCheck size={18} />
-          {isSubmitting ? "跳转中..." : "使用 Google 登录"}
+        <button
+          className="login-button"
+          type="button"
+          onClick={handleGoogleSignIn}
+          disabled={isSubmitting}
+        >
+          <ShieldCheck size={17} />
+          {isSubmitting ? "跳转中..." : "使用 Google 账号登录"}
         </button>
-      </section>
+
+        <p className="login-footnote">
+          <ShieldCheck size={13} />
+          登录成功后将再次校验邮箱白名单。
+        </p>
+      </div>
     </main>
   );
 }
