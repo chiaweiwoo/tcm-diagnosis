@@ -254,7 +254,7 @@ const ResultSection = memo(function ResultSection({ title, items }: { title: str
   );
 });
 
-const ResultColumn = memo(function ResultColumn({ title, icon, colorVariant, children }: { title: string; icon: ReactNode; colorVariant?: "green" | "slate" | "teal"; children: ReactNode }) {
+const ResultColumn = memo(function ResultColumn({ title, icon, colorVariant, children }: { title: string; icon: ReactNode; colorVariant?: "green" | "blue" | "teal" | "amber"; children: ReactNode }) {
   return (
     <div className={`result-column${colorVariant ? ` result-column--${colorVariant}` : ""}`}>
       <div className="result-column__header">
@@ -942,10 +942,15 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
         {/* Loading shimmer */}
         {analyzing && (
           <section className="result-section-wrap result-section-wrap--loading" aria-label="分析中">
-            <div className="result-grid">
-              <ShimmerCard />
-              <ShimmerCard />
-              <ShimmerCard />
+            <div className="result-layout">
+              <div className="result-top-row">
+                <ShimmerCard />
+                <ShimmerCard />
+              </div>
+              <div className="result-bottom-row">
+                <ShimmerCard />
+                <ShimmerCard />
+              </div>
             </div>
           </section>
         )}
@@ -953,62 +958,56 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
         {/* Result */}
         {!analyzing && result && (
           <section className="result-section-wrap" ref={resultRef}>
-            {/* Key points + cautions — side-by-side */}
-            <div className="top-banners">
-              {result.keyPoints.length > 0 && (
-                <div className="keypoints-banner">
-                  <div className="keypoints-banner__label">
-                    <FileText size={14} />
-                    重点结论
-                  </div>
-                  <ul className="keypoints-banner__list">
-                    {result.keyPoints.map((kp, i) => (
-                      <li key={i}>{kp}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+            <div className="result-layout">
 
-              {result.cautions.length > 0 && !result.cautions.every((c) => c.includes("请结合面诊")) && (
-                <div className="cautions-banner">
-                  <div className="cautions-banner__label">
-                    <AlertTriangle size={14} />
-                    风险与提醒
-                  </div>
-                  <ul className="cautions-banner__list">
-                    {result.cautions.map((c, i) => (
-                      <li key={i}>{c}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
+              {/* Top row: 判断 (70%) + 风险与提醒 (30%) */}
+              <div className="result-top-row">
 
-            {/* 3-column grid */}
-            <div className="result-grid">
-              {result.groups.map((group) => (
-                <ResultColumn
-                  key={group.title}
-                  title={group.title}
-                  colorVariant={
-                    group.title === "判断" ? "green" :
-                    group.title === "方案" ? "slate" : "teal"
-                  }
-                  icon={
-                    group.title === "判断" ? (
-                      <Brain size={15} />
-                    ) : group.title === "方案" ? (
-                      <FileText size={15} />
-                    ) : (
-                      <AlertTriangle size={15} />
-                    )
-                  }
-                >
-                  {group.sections.map((section) => (
-                    <ResultSection key={section.title} title={section.title} items={section.items} />
-                  ))}
-                </ResultColumn>
-              ))}
+                {/* 判断 — with 重点结论 folded in as summary */}
+                {result.groups[0] && (
+                  <ResultColumn title="判断" colorVariant="green" icon={<Brain size={15} />}>
+                    {result.keyPoints.length > 0 && (
+                      <div className="result-keypoints">
+                        {result.keyPoints.map((kp, i) => (
+                          <p key={i}>{kp}</p>
+                        ))}
+                      </div>
+                    )}
+                    {result.groups[0].sections.map((section) => (
+                      <ResultSection key={section.title} title={section.title} items={section.items} />
+                    ))}
+                  </ResultColumn>
+                )}
+
+                {/* 风险与提醒 */}
+                {result.cautions.length > 0 && !result.cautions.every((c) => c.includes("请结合面诊")) && (
+                  <ResultColumn title="风险与提醒" colorVariant="amber" icon={<AlertTriangle size={15} />}>
+                    <ul className="cautions-list">
+                      {result.cautions.map((c, i) => (
+                        <li key={i}>{c}</li>
+                      ))}
+                    </ul>
+                  </ResultColumn>
+                )}
+              </div>
+
+              {/* Bottom row: 方案 (50%) + 随访监测 (50%) */}
+              <div className="result-bottom-row">
+                {result.groups[1] && (
+                  <ResultColumn title="方案" colorVariant="blue" icon={<FileText size={15} />}>
+                    {result.groups[1].sections.map((section) => (
+                      <ResultSection key={section.title} title={section.title} items={section.items} />
+                    ))}
+                  </ResultColumn>
+                )}
+                {result.groups[2] && (
+                  <ResultColumn title="随访监测" colorVariant="teal" icon={<AlertTriangle size={15} />}>
+                    {result.groups[2].sections.map((section) => (
+                      <ResultSection key={section.title} title={section.title} items={section.items} />
+                    ))}
+                  </ResultColumn>
+                )}
+              </div>
             </div>
 
             {/* Evidence footer */}
@@ -1019,7 +1018,6 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
                 ))}
               </div>
             )}
-
           </section>
         )}
       </main>

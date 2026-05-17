@@ -564,120 +564,26 @@
   opacity: 0.6;
 }
 
-.top-banners {
+/* ---------- Result layout: 2-row asymmetric grid ---------- */
+
+.result-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Top row: 判断 (70%) | 风险与提醒 (30%) */
+.result-top-row {
+  display: grid;
+  grid-template-columns: 7fr 3fr;
+  gap: 12px;
+  align-items: start;
+}
+
+/* Bottom row: 方案 (50%) | 随访监测 (50%) */
+.result-bottom-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-@media (max-width: 640px) {
-  .top-banners {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* Banner shared */
-.keypoints-banner,
-.cautions-banner {
-  border-radius: var(--radius-lg);
-  padding: 14px 18px;
-  box-shadow: var(--shadow);
-}
-
-/* 重点结论 — green */
-.keypoints-banner {
-  background: #F0FDF4;
-  border: 1px solid #BBF7D0;
-  border-left: 3px solid #16A34A;
-}
-
-.keypoints-banner__label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 700;
-  color: #15803D;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 8px;
-}
-
-.keypoints-banner__list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.keypoints-banner__list li {
-  font-size: 13.5px;
-  color: var(--text);
-  line-height: 1.55;
-  padding-left: 10px;
-  position: relative;
-}
-
-.keypoints-banner__list li::before {
-  content: "\00b7";
-  position: absolute;
-  left: 0;
-  color: #16A34A;
-  font-weight: 700;
-}
-
-/* 风险与提醒 — yellow */
-.cautions-banner {
-  background: #FEFCE8;
-  border: 1px solid #FEF08A;
-  border-left: 3px solid #CA8A04;
-}
-
-.cautions-banner__label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 700;
-  color: #A16207;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 8px;
-}
-
-.cautions-banner__list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.cautions-banner__list li {
-  font-size: 13.5px;
-  color: #713F12;
-  line-height: 1.55;
-  padding-left: 10px;
-  position: relative;
-}
-
-.cautions-banner__list li::before {
-  content: "\00b7";
-  position: absolute;
-  left: 0;
-  color: #CA8A04;
-  font-weight: 700;
-}
-
-/* ---------- 3-column result grid ---------- */
-
-.result-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
   gap: 12px;
 }
 
@@ -712,26 +618,102 @@
   letter-spacing: 0.04em;
 }
 
-/* Column color variants */
+/* 判断 — sage green (core clinical interpretation) */
+.result-column--green {
+  border-left: 3px solid #7BAE87;
+}
 .result-column--green .result-column__header {
-  background: #F0FDF4;
-  border-bottom-color: #BBF7D0;
+  background: #EEF6F0;
+  border-bottom-color: #C3DFC8;
 }
-.result-column--green .result-column__icon { color: #15803D; }
+.result-column--green .result-column__icon { color: #2F5D3A; }
+.result-column--green .result-column__title { color: #2F5D3A; }
 
-/* 方案 — slate/silver (neutral, factual treatment plan) */
-.result-column--slate .result-column__header {
-  background: #F7F7F6;
-  border-bottom-color: #E0DAD5;
+/* 风险与提醒 — warm amber (secondary attention) */
+.result-column--amber {
+  border-left: 3px solid #D89B42;
 }
-.result-column--slate .result-column__icon { color: #5A5754; }
+.result-column--amber .result-column__header {
+  background: #FFF5E8;
+  border-bottom-color: #F5D2A0;
+}
+.result-column--amber .result-column__icon { color: #9A5B00; }
+.result-column--amber .result-column__title { color: #9A5B00; }
 
-/* 随访监测 — teal (forward-looking monitoring) */
+/* 方案 — cool blue-gray (structured action plan) */
+.result-column--blue {
+  border-left: 3px solid #8DA3B8;
+}
+.result-column--blue .result-column__header {
+  background: #F4F7FA;
+  border-bottom-color: #C5D3DF;
+}
+.result-column--blue .result-column__icon { color: #4A6B85; }
+
+/* 随访监测 — teal (longitudinal monitoring) */
+.result-column--teal {
+  border-left: 3px solid #67AFA5;
+}
 .result-column--teal .result-column__header {
-  background: #F0FDFA;
-  border-bottom-color: #99F6E4;
+  background: #EDF8F8;
+  border-bottom-color: #B4DFDB;
 }
-.result-column--teal .result-column__icon { color: #0F766E; }
+.result-column--teal .result-column__icon { color: #1A7A72; }
+
+/* 重点结论 folded into 判断 as summary section */
+.result-keypoints {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding-bottom: 10px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid #C3DFC8;
+}
+
+.result-keypoints p {
+  font-size: 13.5px;
+  color: #2F5D3A;
+  line-height: 1.55;
+  margin: 0;
+  padding-left: 12px;
+  position: relative;
+}
+
+.result-keypoints p::before {
+  content: "▸";
+  position: absolute;
+  left: 0;
+  color: #7BAE87;
+  font-size: 10px;
+  top: 3px;
+}
+
+/* Cautions list inside amber card */
+.cautions-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.cautions-list li {
+  font-size: 13.5px;
+  color: #713F12;
+  line-height: 1.55;
+  padding-left: 12px;
+  position: relative;
+}
+
+.cautions-list li::before {
+  content: "▸";
+  position: absolute;
+  left: 0;
+  color: #D89B42;
+  font-size: 10px;
+  top: 3px;
+}
 
 .result-column__body {
   padding: 12px 16px;
@@ -927,7 +909,8 @@
 /* ---------- Responsive ---------- */
 
 @media (max-width: 900px) {
-  .result-grid {
+  .result-top-row,
+  .result-bottom-row {
     grid-template-columns: 1fr;
   }
 
