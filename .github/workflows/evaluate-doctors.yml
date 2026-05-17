@@ -1,0 +1,44 @@
+name: Evaluate Doctors
+
+on:
+  workflow_dispatch:
+    inputs:
+      email:
+        description: "Doctor email — leave blank to evaluate all active doctors"
+        required: false
+        default: ""
+      force:
+        description: "Force re-evaluation even if already evaluated today"
+        type: boolean
+        default: false
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Build request body
+        id: body
+        run: |
+          BODY='{}'
+          if [ -n "${{ github.event.inputs.email }}" ]; then
+            BODY=$(printf '%s' "$BODY" | jq --arg e "${{ github.event.inputs.email }}" '. + {doctorEmail: $e}')
+          fi
+          if [ "${{ github.event.inputs.force }}" = "true" ]; then
+            BODY=$(printf '%s' "$BODY" | jq '. + {force: true}')
+          fi
+          echo "body=$BODY" >> "$GITHUB_OUTPUT"
+
+      - name: Trigger evaluation
+        run: |
+          STATUS=$(curl -s -o /tmp/result.json -w "%{http_code}" \
+            -X POST "${{ secrets.VERCEL_PRODUCTION_URL }}/api/cron/evaluate-doctors" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -d '${{ steps.body.outputs.body }}')
+          cat /tmp/result.json
+          echo ""
+          if [ "$STATUS" -ne 200 ]; then
+            echo "Evaluation failed with HTTP $STATUS"
+            exit 1
+          fi
