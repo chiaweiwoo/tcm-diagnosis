@@ -33,8 +33,8 @@ jobs:
           fi
 
           STATUS=$(curl -s -o /tmp/result.json -w "%{http_code}" \
-            -X POST "${{ secrets.VERCEL_PRODUCTION_URL }}/api/cron/evaluate-doctors" \
-            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            -X POST "${{ secrets.ASSESS_BASE_URL }}/api/cron/evaluate-doctors" \
+            -H "X-Assessment-Key: ${{ secrets.ASSESSMENT_API_KEY }}" \
             -H "Content-Type: application/json" \
             -d "$BODY")
           cat /tmp/result.json

@@ -30,14 +30,13 @@ import {
 export const maxDuration = 120;
 
 export async function POST(req: NextRequest) {
-  // Auth
-  const secret = process.env.CRON_SECRET;
-  if (!secret) {
-    return apiError(500, "INTERNAL_ERROR", "CRON_SECRET 未配置。");
-  }
-  if (req.headers.get("x-cron-secret") !== secret) {
-    return apiError(401, "UNAUTHORIZED", "无效的 cron 密钥。");
-  }
+  // Auth — accepts either x-cron-secret (CRON_SECRET) or X-Assessment-Key (ASSESSMENT_API_KEY)
+  const cronSecret   = process.env.CRON_SECRET;
+  const assessSecret = process.env.ASSESSMENT_API_KEY;
+  const authed =
+    (cronSecret   && req.headers.get("x-cron-secret")    === cronSecret)   ||
+    (assessSecret && req.headers.get("x-assessment-key") === assessSecret);
+  if (!authed) return apiError(401, "UNAUTHORIZED", "无效的密钥。");
 
   const admin = getServiceRoleClient();
 
