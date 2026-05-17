@@ -577,7 +577,7 @@
   display: grid;
   grid-template-columns: 7fr 3fr;
   gap: 12px;
-  align-items: start;
+  align-items: stretch;
 }
 
 /* Bottom row: 方案 (50%) | 随访监测 (50%) */
