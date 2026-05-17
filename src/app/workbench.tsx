@@ -777,25 +777,50 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
           </div>
           <div className="workbench__actions">
             {isAdmin && (
+              <div className="btn-with-dropdown">
+                <button
+                  className="btn btn--ghost btn--sm"
+                  onClick={() => void handleToggleSamples()}
+                  title="评估样本"
+                >
+                  <FlaskConical size={15} />
+                  <span>样本</span>
+                  <ChevronDown size={13} className={samplesOpen ? "rotate-180" : ""} />
+                </button>
+                {samplesOpen && (
+                  <div className="header-dropdown">
+                    <SamplesPanel
+                      samples={samples}
+                      loading={samplesLoading}
+                      onLoad={handleLoadSample}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+            <div className="btn-with-dropdown">
               <button
                 className="btn btn--ghost btn--sm"
-                onClick={() => void handleToggleSamples()}
-                title="评估样本"
+                onClick={() => { setHistoryOpen((o) => !o); setSamplesOpen(false); }}
+                title="历史记录"
               >
-                <FlaskConical size={15} />
-                <span>样本</span>
-                <ChevronDown size={13} className={samplesOpen ? "rotate-180" : ""} />
+                <Clock size={15} />
+                <span>历史</span>
+                <ChevronDown size={13} className={historyOpen ? "rotate-180" : ""} />
               </button>
-            )}
-            <button
-              className="btn btn--ghost btn--sm"
-              onClick={() => { setHistoryOpen((o) => !o); setSamplesOpen(false); }}
-              title="历史记录"
-            >
-              <Clock size={15} />
-              <span>历史</span>
-              <ChevronDown size={13} className={historyOpen ? "rotate-180" : ""} />
-            </button>
+              {historyOpen && (
+                <div className="header-dropdown">
+                  <HistoryPanel
+                    consultations={consultations}
+                    activeId={activeId}
+                    onSelect={(id) => void handleSelectHistory(id)}
+                    onNew={handleNew}
+                    onDelete={(id) => void handleDeleteHistory(id)}
+                    loading={historyLoading}
+                  />
+                </div>
+              )}
+            </div>
             <button className="btn btn--ghost btn--sm" onClick={handleNew} title="新建">
               <Plus size={15} />
               <span>新建</span>
@@ -824,31 +849,6 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
           </div>
         </div>
       </header>
-
-      {/* Samples panel dropdown (admin only) */}
-      {samplesOpen && isAdmin && (
-        <div className="history-dropdown">
-          <SamplesPanel
-            samples={samples}
-            loading={samplesLoading}
-            onLoad={handleLoadSample}
-          />
-        </div>
-      )}
-
-      {/* History panel dropdown */}
-      {historyOpen && (
-        <div className="history-dropdown">
-          <HistoryPanel
-            consultations={consultations}
-            activeId={activeId}
-            onSelect={(id) => void handleSelectHistory(id)}
-            onNew={handleNew}
-            onDelete={(id) => void handleDeleteHistory(id)}
-            loading={historyLoading}
-          />
-        </div>
-      )}
 
       {/* Form */}
       <main className="workbench__main">

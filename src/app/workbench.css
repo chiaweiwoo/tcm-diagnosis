@@ -155,15 +155,23 @@
   padding: 5px 9px;
 }
 
-/* ---------- History dropdown ---------- */
+/* ---------- Header dropdowns ---------- */
 
-.history-dropdown {
-  position: fixed;
-  top: 68px;
-  right: 28px;
-  width: 320px;
+/* Wrapper that gives the dropdown an anchor point */
+.btn-with-dropdown {
+  position: relative;
+}
+
+/* The floating panel — anchored to the right edge of its trigger button */
+.header-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 300px;
   z-index: 200;
   box-shadow: var(--shadow-md);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
 }
 
 .history-panel {
@@ -924,9 +932,10 @@
     padding: 16px 14px;
   }
 
-  .history-dropdown {
-    right: 16px;
+  .header-dropdown {
+    right: 0;
     width: calc(100vw - 32px);
+    max-width: 320px;
   }
 }
 
