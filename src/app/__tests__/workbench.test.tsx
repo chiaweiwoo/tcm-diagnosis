@@ -295,7 +295,7 @@ describe("Analyze flow", () => {
     await fillRequiredFields(user);
     await user.click(screen.getByText("开始分析"));
 
-    await waitFor(() => screen.getByText("风险与提醒"));
+    await waitFor(() => screen.getByText("风险与提醒 Cautions"));
     expect(screen.getByText("注意肝功能")).toBeInTheDocument();
   });
 
