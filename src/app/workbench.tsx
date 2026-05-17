@@ -576,7 +576,11 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
       setResult(data.result);
       setRawResult(data.raw);
       setMeta({ model: data.model, repairedJson: data.repairedJson, promptVersion: data.promptVersion, durationSeconds });
-      setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+      setTimeout(() => {
+        if (typeof resultRef.current?.scrollIntoView === "function") {
+          resultRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }, 50);
 
       // Auto-save or update
       try {

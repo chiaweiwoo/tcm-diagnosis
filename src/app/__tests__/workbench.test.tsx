@@ -277,7 +277,7 @@ describe("Analyze flow", () => {
     await user.click(screen.getByText("开始分析"));
 
     await waitFor(() => {
-      expect(screen.getByText("重点结论")).toBeInTheDocument();
+      expect(screen.getByText("判断")).toBeInTheDocument();
     });
 
     expect(screen.getByText("处方方向基本合理")).toBeInTheDocument();
