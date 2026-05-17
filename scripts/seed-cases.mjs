@@ -134,44 +134,34 @@ try {
 console.log(`\nSeeding ${seedCases.length} cases for ${email}…\n`);
 
 // ---------------------------------------------------------------------------
-// Process each case
+// Process all cases in parallel
 // ---------------------------------------------------------------------------
 
-let passed = 0;
-let failed = 0;
-
-for (let i = 0; i < seedCases.length; i++) {
-  const { form_data } = seedCases[i];
-  const label = `[${i + 1}/${seedCases.length}] ${form_data.chiefComplaint ?? "(no complaint)"}`;
+async function seedOne(form_data, index) {
+  const label = `[${index + 1}/${seedCases.length}] ${form_data.chiefComplaint ?? "(no complaint)"}`;
 
   // 1. Analyze via /api/analyze (server-side, bypasses browser auth)
   let analysisResult, analysisRaw, modelMeta;
-  try {
-    const res = await fetch(`${baseUrl}/api/analyze`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Assessment-Key": assessKey,
-      },
-      body: JSON.stringify({ form: form_data }),
-    });
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`${res.status} ${err.slice(0, 200)}`);
-    }
-    const data = await res.json();
-    analysisResult = data.result;
-    analysisRaw    = data.raw;
-    modelMeta      = {
-      model:         data.model,
-      promptVersion: data.promptVersion,
-      repairedJson:  data.repairedJson ?? false,
-    };
-  } catch (err) {
-    console.error(`  ✗ ${label} — analyze failed: ${err.message}`);
-    failed++;
-    continue;
+  const res = await fetch(`${baseUrl}/api/analyze`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Assessment-Key": assessKey,
+    },
+    body: JSON.stringify({ form: form_data }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`${label} — analyze failed: ${res.status} ${err.slice(0, 200)}`);
   }
+  const data = await res.json();
+  analysisResult = data.result;
+  analysisRaw    = data.raw;
+  modelMeta      = {
+    model:         data.model,
+    promptVersion: data.promptVersion,
+    repairedJson:  data.repairedJson ?? false,
+  };
 
   // 2. Insert consultation row via service-role (bypasses RLS)
   const { error: insertError } = await supabase.from("consultations").insert({
@@ -184,18 +174,25 @@ for (let i = 0; i < seedCases.length; i++) {
     analysis_status:  "analyzed",
     analyzed_at:      new Date().toISOString(),
   });
+  if (insertError) throw new Error(`${label} — insert failed: ${insertError.message}`);
 
-  if (insertError) {
-    console.error(`  ✗ ${label} — insert failed: ${insertError.message}`);
+  return label;
+}
+
+const results = await Promise.allSettled(
+  seedCases.map(({ form_data }, i) => seedOne(form_data, i)),
+);
+
+let passed = 0;
+let failed = 0;
+for (const r of results) {
+  if (r.status === "fulfilled") {
+    console.log(`  ✓ ${r.value}`);
+    passed++;
+  } else {
+    console.error(`  ✗ ${r.reason?.message ?? r.reason}`);
     failed++;
-    continue;
   }
-
-  console.log(`  ✓ ${label}`);
-  passed++;
-
-  // Small delay to avoid rate-limiting
-  await new Promise((r) => setTimeout(r, 500));
 }
 
 console.log(`\nDone: ${passed} seeded, ${failed} failed.`);
