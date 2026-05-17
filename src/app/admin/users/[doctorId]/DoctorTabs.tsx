@@ -4,7 +4,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 const TABS = [
   { key: "records", label: "病案列表" },
-  { key: "output-review", label: "AI 输出审核" },
   { key: "profile", label: "临床画像" },
 ] as const;
 

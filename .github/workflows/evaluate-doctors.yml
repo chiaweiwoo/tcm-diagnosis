@@ -1,47 +1,54 @@
 name: Evaluate Doctors
 
 on:
-  schedule:
-    - cron: "0 18 * * *"  # 02:00 CST (UTC+8)
   workflow_dispatch:
     inputs:
       email:
         description: "Doctor email — leave blank to evaluate all active doctors"
         required: false
         default: ""
-      force:
-        description: "Force re-evaluation even if already evaluated today"
-        type: boolean
-        default: false
 
 jobs:
   evaluate:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Trigger evaluation
+      - name: Trigger evaluation (with retry)
         run: |
           EMAIL="${{ github.event.inputs.email }}"
-          FORCE="${{ github.event.inputs.force }}"
 
-          if [ -n "$EMAIL" ] && [ "$FORCE" = "true" ]; then
-            BODY="{\"doctorEmail\":\"$EMAIL\",\"force\":true}"
-          elif [ -n "$EMAIL" ]; then
+          if [ -n "$EMAIL" ]; then
             BODY="{\"doctorEmail\":\"$EMAIL\"}"
-          elif [ "$FORCE" = "true" ]; then
-            BODY="{\"force\":true}"
           else
             BODY="{}"
           fi
 
-          STATUS=$(curl -s -o /tmp/result.json -w "%{http_code}" \
-            -X POST "${{ secrets.ASSESS_BASE_URL }}/api/cron/evaluate-doctors" \
-            -H "X-Assessment-Key: ${{ secrets.ASSESSMENT_API_KEY }}" \
-            -H "Content-Type: application/json" \
-            -d "$BODY")
-          cat /tmp/result.json
-          echo ""
-          if [ "$STATUS" -ne 200 ]; then
-            echo "Evaluation failed with HTTP $STATUS"
-            exit 1
-          fi
+          MAX_ATTEMPTS=3
+          ATTEMPT=0
+          DELAY=10
+
+          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+            ATTEMPT=$((ATTEMPT + 1))
+            echo "Attempt $ATTEMPT of $MAX_ATTEMPTS..."
+
+            STATUS=$(curl -s -o /tmp/result.json -w "%{http_code}" \
+              -X POST "${{ secrets.ASSESS_BASE_URL }}/api/cron/evaluate-doctors" \
+              -H "X-Assessment-Key: ${{ secrets.ASSESSMENT_API_KEY }}" \
+              -H "Content-Type: application/json" \
+              -d "$BODY")
+
+            cat /tmp/result.json
+            echo ""
+
+            if [ "$STATUS" -eq 200 ]; then
+              echo "Evaluation succeeded."
+              exit 0
+            fi
+
+            echo "HTTP $STATUS — retrying in ${DELAY}s..."
+            sleep $DELAY
+            DELAY=$((DELAY * 2))
+          done
+
+          echo "Evaluation failed after $MAX_ATTEMPTS attempts."
+          exit 1

@@ -52,6 +52,10 @@ npm run build  # 本地构建验证
 
 ## AI 输出质量评估
 
-系统每日自动对所有活跃医师近 7 天的病案运行双重评估（AI 输出审核 + 医师画像），结果可在管理后台 `/admin/users/[doctorId]` 的「AI输出审核」和「临床画像」标签页查看。
+两类按需评估，均由管理员手动触发：
 
-评估由 GitHub Actions 定时触发（每日 02:00 CST），也可在 Actions → Evaluate Doctors → Run workflow 手动运行（可指定单个医师邮箱或强制重新评估）。
+**临床画像（per-doctor）** — 管理员在 `/admin/users/[doctorId]` → 临床画像 标签页点击"运行评估"，分析该医师近 14 天的病案输入习惯。结果仅供管理员参考。
+
+**提示词评估（fleet-wide）** — 管理员在 `/admin/prompt-reviews` 点击"运行新审查"，对全体医师的 AI 输出进行系统审查，追踪提示词问题与改进效果。
+
+批量运行：在 GitHub Actions → Evaluate Doctors → Run workflow 手动触发（可指定单个医师邮箱）。

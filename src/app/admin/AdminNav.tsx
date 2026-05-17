@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 const NAV_LINKS = [
   { href: "/admin/users", label: "用户" },
+  { href: "/admin/prompt-reviews", label: "提示词评估" },
 ];
 
 export default function AdminNav() {

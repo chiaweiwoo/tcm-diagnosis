@@ -113,17 +113,10 @@ export default async function DoctorPage({ params, searchParams }: RouteContext)
         </>
       )}
 
-      {/* Tab: AI 输出审核 (Goal 1) */}
-      {tab === "output-review" && (
-        <Suspense fallback={<div className="eval-loading">加载中…</div>}>
-          <EvaluationPanel doctorId={doctorId} mode="output-review" />
-        </Suspense>
-      )}
-
-      {/* Tab: 临床画像 (Goal 2) */}
+      {/* Tab: 临床画像 */}
       {tab === "profile" && (
         <Suspense fallback={<div className="eval-loading">加载中…</div>}>
-          <EvaluationPanel doctorId={doctorId} mode="profile" />
+          <EvaluationPanel doctorId={doctorId} />
         </Suspense>
       )}
     </main>

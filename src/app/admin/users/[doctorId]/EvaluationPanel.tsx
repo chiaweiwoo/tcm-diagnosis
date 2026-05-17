@@ -1,30 +1,17 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { OutputReview, DoctorProfile } from "@/lib/analytics/evaluation";
+import type { DoctorProfile } from "@/lib/analytics/evaluation";
 
 type EvaluationRecord = {
   id: string;
   window_start: string;
   window_end: string;
   consultation_count: number;
-  output_review: OutputReview | null;
   doctor_profile: DoctorProfile | null;
   model: string | null;
   created_at: string;
 } | null;
-
-const VERDICT_LABEL: Record<string, string> = {
-  stable: "正常",
-  needs_attention: "需关注",
-  critical: "须立即检查",
-};
-
-const VERDICT_CLASS: Record<string, string> = {
-  stable: "eval-verdict--stable",
-  needs_attention: "eval-verdict--warn",
-  critical: "eval-verdict--critical",
-};
 
 const COMPLETENESS_LABEL: Record<string, string> = {
   high: "完整",
@@ -43,17 +30,21 @@ function formatSGT(iso: string) {
   });
 }
 
-export function EvaluationPanel({
-  doctorId,
-  mode,
-}: {
-  doctorId: string;
-  mode: "output-review" | "profile";
-}) {
+function formatDateSGT(iso: string) {
+  return new Date(iso).toLocaleDateString("zh-SG", {
+    timeZone: "Asia/Singapore",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+}
+
+export function EvaluationPanel({ doctorId }: { doctorId: string }) {
   const [record, setRecord] = useState<EvaluationRecord>(null);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   async function fetchEvaluation() {
     setLoading(true);
@@ -73,17 +64,19 @@ export function EvaluationPanel({
   async function runEvaluation() {
     setRunning(true);
     setError(null);
+    setSuccessMsg(null);
     try {
       const res = await fetch(`/api/admin/analytics/evaluate/${doctorId}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ windowDays: 7 }),
       });
+      const json = await res.json() as { message?: string; evaluation?: EvaluationRecord };
       if (!res.ok) {
-        const err = await res.json() as { message?: string };
-        throw new Error(err.message ?? "评估失败");
+        throw new Error(json.message ?? "评估失败");
       }
-      await fetchEvaluation();
+      if (json.evaluation) setRecord(json.evaluation);
+      else await fetchEvaluation();
+      setSuccessMsg("评估完成。");
+      setTimeout(() => setSuccessMsg(null), 4000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "评估失败，请稍后重试。");
     } finally {
@@ -104,12 +97,15 @@ export function EvaluationPanel({
     <div className="eval-panel">
       <div className="eval-toolbar">
         <div>
-          {record && (
+          {record ? (
             <span className="eval-meta">
-              最近评估：{formatSGT(record.created_at)} ·
-              窗口 {record.window_start.slice(0, 10)} — {record.window_end.slice(0, 10)} ·
-              {record.consultation_count} 条病案
+              评估窗口：最近 14 天
+              （{formatDateSGT(record.window_start)} — {formatDateSGT(record.window_end)}）
+              · 最近评估：{formatSGT(record.created_at)}
+              · {record.consultation_count} 条病案
             </span>
+          ) : (
+            <span className="eval-meta">暂无评估记录</span>
           )}
         </div>
         <button
@@ -117,23 +113,20 @@ export function EvaluationPanel({
           onClick={runEvaluation}
           disabled={running}
         >
-          {running ? "评估中…" : record ? "重新评估（近7天）" : "开始评估（近7天）"}
+          {running ? "评估中…" : record ? "重新评估（近 14 天）" : "开始评估（近 14 天）"}
         </button>
       </div>
 
       {error && <div className="eval-error">{error}</div>}
+      {successMsg && <div className="eval-success">{successMsg}</div>}
 
       {!record && !error && (
         <div className="admin-empty">
-          <p>暂无评估记录。点击"开始评估"对该医生的近7天病案进行分析。</p>
+          <p>暂无评估记录。点击"开始评估"对该医生的近 14 天病案进行分析。</p>
         </div>
       )}
 
-      {record && mode === "output-review" && record.output_review && (
-        <OutputReviewSection review={record.output_review} />
-      )}
-
-      {record && mode === "profile" && record.doctor_profile && (
+      {record?.doctor_profile && (
         <DoctorProfileSection profile={record.doctor_profile} />
       )}
     </div>
@@ -141,66 +134,7 @@ export function EvaluationPanel({
 }
 
 // ---------------------------------------------------------------------------
-// Output Review (Goal 1)
-// ---------------------------------------------------------------------------
-
-function OutputReviewSection({ review }: { review: OutputReview }) {
-  const verdictClass = VERDICT_CLASS[review.verdict] ?? "eval-verdict--stable";
-
-  return (
-    <div className="eval-section">
-      <div className="eval-verdict-row">
-        <span className={`eval-verdict ${verdictClass}`}>
-          {VERDICT_LABEL[review.verdict] ?? review.verdict}
-        </span>
-        <p className="eval-summary">{review.reviewSummary}</p>
-      </div>
-
-      {review.crossCasePatterns.length > 0 && (
-        <div className="eval-block">
-          <h3 className="eval-block-title">跨病案规律</h3>
-          <ul className="eval-list">
-            {review.crossCasePatterns.map((p, i) => (
-              <li key={i}>{p}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      <div className="eval-block">
-        <h3 className="eval-block-title">逐案审核</h3>
-        <div className="eval-case-grid">
-          {review.caseFindings.map((cf) => (
-            <div
-              key={cf.caseIndex}
-              className={`eval-case-card${cf.alignmentOk ? "" : " eval-case-card--flagged"}`}
-            >
-              <div className="eval-case-header">
-                <span className="eval-case-index">案例 {cf.caseIndex}</span>
-                <span className={`eval-align-badge ${cf.alignmentOk ? "ok" : "warn"}`}>
-                  {cf.alignmentOk ? "对齐" : "需关注"}
-                </span>
-              </div>
-              {cf.strengths.length > 0 && (
-                <div className="eval-case-strengths">
-                  {cf.strengths.map((s, i) => <p key={i}>✓ {s}</p>)}
-                </div>
-              )}
-              {cf.issues.length > 0 && (
-                <div className="eval-case-issues">
-                  {cf.issues.map((s, i) => <p key={i}>△ {s}</p>)}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Doctor Profile (Goal 2)
+// Doctor Profile
 // ---------------------------------------------------------------------------
 
 function DoctorProfileSection({ profile }: { profile: DoctorProfile }) {

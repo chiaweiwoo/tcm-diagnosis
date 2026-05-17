@@ -136,14 +136,17 @@ Doctor (browser)
 Admin (browser, is_admin=true only)
   └── GET  /api/admin/users                    → doctor list with 30-day stats
   └── GET  /api/admin/users/[doctorId]/consultations → per-doctor consultation list (service_role)
-  └── GET  /api/admin/analytics/evaluate/[doctorId] → latest doctor evaluation (Goal 1+2)
-  └── POST /api/admin/analytics/evaluate/[doctorId] → trigger new evaluation for a doctor
+  └── GET  /api/admin/analytics/evaluate/[doctorId] → latest doctor profile evaluation
+  └── POST /api/admin/analytics/evaluate/[doctorId] → trigger new doctor profile evaluation (14d window)
+  └── GET  /api/admin/analytics/session-review      → list fleet-wide session reviews
+  └── POST /api/admin/analytics/session-review      → trigger new fleet-wide session review
   └── /admin/users                             → doctor list page
-  └── /admin/users/[doctorId]                  → 3-tab view: 病案列表 | AI输出审核 | 临床画像
+  └── /admin/users/[doctorId]                  → 2-tab view: 病案列表 | 临床画像
+  └── /admin/prompt-reviews                    → fleet-wide session reviews (prompt refinement)
 
-Cron (GitHub Actions, ASSESSMENT_API_KEY auth)
-  └── POST /api/cron/evaluate-doctors          → nightly Goal 1+2 evaluation for all active doctors (02:00 CST)
-                                                  also triggerable via workflow_dispatch with email + force inputs
+GH Actions (ASSESSMENT_API_KEY auth, workflow_dispatch only — no schedule)
+  └── POST /api/cron/evaluate-doctors          → bulk doctor profile evaluation (14d window, skips empty doctors)
+                                                  triggerable via workflow_dispatch with optional email input
 
 Workbench header (admin only):
   └── ⚙ Settings2 icon → /admin → redirects to /admin/users
@@ -230,17 +233,17 @@ Admin entry point: `⚙` icon (Settings2) in workbench header, visible only when
 
 Admin guard: `src/app/admin/layout.tsx` — server-side, redirects to `/?reason=not_admin` if not admin.
 
-Admin nav (1 tab, `src/app/admin/AdminNav.tsx`):
+Admin nav (2 tabs, `src/app/admin/AdminNav.tsx`):
 - **用户** — `/admin/users` — doctor list with 30-day stats + link to per-doctor view
+- **提示词评估** — `/admin/prompt-reviews` — fleet-wide session reviews for prompt refinement
 
 `/admin` redirects to `/admin/users`.
 
 `AdminNav` is a client component (needs `usePathname()` for active link highlighting). Admin layout is a server component.
 
-Per-doctor read-only view (`/admin/users/[doctorId]`) — 3-tab layout via `?tab=` searchParam:
+Per-doctor read-only view (`/admin/users/[doctorId]`) — 2-tab layout via `?tab=` searchParam:
 - **病案列表** — compact paginated table (15/page) of consultation records
-- **AI输出审核** — Goal 1 output: `outputReview` from `analytics_doctor_evaluations`
-- **临床画像** — Goal 2 output: `doctorProfile` from `analytics_doctor_evaluations`
+- **临床画像** — `doctorProfile` from `analytics_doctor_evaluations`; includes 运行评估 button (14-day window, append-only)
 
 Each consultation row has a **拷贝此病案** button — clones `form_data` only to admin's own account.
 Clone inserts a new draft consultation under admin's UUID with `model_meta = { cloned_from_doctor_email: "..." }`.
@@ -253,27 +256,47 @@ Only `chiaweiwoo123@gmail.com` is seeded as admin.
 
 ---
 
-## Doctor Evaluation (Goal 1 + Goal 2)
+## Doctor Evaluation (Goal 2 — doctor profile)
 
-Nightly evaluation runs via GitHub Actions (`.github/workflows/evaluate-doctors.yml`):
-- Schedule: `0 18 * * *` (02:00 CST)
-- Auth: `X-Assessment-Key` header → `ASSESSMENT_API_KEY` GitHub secret
-- Base URL: `ASSESS_BASE_URL` GitHub secret
-- Smart skip: if a doctor already has an evaluation for today's window, skips (bypass with `force: true`)
-- Can also be triggered manually via `workflow_dispatch` with optional `email` and `force` inputs
+**On-demand only.** No scheduled cron. Triggered by:
+- Admin UI button on `/admin/users/[doctorId]` → 临床画像 tab
+- GH Actions `workflow_dispatch` (`.github/workflows/evaluate-doctors.yml`) for bulk runs
+- Local CLI: `npm run evaluate -- [--email doctor@example.com]`
 
-Route: `POST /api/cron/evaluate-doctors`
-- Auth: `X-Assessment-Key` header only (no CRON_SECRET)
-- Body: `{ doctorEmail?: string, force?: boolean }`
-- Calls `evaluateDoctor()` in `src/lib/analytics/evaluation.ts`
-- Stores result in `analytics_doctor_evaluations` table
-- Window: 7 days, keyed by `(doctor_id, window_start, window_end)`
+Route: `POST /api/admin/analytics/evaluate/[doctorId]`
+- Admin session auth required
+- Window: **14 days rolling**, append-only (no upsert)
+- Empty window → 400 `NO_CONSULTATIONS` with friendly Chinese message
+
+Bulk route: `POST /api/cron/evaluate-doctors`
+- Auth: `X-Assessment-Key` header
+- Body: `{ doctorEmail?: string }`
+- Doctors with 0 consultations in window → skipped silently (not failed)
+- 3-attempt retry with exponential backoff in the GH Actions workflow
+
+Output: `doctorProfile` only — `internalScore` and `scoreDirection` stored but never shown to doctor.
+`doctorFacingHint` field stored for future Phase 2 doctor-facing surface; not rendered yet.
 
 Prompts: `DOCTOR_EVALUATION_SYSTEM_PROMPT` in `src/lib/analytics/prompts.ts`
 Window helper: `buildWindow(days)` in `src/lib/analytics/stats.ts`
 
-Local escape hatch: `npm run evaluate -- [--email doctor@example.com] [--force]`
-(reads `.env.local`, calls the same API endpoint)
+## Session Review (Goal 1 — prompt refinement)
+
+**On-demand only.** Fleet-wide review of AI output quality across all doctors. Developer/admin use only.
+
+Route: `POST /api/admin/analytics/session-review`
+- Admin session auth required
+- Samples up to 40 consultations from all doctors in the last 14 days, stratified by prescriptionType
+- Auto-links to most recent prior review (chain) for issue tracking; pass `{ includePrior: false }` for fresh baseline
+- Returns inserted `analytics_session_reviews` row
+
+Route: `GET /api/admin/analytics/session-review?limit=20`
+- Lists reviews newest first
+
+UI: `/admin/prompt-reviews` — append-only list, each row collapsible, "运行新审查" button
+
+Prompts: `SESSION_REVIEW_SYSTEM_PROMPT`, `SESSION_REVIEW_PROMPT_VERSION` in `src/lib/analytics/prompts.ts`
+Library: `reviewSession()` in `src/lib/analytics/sessionReview.ts`
 
 ---
 
@@ -308,7 +331,8 @@ Migrations: `supabase/migrations/` (numbered SQL). Applied manually in Supabase 
 | `error_logs` | Pipeline errors (no form field values) |
 | `doctor_allowlist` | `email`, `is_active`, `is_admin` — access control source of truth |
 | `activity_logs` | Doctor activity events (login, analyze) — no UI for now |
-| `analytics_doctor_evaluations` | Per-doctor Goal 1+2 evaluation results. No RLS (admin service_role only). UNIQUE (doctor_id, window_start, window_end). (migration 021) |
+| `analytics_doctor_evaluations` | Per-doctor profile evaluations. No RLS (admin service_role only). Append-only (no unique constraint). (migration 021, cleaned up in 023) |
+| `analytics_session_reviews` | Fleet-wide AI output reviews for prompt refinement. No RLS. Append-only with optional `prior_review_id` chain. (migration 023) |
 
 > Migration 022 drops legacy tables: `analytics_prompt_quality_runs`, `analytics_usage_runs`, `analytics_performance_runs`, `analytics_admin_alerts`, `analytics_doctor_dashboard` view, `assessment_jobs`, `assessment_job_results`. Apply when ready.
 
@@ -370,8 +394,8 @@ Add it to `.env.local` and Vercel env vars. Still required for the `/api/analyze
 Registered secrets: `ASSESS_BASE_URL` (e.g. `https://your-app.vercel.app`) and `ASSESSMENT_API_KEY`.
 There is no `CRON_SECRET` or `VERCEL_PRODUCTION_URL` — do not reference these.
 
-**evaluate-doctors returns `failed:1` with "no consultations in window"**
-`buildWindow` sets `windowEnd` to midnight tomorrow, not today — this is intentional to include today's records. If evaluations are still empty, check that the doctor has consultations in the last 7 days.
+**evaluate-doctors returns `skipped:1` with empty doctor**
+`NoConsultationsError` now counts as a skip (not failure). Check that the doctor has analyzed consultations in the last 14 days. `buildWindow` sets `windowEnd` to midnight tomorrow — intentional, includes today's records.
 
 **DeepSeek returns malformed JSON**
 Expected — repair is built in. Check `repairedJson: true` in logs. If repair triggers consistently, the prompt output format needs tightening.
@@ -409,3 +433,6 @@ Do not say done until the changed path is verified, not merely coded.
 1. Doctor feedback capture — accepted/rejected suggestion tracking
 2. External citation retrieval layer
 3. Migration 022 applied in production (drops legacy analytics/assessment tables)
+4. Migration 023 applied in production (drops `output_review` column, creates `analytics_session_reviews`)
+5. Phase 2: doctor-facing surface using `doctorFacingHint` field (already generated, not yet rendered)
+6. SGT timezone alignment in `buildWindow` — 14-day on-demand window makes boundary precision a non-issue; reopen if needed

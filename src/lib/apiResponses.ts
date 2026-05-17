@@ -4,6 +4,7 @@ export type ApiErrorCode =
   | "UNAUTHORIZED"
   | "NOT_FOUND"
   | "INVALID_INPUT"
+  | "NO_CONSULTATIONS"
   | "DRAFT_TOO_LONG"
   | "VALIDATION_BLOCKED"
   | "AI_REQUEST_FAILED"

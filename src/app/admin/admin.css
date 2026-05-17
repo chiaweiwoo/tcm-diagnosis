@@ -1560,6 +1560,15 @@ details[open] .sample-details__toggle::before {
   color: var(--error, #DC2626);
 }
 
+.eval-success {
+  padding: 10px 14px;
+  background: #F0FDF4;
+  border: 1px solid #16A34A;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #15803D;
+}
+
 .eval-section {
   display: flex;
   flex-direction: column;

@@ -1,14 +1,10 @@
 /**
- * Doctor evaluation pipeline — Sprint 6 (Goal 1 + Goal 2).
+ * Doctor profile evaluation pipeline — Goal 2.
  *
- * Goal 1 (outputReview):  evaluate AI output quality across recent consultations —
- *   alignment, specificity, anomalies, structural completeness.
+ * Analyses a single doctor's input patterns over a rolling window (default 14d).
+ * On-demand only — triggered by admin UI or GH Action workflow_dispatch.
  *
- * Goal 2 (doctorProfile): analyse doctor's input patterns, identify recurring gaps
- *   between input and AI suggestions, compute internal score (never shown to doctor).
- *
- * Compact serialization reduces token cost ~60% vs raw JSON by eliminating
- * repeated field names and truncating long free-text fields.
+ * Goal 1 (AI output review) moved to sessionReview.ts — fleet-wide, on-demand.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -18,22 +14,19 @@ import { buildWindow } from "./stats";
 import { getLangfuse } from "@/lib/langfuse";
 
 // ---------------------------------------------------------------------------
-// Types
+// Errors
 // ---------------------------------------------------------------------------
 
-export type CaseFinding = {
-  caseIndex: number;
-  alignmentOk: boolean;
-  issues: string[];
-  strengths: string[];
-};
+export class NoConsultationsError extends Error {
+  constructor(windowDays: number) {
+    super(`本医生最近 ${windowDays} 天无已分析的病案，无法生成评估。`);
+    this.name = "NoConsultationsError";
+  }
+}
 
-export type OutputReview = {
-  verdict: "stable" | "needs_attention" | "critical";
-  caseFindings: CaseFinding[];
-  crossCasePatterns: string[];
-  reviewSummary: string;
-};
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 export type GapEntry = {
   gap: string;
@@ -43,16 +36,18 @@ export type GapEntry = {
 
 export type DoctorProfile = {
   internalScore: number;
+  scoreDirection: "improving" | "stable" | "declining" | "first_run";
   prescriptionStyle: string;
   inputCompleteness: "high" | "medium" | "low";
   weakFields: string[];
   gaps: GapEntry[];
   guidancePoints: string[];
   profileSummary: string;
+  /** Stored for Phase 2 doctor-facing surface. Not rendered in admin UI yet. */
+  doctorFacingHint: string;
 };
 
 export type DoctorEvaluation = {
-  outputReview: OutputReview;
   doctorProfile: DoctorProfile;
 };
 
@@ -82,7 +77,7 @@ function joinArray(arr: unknown, max = 2, sep = "；"): string {
     .join(sep);
 }
 
-function serializeConsultationsCompact(rows: EvalRow[]): string {
+export function serializeConsultationsCompact(rows: EvalRow[]): string {
   return rows
     .map((row, i) => {
       const fd = row.form_data ?? {};
@@ -108,11 +103,9 @@ function serializeConsultationsCompact(rows: EvalRow[]): string {
       ];
 
       if (ar && typeof ar === "object") {
-        // keyPoints
         const kp = joinArray(ar.keyPoints, 2);
         if (kp) lines.push(`重点: ${kp}`);
 
-        // groups[0] = 判断 (可取之处, 需要复核)
         const groups = ar.groups as Array<{ sections?: Array<{ items?: unknown[] }> }> | undefined;
         const g0 = groups?.[0];
         const merits = joinArray(g0?.sections?.[0]?.items, 2);
@@ -120,16 +113,13 @@ function serializeConsultationsCompact(rows: EvalRow[]): string {
         if (merits) lines.push(`可取: ${merits}`);
         if (review) lines.push(`复核: ${review}`);
 
-        // groups[1] = 方案 (建议优化, 可选思路)
         const g1 = groups?.[1];
         const suggestions = joinArray(g1?.sections?.[0]?.items, 2);
         if (suggestions) lines.push(`建议: ${suggestions}`);
 
-        // cautions
         const cautions = joinArray(ar.cautions as unknown[], 2);
         if (cautions) lines.push(`风险: ${cautions}`);
 
-        // evidence (just first item, truncated)
         const evidenceArr = ar.evidence as unknown[];
         if (Array.isArray(evidenceArr) && evidenceArr.length > 0) {
           lines.push(`证据: ${truncate(String(evidenceArr[0]), 50)}`);
@@ -148,11 +138,10 @@ function serializeConsultationsCompact(rows: EvalRow[]): string {
 export async function evaluateDoctor(
   client: SupabaseClient,
   doctorId: string,
-  windowDays = 7,
+  windowDays = 14,
 ): Promise<{ evaluation: DoctorEvaluation; consultationCount: number; model: string }> {
   const { windowStart, windowEnd } = buildWindow(windowDays);
 
-  // Fetch recent analyzed consultations
   const { data, error } = await client
     .from("consultations")
     .select("form_data,analysis_result,analyzed_at")
@@ -168,18 +157,16 @@ export async function evaluateDoctor(
   const consultationCount = rows.length;
 
   if (consultationCount === 0) {
-    throw new Error("该医生在指定窗口内没有已分析的病案。");
+    throw new NoConsultationsError(windowDays);
   }
 
   const serialized = serializeConsultationsCompact(rows);
 
   const userPrompt = [
-    `请对以下 ${consultationCount} 条病案进行双重评估（AI输出审核 + 医生画像）。`,
+    `请对以下 ${consultationCount} 条病案进行医生画像分析。`,
     `窗口：过去 ${windowDays} 天`,
     "",
     serialized,
-    "",
-    "请严格按照输出结构返回 JSON，caseFindings 数组长度必须为 " + consultationCount + "。",
   ].join("\n");
 
   const model = getDeepSeekFastModel();
@@ -197,7 +184,7 @@ export async function evaluateDoctor(
       { role: "user", content: userPrompt },
     ],
     model,
-    maxTokens: 3000,
+    maxTokens: 2000,
     repairJson: true,
   });
 

@@ -1,17 +1,15 @@
 /**
- * Nightly evaluation cron — runs Goal 1 (AI output review) + Goal 2 (doctor profile)
- * for all active doctors over the past 7 days.
+ * Bulk doctor evaluation endpoint — runs doctor profile (Goal 2)
+ * for all active doctors or a single doctor over the past 14 days.
  *
- * Called by GitHub Actions after analytics-daily (same schedule: 02:00 CST).
- * Smart skip: if a doctor already has an evaluation for today's window, skip them.
- *
- * Auth: x-cron-secret header must match CRON_SECRET env var.
+ * Triggered via GH Actions workflow_dispatch (manual only — no schedule).
+ * Auth: x-assessment-key header must match ASSESSMENT_API_KEY env var.
  */
 
 import { type NextRequest, NextResponse } from "next/server";
 import { getServiceRoleClient } from "@/lib/supabase/server";
 import { apiError } from "@/lib/apiResponses";
-import { evaluateDoctor } from "@/lib/analytics/evaluation";
+import { evaluateDoctor, NoConsultationsError } from "@/lib/analytics/evaluation";
 import { buildWindow } from "@/lib/analytics/stats";
 
 // Each doctor = 1 DeepSeek call; allow enough for ~20 doctors in parallel
@@ -25,19 +23,18 @@ export async function POST(req: NextRequest) {
     return apiError(401, "UNAUTHORIZED", "无效的密钥。");
   }
 
-  // Optional body: { doctorEmail?: string, force?: boolean }
+  // Optional body: { doctorEmail?: string }
   let targetEmail: string | null = null;
-  let force = false;
   try {
-    const body = await req.json() as { doctorEmail?: string; force?: boolean };
+    const body = await req.json() as { doctorEmail?: string };
     if (typeof body.doctorEmail === "string" && body.doctorEmail.trim()) {
       targetEmail = body.doctorEmail.trim().toLowerCase();
     }
-    if (body.force === true) force = true;
   } catch { /* no body — run all */ }
 
   const admin = getServiceRoleClient();
-  const { windowStart, windowEnd } = buildWindow(7);
+  const windowDays = 14;
+  const { windowStart, windowEnd } = buildWindow(windowDays);
 
   const [allowlistResult, usersResult] = await Promise.all([
     admin.from("doctor_allowlist").select("email").eq("is_active", true),
@@ -68,41 +65,32 @@ export async function POST(req: NextRequest) {
 
   const results = await Promise.allSettled(
     doctors.map(async (doctor) => {
-      // Smart skip: already evaluated this window (bypass with force=true)
-      if (!force) {
-        const { data: existing } = await admin
-          .from("analytics_doctor_evaluations")
-          .select("id")
-          .eq("doctor_id", doctor.doctorId)
-          .eq("window_start", windowStart.toISOString())
-          .eq("window_end", windowEnd.toISOString())
-          .maybeSingle();
-
-        if (existing) return { skipped: true };
-      }
-
-      const { evaluation, consultationCount, model } = await evaluateDoctor(
-        admin,
-        doctor.doctorId,
-        7,
-      );
-
-      await admin
-        .from("analytics_doctor_evaluations")
-        .upsert(
-          {
-            doctor_id: doctor.doctorId,
-            window_start: windowStart.toISOString(),
-            window_end: windowEnd.toISOString(),
-            consultation_count: consultationCount,
-            output_review: evaluation.outputReview,
-            doctor_profile: evaluation.doctorProfile,
-            model,
-          },
-          { onConflict: "doctor_id,window_start,window_end" },
+      try {
+        const { evaluation, consultationCount, model } = await evaluateDoctor(
+          admin,
+          doctor.doctorId,
+          windowDays,
         );
 
-      return { skipped: false };
+        await admin
+          .from("analytics_doctor_evaluations")
+          .insert({
+            doctor_id:          doctor.doctorId,
+            window_start:       windowStart.toISOString(),
+            window_end:         windowEnd.toISOString(),
+            consultation_count: consultationCount,
+            doctor_profile:     evaluation.doctorProfile,
+            model,
+          });
+
+        return { skipped: false };
+      } catch (err) {
+        // No consultations in window — skip silently, don't count as failure
+        if (err instanceof NoConsultationsError) {
+          return { skipped: true };
+        }
+        throw err;
+      }
     }),
   );
 
