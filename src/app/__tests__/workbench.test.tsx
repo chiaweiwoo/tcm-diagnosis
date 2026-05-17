@@ -277,14 +277,14 @@ describe("Analyze flow", () => {
     await user.click(screen.getByText("开始分析"));
 
     await waitFor(() => {
-      expect(screen.getByText("判断")).toBeInTheDocument();
+      expect(screen.getByText("判断 Assessment")).toBeInTheDocument();
     });
 
     expect(screen.getByText("处方方向基本合理")).toBeInTheDocument();
-    expect(screen.getByText("判断")).toBeInTheDocument();
-    expect(screen.getByText("方案")).toBeInTheDocument();
+    expect(screen.getByText("判断 Assessment")).toBeInTheDocument();
+    expect(screen.getByText("方案 Plan")).toBeInTheDocument();
     // "随访监测" appears in both column title and section title — use getAllByText
-    expect(screen.getAllByText("随访监测").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/随访监测/).length).toBeGreaterThanOrEqual(1);
   });
 
   it("shows cautions banner when cautions contain non-generic content", async () => {
