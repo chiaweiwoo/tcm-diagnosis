@@ -16,18 +16,31 @@ jobs:
   evaluate:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      PROD_URL: ${{ secrets.VERCEL_PRODUCTION_URL }}
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      INPUT_EMAIL: ${{ github.event.inputs.email }}
+      INPUT_FORCE: ${{ github.event.inputs.force }}
     steps:
       - name: Trigger evaluation
         run: |
-          BODY=$(jq -cn \
-            --arg email "${{ github.event.inputs.email }}" \
-            --argjson force "${{ github.event.inputs.force }}" \
-            '{doctorEmail: (if $email != "" then $email else null end), force: $force}
-             | if .doctorEmail == null then del(.doctorEmail) else . end')
+          # Build JSON body without jq
+          if [ -n "$INPUT_EMAIL" ] && [ "$INPUT_FORCE" = "true" ]; then
+            BODY="{\"doctorEmail\":\"$INPUT_EMAIL\",\"force\":true}"
+          elif [ -n "$INPUT_EMAIL" ]; then
+            BODY="{\"doctorEmail\":\"$INPUT_EMAIL\"}"
+          elif [ "$INPUT_FORCE" = "true" ]; then
+            BODY="{\"force\":true}"
+          else
+            BODY="{}"
+          fi
+
+          echo "Posting to $PROD_URL/api/cron/evaluate-doctors"
+          echo "Body: $BODY"
 
           STATUS=$(curl -s -o /tmp/result.json -w "%{http_code}" \
-            -X POST "${{ secrets.VERCEL_PRODUCTION_URL }}/api/cron/evaluate-doctors" \
-            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            -X POST "$PROD_URL/api/cron/evaluate-doctors" \
+            -H "x-cron-secret: $CRON_SECRET" \
             -H "Content-Type: application/json" \
             -d "$BODY")
           cat /tmp/result.json
