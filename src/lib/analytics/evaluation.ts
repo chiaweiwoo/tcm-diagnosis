@@ -8,7 +8,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { callDeepSeekJson, getDeepSeekFastModel } from "@/lib/ai/deepseek";
+import { callDeepSeekJson, getDeepSeekSmartModel } from "@/lib/ai/deepseek";
 import { DOCTOR_EVALUATION_SYSTEM_PROMPT } from "./prompts";
 import { buildWindow } from "./stats";
 import { getLangfuse } from "@/lib/langfuse";
@@ -169,7 +169,7 @@ export async function evaluateDoctor(
     serialized,
   ].join("\n");
 
-  const model = getDeepSeekFastModel();
+  const model = getDeepSeekSmartModel();
   const langfuse = getLangfuse();
   const trace = langfuse?.trace({
     name: "evaluate-doctor",

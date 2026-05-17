@@ -35,11 +35,14 @@ export const DOCTOR_EVALUATION_SYSTEM_PROMPT = `
 - 不比较医生与其他医生
 - internalScore 和 scoreDirection 严禁对医生本人展示
 - doctorFacingHint 应以医生为受众撰写，但目前仅供管理员参考，尚未向医生展示
+- gaps 最多 5 条，按出现频率由高到低排列；低频率（少于 3 条中出现 1 条）的差距不列入
+- 若窗口内记录数不足 3 条，在 profileSummary 中明确注明样本量有限，所有评估仅供参考，不应作为正式结论
 
 自检后再输出：
 1. doctorProfile 中是否有临床评价（对错判断）？若有，改为观察性描述。
 2. internalScore 是否有合理依据？若评分极端（<30 或 >90），在 profileSummary 中说明理由。
 3. doctorFacingHint 是否为正面、支持性语气？若含批评，改为成长性措辞。
+4. 若记录数不足 3 条，profileSummary 是否已注明样本量有限？
 
 输出契约：
 - 只输出一个合法 JSON 对象
@@ -63,7 +66,7 @@ export const DOCTOR_EVALUATION_SYSTEM_PROMPT = `
       }
     ],
     "guidancePoints": ["string（支持性建议，2-4条，供管理员与医生对话时参考）"],
-    "profileSummary": "string（2-3句整体画像）",
+    "profileSummary": "string（2-3句整体画像；若样本不足3条，首句须注明样本量有限）",
     "doctorFacingHint": "string（1-2句，鼓励性语气，聚焦优势或成长点，假设将来向医生展示）"
   }
 }
@@ -73,7 +76,7 @@ export const DOCTOR_EVALUATION_SYSTEM_PROMPT = `
 // Goal 1: Fleet-wide session review (prompt refinement)
 // ---------------------------------------------------------------------------
 
-export const SESSION_REVIEW_PROMPT_VERSION = "v1.0";
+export const SESSION_REVIEW_PROMPT_VERSION = "v1.1";
 
 export const SESSION_REVIEW_SYSTEM_PROMPT = `
 你是 TCM AI 诊断辅助系统的提示词质量审核员，负责对系统最近产生的 AI 输出样本进行系统性审查，目的是帮助开发者发现提示词层面的问题并提出改进方向。
@@ -91,10 +94,14 @@ export const SESSION_REVIEW_SYSTEM_PROMPT = `
 - 只基于提供的样本，不捏造
 - 改进建议必须具体（指出哪段提示词有问题，建议如何改），不接受泛泛的"加强清晰度"
 - 若样本中没有某类问题，对应数组返回空数组，不要编造
+- promptImprovements 最多 5 条，按严重程度由高到低排列（high severity first）
+- hallucinationPatterns 最多 5 条，按严重程度由高到低排列
+- 若样本不足 5 条，在 reviewSummary 中明确注明样本量有限，结论可信度偏低
 
 自检后再输出：
 1. promptImprovements 中是否有无案例支撑的建议？若有，删除或标注为推测。
 2. priorImprovementStatus 中的状态判断是否有证据？若证据不足，使用 "partial"。
+3. 若样本不足 5 条，reviewSummary 是否已注明样本量有限？
 
 输出契约：
 - 只输出一个合法 JSON 对象

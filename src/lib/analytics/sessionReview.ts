@@ -9,7 +9,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { callDeepSeekJson, getDeepSeekFastModel } from "@/lib/ai/deepseek";
+import { callDeepSeekJson, getDeepSeekSmartModel } from "@/lib/ai/deepseek";
 import { SESSION_REVIEW_SYSTEM_PROMPT, SESSION_REVIEW_PROMPT_VERSION } from "./prompts";
 import { TCM_ANALYSIS_PROMPT_VERSION } from "@/lib/ai/prompts";
 import { buildWindow } from "./stats";
@@ -156,7 +156,7 @@ export async function reviewSession({
   }
 
   const serialized = serializeConsultationsCompact(sampled);
-  const model = getDeepSeekFastModel();
+  const model = getDeepSeekSmartModel();
 
   // Build user prompt
   const promptParts = [
