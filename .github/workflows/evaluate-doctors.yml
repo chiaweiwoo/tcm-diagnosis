@@ -17,25 +17,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Build request body
-        id: body
-        run: |
-          BODY='{}'
-          if [ -n "${{ github.event.inputs.email }}" ]; then
-            BODY=$(printf '%s' "$BODY" | jq --arg e "${{ github.event.inputs.email }}" '. + {doctorEmail: $e}')
-          fi
-          if [ "${{ github.event.inputs.force }}" = "true" ]; then
-            BODY=$(printf '%s' "$BODY" | jq '. + {force: true}')
-          fi
-          echo "body=$BODY" >> "$GITHUB_OUTPUT"
-
       - name: Trigger evaluation
         run: |
+          BODY=$(jq -cn \
+            --arg email "${{ github.event.inputs.email }}" \
+            --argjson force "${{ github.event.inputs.force }}" \
+            '{doctorEmail: (if $email != "" then $email else null end), force: $force}
+             | if .doctorEmail == null then del(.doctorEmail) else . end')
+
           STATUS=$(curl -s -o /tmp/result.json -w "%{http_code}" \
             -X POST "${{ secrets.VERCEL_PRODUCTION_URL }}/api/cron/evaluate-doctors" \
             -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
             -H "Content-Type: application/json" \
-            -d '${{ steps.body.outputs.body }}')
+            -d "$BODY")
           cat /tmp/result.json
           echo ""
           if [ "$STATUS" -ne 200 ]; then
