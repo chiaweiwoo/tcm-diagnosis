@@ -10,7 +10,8 @@
     "test": "vitest run",
     "check:deepseek": "node scripts/check-deepseek.mjs",
     "allowlist:add": "node --env-file=.env.local scripts/allowlist-add.mjs",
-    "seed:cases": "node --env-file=.env.local scripts/seed-cases.mjs"
+    "seed:cases": "node --env-file=.env.local scripts/seed-cases.mjs",
+    "evaluate": "node --env-file=.env.local scripts/evaluate.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",

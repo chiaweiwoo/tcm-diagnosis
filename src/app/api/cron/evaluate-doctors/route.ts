@@ -24,6 +24,17 @@ export async function POST(req: NextRequest) {
     return apiError(401, "UNAUTHORIZED", "无效的 cron 密钥。");
   }
 
+  // Optional body: { doctorEmail?: string, force?: boolean }
+  let targetEmail: string | null = null;
+  let force = false;
+  try {
+    const body = await req.json() as { doctorEmail?: string; force?: boolean };
+    if (typeof body.doctorEmail === "string" && body.doctorEmail.trim()) {
+      targetEmail = body.doctorEmail.trim().toLowerCase();
+    }
+    if (body.force === true) force = true;
+  } catch { /* no body — run all */ }
+
   const admin = getServiceRoleClient();
   const { windowStart, windowEnd } = buildWindow(7);
 
@@ -40,25 +51,34 @@ export async function POST(req: NextRequest) {
     usersResult.data.users.map((u) => [u.email?.toLowerCase() ?? "", u.id]),
   );
 
-  const doctors = (allowlistResult.data ?? [])
+  let doctors = (allowlistResult.data ?? [])
     .map((row) => ({
       email: row.email.toLowerCase(),
       doctorId: emailToId.get(row.email.toLowerCase()),
     }))
     .filter((d): d is { email: string; doctorId: string } => Boolean(d.doctorId));
 
+  if (targetEmail) {
+    doctors = doctors.filter((d) => d.email === targetEmail);
+    if (doctors.length === 0) {
+      return apiError(404, "NOT_FOUND", `找不到医生：${targetEmail}`);
+    }
+  }
+
   const results = await Promise.allSettled(
     doctors.map(async (doctor) => {
-      // Smart skip: already evaluated this window
-      const { data: existing } = await admin
-        .from("analytics_doctor_evaluations")
-        .select("id")
-        .eq("doctor_id", doctor.doctorId)
-        .eq("window_start", windowStart.toISOString())
-        .eq("window_end", windowEnd.toISOString())
-        .maybeSingle();
+      // Smart skip: already evaluated this window (bypass with force=true)
+      if (!force) {
+        const { data: existing } = await admin
+          .from("analytics_doctor_evaluations")
+          .select("id")
+          .eq("doctor_id", doctor.doctorId)
+          .eq("window_start", windowStart.toISOString())
+          .eq("window_end", windowEnd.toISOString())
+          .maybeSingle();
 
-      if (existing) return { skipped: true };
+        if (existing) return { skipped: true };
+      }
 
       const { evaluation, consultationCount, model } = await evaluateDoctor(
         admin,
