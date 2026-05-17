@@ -11,7 +11,7 @@ export async function POST(_req: Request, context: RouteContext) {
   try {
     const doctor = await getCurrentDoctor();
     if (!(await isAdminDoctorEmail(doctor.email))) {
-      return apiError(403, "UNAUTHORIZED", "仅管理员可克隆病案。");
+      return apiError(403, "UNAUTHORIZED", "仅管理员可拷贝病案。");
     }
 
     const { id } = await context.params;
@@ -49,9 +49,9 @@ export async function POST(_req: Request, context: RouteContext) {
     }
     await logServerEvent({
       source: "api/consultations/[id]/clone",
-      message: "克隆病案记录失败。",
+      message: "拷贝病案记录失败。",
       details: { error: error instanceof Error ? error.message : String(error) },
     });
-    return apiError(500, "INTERNAL_ERROR", "克隆病案记录失败。");
+    return apiError(500, "INTERNAL_ERROR", "拷贝病案记录失败。");
   }
 }

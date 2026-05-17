@@ -265,7 +265,7 @@ Do a full conflict pass. Specific changes:
   - Form fields rendered as read-only `<div>` (not `<input>`)
   - No save / analyze / delete buttons
   - History sidebar same as workbench
-  - Each history row has a `克隆此病案` button
+  - Each history row has a `拷贝此病案` button
   - Top banner: `正在以只读模式查看 ${email} 的记录`
 
 ### New API routes
@@ -286,7 +286,7 @@ Add `用户` link → `/admin/users`. Keep `评估记录` (will be renamed to `�
 
 ### Workbench
 
-When workbench loads a consultation that has `metadata.cloned_from_doctor_email`, show a banner: `克隆自 ${email} 的病案 — 修改与保存只影响你的账户`.
+When workbench loads a consultation that has `metadata.cloned_from_doctor_email`, show a banner: `拷贝自 ${email} 的病案 — 修改与保存只影响你的账户`.
 
 ### Commit message: `sprint 3: admin users list, read-only view, clone-to-own`
 

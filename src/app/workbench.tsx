@@ -742,7 +742,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
             {/* Clone provenance banner — shown when a consultation was cloned from another doctor */}
             {meta?.cloned_from_doctor_email && (
               <div className="clone-source-banner">
-                克隆自 {meta.cloned_from_doctor_email} 的病案 — 修改与保存只影响你的账户
+                拷贝自 {meta.cloned_from_doctor_email} 的病案 — 修改与保存只影响你的账户
               </div>
             )}
 

@@ -241,7 +241,7 @@ Admin nav (3 tabs, `src/app/admin/AdminNav.tsx`):
 
 Per-doctor read-only view (`/admin/users/[doctorId]`):
 - Lists the doctor's consultations as cards (form summary fields, status, date)
-- Each card has a **克隆此病案** button — clones `form_data` only to admin's own account
+- Each card has a **拷贝此病案** button — clones `form_data` only to admin's own account
 - Clone inserts a new draft consultation under admin's UUID with `model_meta = { cloned_from_doctor_email: "..." }`
 - Workbench shows a blue info banner when a cloned consultation is loaded; banner disappears after re-analysis
 
