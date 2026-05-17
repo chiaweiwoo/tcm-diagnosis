@@ -1,15 +1,17 @@
-/* ── Admin CSS variable aliases (map admin classes to workbench tokens) ── */
+/* ── Admin CSS variable aliases ──
+   Maps legacy class-level names to the canonical globals.css tokens.
+   ─────────────────────────────────────────────────────────────── */
 :root {
-  --muted:       var(--text-muted, #6B6B6B);
-  --foreground:  var(--text, #1A1A1A);
-  --paper:       var(--surface, #FFFFFF);
-  --line:        var(--border, #EAE6E2);
-  --sage:        var(--bg, #FAFAF8);
-  --mint:        var(--bg, #FAFAF8);
-  --danger:      var(--error, #B91C1C);
-  --danger-bg:   var(--error-bg, #FEF2F2);
-  --clinic-red:  var(--brand, #9B2226);
-  --clinic-red-soft: var(--brand-light, #FDF4F4);
+  --muted:           var(--text-muted);
+  --foreground:      var(--text);
+  --paper:           var(--surface);
+  --line:            var(--border);
+  --sage:            var(--bg);
+  --mint:            var(--bg);
+  --danger:          var(--error);
+  --danger-bg:       var(--error-bg);
+  --clinic-red:      var(--brand);
+  --clinic-red-soft: var(--brand-light);
 }
 
 /* ── Admin page body ── */

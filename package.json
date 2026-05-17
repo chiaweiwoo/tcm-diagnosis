@@ -8,10 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "check:deepseek": "node scripts/check-deepseek.mjs",
-    "assess:seed": "node scripts/assess-seed.mjs",
-    "assess:run": "node scripts/assess-run.mjs",
-    "assess:review": "node scripts/assess-review.mjs"
+    "check:deepseek": "node scripts/check-deepseek.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",

@@ -15,7 +15,7 @@ import {
   Settings2,
   Trash2,
 } from "lucide-react";
-import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { ReactNode, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StructuredCaseForm, structuredCaseSchema, PRESCRIPTION_TYPES, SEX_VALUES } from "@/lib/forms/caseSchema";
 import { AnalysisResult, ensureAnalysisResult, normalizePrescriptionType } from "@/lib/ai/analysisResult";
 import { BRANDING } from "@/lib/branding";
@@ -221,7 +221,7 @@ function getFormErrors(form: StructuredCaseForm): FormErrors {
 // Small components
 // ---------------------------------------------------------------------------
 
-function Toast({ toast, onClose }: { toast: ToastState; onClose: () => void }) {
+const Toast = memo(function Toast({ toast, onClose }: { toast: ToastState; onClose: () => void }) {
   useEffect(() => {
     const t = setTimeout(onClose, 3500);
     return () => clearTimeout(t);
@@ -242,14 +242,14 @@ function Toast({ toast, onClose }: { toast: ToastState; onClose: () => void }) {
       </button>
     </div>
   );
-}
+});
 
 function FieldError({ message }: { message?: string }) {
   if (!message) return null;
   return <span className="field-error">{message}</span>;
 }
 
-function ResultSection({ title, items }: { title: string; items: string[] }) {
+const ResultSection = memo(function ResultSection({ title, items }: { title: string; items: string[] }) {
   if (!items.length) return null;
   return (
     <div className="result-section">
@@ -261,9 +261,9 @@ function ResultSection({ title, items }: { title: string; items: string[] }) {
       </ul>
     </div>
   );
-}
+});
 
-function ResultColumn({ title, icon, colorVariant, children }: { title: string; icon: ReactNode; colorVariant?: "green" | "slate" | "teal"; children: ReactNode }) {
+const ResultColumn = memo(function ResultColumn({ title, icon, colorVariant, children }: { title: string; icon: ReactNode; colorVariant?: "green" | "slate" | "teal"; children: ReactNode }) {
   return (
     <div className={`result-column${colorVariant ? ` result-column--${colorVariant}` : ""}`}>
       <div className="result-column__header">
@@ -273,7 +273,7 @@ function ResultColumn({ title, icon, colorVariant, children }: { title: string; 
       <div className="result-column__body">{children}</div>
     </div>
   );
-}
+});
 
 function ShimmerCard() {
   return (
@@ -329,7 +329,7 @@ function formatSavedTime(d: Date) {
 // Status bar
 // ---------------------------------------------------------------------------
 
-function StatusBar({
+const StatusBar = memo(function StatusBar({
   saveStatus,
   savedAt,
   analyzing,
@@ -394,13 +394,13 @@ function StatusBar({
       {indicator}
     </div>
   );
-}
+});
 
 // ---------------------------------------------------------------------------
 // Samples panel (admin only)
 // ---------------------------------------------------------------------------
 
-function SamplesPanel({
+const SamplesPanel = memo(function SamplesPanel({
   samples,
   loading,
   onLoad,
@@ -438,13 +438,13 @@ function SamplesPanel({
       </div>
     </div>
   );
-}
+});
 
 // ---------------------------------------------------------------------------
 // History panel
 // ---------------------------------------------------------------------------
 
-function HistoryPanel({
+const HistoryPanel = memo(function HistoryPanel({
   consultations,
   activeId,
   onSelect,
@@ -503,7 +503,7 @@ function HistoryPanel({
       </div>
     </div>
   );
-}
+});
 
 // ---------------------------------------------------------------------------
 // Main Workbench
@@ -512,6 +512,16 @@ function HistoryPanel({
 export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
   const [form, setForm] = useState<StructuredCaseForm>(EMPTY_FORM);
   const [touched, setTouched] = useState<Set<keyof StructuredCaseForm>>(new Set());
+
+  // Debounced errors: run zod parse 250 ms after the last keystroke to avoid
+  // blocking the input event loop on every character.
+  const [displayErrors, setDisplayErrors] = useState<FormErrors>({});
+  useEffect(() => {
+    const t = setTimeout(() => setDisplayErrors(getFormErrors(form)), 250);
+    return () => clearTimeout(t);
+  }, [form]);
+  // Live (synchronous) errors used only for submit-button gating — cheap to
+  // compute once on user action, not on every render cycle.
   const liveErrors = useMemo(() => getFormErrors(form), [form]);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("new");
   const [savedAt, setSavedAt] = useState<Date | null>(null);
@@ -534,9 +544,10 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
   const [toast, setToast] = useState<ToastState | null>(null);
   const resultRef = useRef<HTMLDivElement>(null);
 
-  function showToast(message: string, tone: ToastState["tone"] = "info") {
+  const showToast = useCallback((message: string, tone: ToastState["tone"] = "info") => {
     setToast({ message, tone });
-  }
+  }, []);
+  const dismissToast = useCallback(() => setToast(null), []);
 
   // Load consultation list on mount
   useEffect(() => {
@@ -544,16 +555,16 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
       .then((records) => setConsultations(records))
       .catch(() => showToast("读取历史记录失败。", "error"))
       .finally(() => setHistoryLoading(false));
-  }, []);
+  }, [showToast]);
 
-  function setField<K extends keyof StructuredCaseForm>(key: K, value: StructuredCaseForm[K]) {
+  const setField = useCallback(<K extends keyof StructuredCaseForm>(key: K, value: StructuredCaseForm[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
     setSaveStatus((prev) => prev === "saving" ? prev : "unsaved");
-  }
+  }, []);
 
-  function markTouched(key: keyof StructuredCaseForm) {
+  const markTouched = useCallback((key: keyof StructuredCaseForm) => {
     setTouched((prev) => new Set([...prev, key]));
-  }
+  }, []);
 
   function handleNew() {
     setForm(EMPTY_FORM);
@@ -863,7 +874,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
               <div className="form-group">
                 <label className="form-label form-label--required">年龄 Age</label>
                 <input
-                  className={`form-input form-input--sm ${touched.has("patientAge") ? (liveErrors.patientAge ? "form-input--error" : "form-input--valid") : ""}`}
+                  className={`form-input form-input--sm ${touched.has("patientAge") ? (displayErrors.patientAge ? "form-input--error" : "form-input--valid") : ""}`}
                   type="number"
                   placeholder="岁"
                   value={form.patientAge}
@@ -872,7 +883,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
                   min={1}
                   max={120}
                 />
-                <FieldError message={touched.has("patientAge") ? liveErrors.patientAge : undefined} />
+                <FieldError message={touched.has("patientAge") ? displayErrors.patientAge : undefined} />
               </div>
               <div className="form-group">
                 <label className="form-label form-label--required">处方类型 Prescription Type</label>
@@ -897,7 +908,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
                     );
                   })}
                 </div>
-                <FieldError message={touched.has("prescriptionType") ? liveErrors.prescriptionType as string | undefined : undefined} />
+                <FieldError message={touched.has("prescriptionType") ? displayErrors.prescriptionType as string | undefined : undefined} />
               </div>
             </div>
 
@@ -905,7 +916,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
             <div className="form-group">
               <label className="form-label form-label--required">主诉 Presenting Complaint</label>
               <input
-                className={`form-input ${touched.has("chiefComplaint") ? (liveErrors.chiefComplaint ? "form-input--error" : "form-input--valid") : ""}`}
+                className={`form-input ${touched.has("chiefComplaint") ? (displayErrors.chiefComplaint ? "form-input--error" : "form-input--valid") : ""}`}
                 type="text"
                 placeholder="例：头痛眩晕反复发作"
                 value={form.chiefComplaint}
@@ -913,14 +924,14 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
                 onBlur={() => markTouched("chiefComplaint")}
                 maxLength={200}
               />
-              <FieldError message={touched.has("chiefComplaint") ? liveErrors.chiefComplaint : undefined} />
+              <FieldError message={touched.has("chiefComplaint") ? displayErrors.chiefComplaint : undefined} />
             </div>
 
             {/* Row 4: Current illness */}
             <div className="form-group">
               <label className="form-label form-label--required">现病史 History of Presenting Complaint</label>
               <textarea
-                className={`form-textarea ${touched.has("currentIllness") ? (liveErrors.currentIllness ? "form-input--error" : "form-input--valid") : ""}`}
+                className={`form-textarea ${touched.has("currentIllness") ? (displayErrors.currentIllness ? "form-input--error" : "form-input--valid") : ""}`}
                 placeholder="例：头痛3个月余，伴轻度眩晕，劳累后加重"
                 value={form.currentIllness}
                 onChange={(e) => setField("currentIllness", e.target.value)}
@@ -928,7 +939,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
                 rows={4}
                 maxLength={2000}
               />
-              <FieldError message={touched.has("currentIllness") ? liveErrors.currentIllness : undefined} />
+              <FieldError message={touched.has("currentIllness") ? displayErrors.currentIllness : undefined} />
             </div>
 
             {/* Row 5: Past history + Physical exam (2 cols) */}
@@ -947,7 +958,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
               <div className="form-group">
                 <label className="form-label form-label--required">体格检查 Medical Examination</label>
                 <textarea
-                  className={`form-textarea ${touched.has("physicalExam") ? (liveErrors.physicalExam ? "form-input--error" : "form-input--valid") : ""}`}
+                  className={`form-textarea ${touched.has("physicalExam") ? (displayErrors.physicalExam ? "form-input--error" : "form-input--valid") : ""}`}
                   placeholder="舌脉、查体重点"
                   value={form.physicalExam}
                   onChange={(e) => setField("physicalExam", e.target.value)}
@@ -955,7 +966,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
                   rows={3}
                   maxLength={1000}
                 />
-                <FieldError message={touched.has("physicalExam") ? liveErrors.physicalExam : undefined} />
+                <FieldError message={touched.has("physicalExam") ? displayErrors.physicalExam : undefined} />
               </div>
             </div>
 
@@ -964,7 +975,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
               <div className="form-group">
                 <label className="form-label form-label--required">诊断 Diagnosis</label>
                 <input
-                  className={`form-input ${touched.has("diagnosis") ? (liveErrors.diagnosis ? "form-input--error" : "form-input--valid") : ""}`}
+                  className={`form-input ${touched.has("diagnosis") ? (displayErrors.diagnosis ? "form-input--error" : "form-input--valid") : ""}`}
                   type="text"
                   placeholder="例：头痛 / 眩晕"
                   value={form.diagnosis}
@@ -972,12 +983,12 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
                   onBlur={() => markTouched("diagnosis")}
                   maxLength={100}
                 />
-                <FieldError message={touched.has("diagnosis") ? liveErrors.diagnosis : undefined} />
+                <FieldError message={touched.has("diagnosis") ? displayErrors.diagnosis : undefined} />
               </div>
               <div className="form-group">
                 <label className="form-label form-label--required">证型 Pattern</label>
                 <input
-                  className={`form-input ${touched.has("pattern") ? (liveErrors.pattern ? "form-input--error" : "form-input--valid") : ""}`}
+                  className={`form-input ${touched.has("pattern") ? (displayErrors.pattern ? "form-input--error" : "form-input--valid") : ""}`}
                   type="text"
                   placeholder="例：肝阳上亢"
                   value={form.pattern}
@@ -985,7 +996,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
                   onBlur={() => markTouched("pattern")}
                   maxLength={100}
                 />
-                <FieldError message={touched.has("pattern") ? liveErrors.pattern : undefined} />
+                <FieldError message={touched.has("pattern") ? displayErrors.pattern : undefined} />
               </div>
             </div>
 
@@ -993,7 +1004,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
             <div className="form-group">
               <label className="form-label form-label--required">处方 Treatment</label>
               <textarea
-                className={`form-textarea form-textarea--tall ${touched.has("prescription") ? (liveErrors.prescription ? "form-input--error" : "form-input--valid") : ""}`}
+                className={`form-textarea form-textarea--tall ${touched.has("prescription") ? (displayErrors.prescription ? "form-input--error" : "form-input--valid") : ""}`}
                 placeholder={
                   form.prescriptionType.includes("针灸") && !form.prescriptionType.includes("方药")
                     ? "例：百会、太冲、风池，平补平泻，留针20分钟"
@@ -1007,7 +1018,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
                 rows={5}
                 maxLength={2000}
               />
-              <FieldError message={touched.has("prescription") ? liveErrors.prescription : undefined} />
+              <FieldError message={touched.has("prescription") ? displayErrors.prescription : undefined} />
             </div>
 
             {/* Submit */}
@@ -1123,13 +1134,13 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
 
       {/* Footer */}
       <footer className="workbench-footer">
-        <span>Chia Wei</span>
+        <span>{BRANDING.author}</span>
         <span className="workbench-footer__sep">·</span>
         <span>Powered by DeepSeek</span>
       </footer>
 
       {/* Toast */}
-      {toast && <Toast toast={toast} onClose={() => setToast(null)} />}
+      {toast && <Toast toast={toast} onClose={dismissToast} />}
     </div>
   );
 }

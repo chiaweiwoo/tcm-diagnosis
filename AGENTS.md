@@ -101,7 +101,7 @@ Helps registered TCM doctors:
 
 - Frontend: Next.js + TypeScript on Vercel
 - UI: focused CSS (`workbench.css`, `admin/admin.css`) + `lucide-react` icons
-- Branding: `src/lib/branding.ts` — `BRANDING.name/subtitle/icon` used in header and login
+- Branding: `src/lib/branding.ts` — `BRANDING.name/subtitle/author/icon` used in header, login, and workbench footer
 - Validation: `zod` schema in `src/lib/forms/caseSchema.ts` (`structuredCaseSchema`, `StructuredCaseForm`)
 - Auth and data: Supabase (Google OAuth, allowlist, JSONB storage)
 - AI provider: DeepSeek only, through server-side routes (`src/app/api/`)
@@ -116,9 +116,11 @@ Doctor (browser)
   └── /api/consultations/*     → Supabase (save / load / delete history)
 
 Admin (browser, is_admin=true only)
-  └── GET /api/admin/samples   → returns assessment_samples rows
-  └── /admin/assessments       → assessment job list (future: trigger runs)
-  └── /admin/examples          → read-only sample library view
+  └── GET  /api/admin/samples         → returns active assessment_samples rows
+  └── POST /api/admin/assessment-jobs → runs all samples, saves results, runs synthesis (maxDuration=300s)
+  └── GET  /api/admin/assessment-jobs → lists assessment_jobs
+  └── /admin/assessments              → job list + RunButton → /admin/assessments/[runId] report
+  └── /admin/examples                 → read-only sample library view
 
 Workbench header (admin only):
   └── ⚙ Settings2 icon → /admin
@@ -129,11 +131,11 @@ Workbench header (admin only):
 
 ## CSS Architecture
 
-- `src/app/globals.css` — shared brand tokens (`--brand`, `--brand-dark`, `--brand-mid`, `--brand-light`, `--brand-tint`, `--surface`, `--border`, `--border-strong`). Must be the canonical source so admin routes (which don't load `workbench.css`) can use brand colors.
-- `src/app/workbench.css` — workbench-only styles. Loaded only on `/` route.
-- `src/app/admin/admin.css` — admin UI styles. Relies on tokens from `globals.css`.
+- `src/app/globals.css` — **full canonical token set**: `--brand`, `--text`, `--text-muted`, `--bg`, `--surface`, `--border`, `--border-strong`, `--border-focus`, `--error`, `--error-bg`, `--warn`, `--warn-bg`, `--radius`, `--radius-lg`, `--shadow`, `--shadow-md`. Always the primary source — all routes load it.
+- `src/app/workbench.css` — workbench-only styles. Also declares its own `:root` block (harmless duplicate) for IDE tooling. Loaded only on `/` route.
+- `src/app/admin/admin.css` — admin UI styles. Has a `:root` alias block that maps legacy names (`--muted`, `--foreground`, `--paper`, `--line`, `--sage`, `--mint`, `--clinic-red`, `--clinic-red-soft`) to canonical globals.css tokens.
 
-Never define brand tokens only in `workbench.css` — admin pages won't see them.
+Never define a token only in `workbench.css` — admin pages won't see it. Add it to `globals.css` first.
 
 ---
 
@@ -150,8 +152,8 @@ Never define brand tokens only in `workbench.css` — admin pages won't see them
 - `重点结论` banner: green (`#F0FDF4` bg, `#16A34A` border)
 - `风险与提醒` banner: yellow (`#FEFCE8` bg, `#CA8A04` border)
 - 判断 column: green header (`result-column--green`)
-- 方案 column: blue header (`result-column--blue`)
-- 随访监测 column: yellow header (`result-column--yellow`)
+- 方案 column: slate/silver header (`result-column--slate`)
+- 随访监测 column: teal header (`result-column--teal`)
 
 ---
 
@@ -176,7 +178,10 @@ History item display name: auto-built from `patientSex + patientAge岁 + chiefCo
 
 **Validation:** Single-layer zod schema (hard-block). Block patterns (hard-reject): guaranteed efficacy (`保证`, `治愈`, `包好`), patient self-use (`我是患者`, `我自己可以吃`).
 
-**Live validation UI:** `liveErrors` via `useMemo(() => getFormErrors(form), [form])`. Errors show once field is touched (`touched` set). Submit button disabled when any live error present. Fields show green border when valid, red when errored.
+**Live validation UI:** Split into two:
+- `displayErrors`: debounced (250 ms) — used for per-field red/green borders and `<FieldError>` messages. Avoids zod parse blocking every keystroke.
+- `liveErrors`: synchronous `useMemo` — used only for submit-button `disabled` gating and in `handleAnalyze` before calling the API.
+Errors show once field is touched (`touched` set). Submit button disabled when `liveErrors` is non-empty.
 
 ---
 
@@ -240,15 +245,14 @@ Migrations: `supabase/migrations/` (numbered SQL). Applied manually in Supabase 
 | Table | Purpose |
 |---|---|
 | `consultations` | Doctor history — form_data JSONB, analysis JSON, model meta |
-| `api_call_logs` | Per-call operational metrics — model, tokens, cost, latency |
 | `error_logs` | Pipeline errors (no form field values) |
 | `doctor_allowlist` | `email`, `is_active`, `is_admin` — access control source of truth |
 | `activity_logs` | Doctor activity events (login, analyze) — no UI for now |
 | `assessment_samples` | Test case library (migration 013) — seeded from CSV, admin-only read |
-| `assessment_jobs` | Assessment run tracking (migration 013) — future use |
-| `assessment_job_results` | Per-sample results per job (migration 013) — future use |
-| `assessment_runs` | Old calibration runs (legacy — not actively used) |
-| `doctor_examples` | Old example library (legacy — superseded by assessment_samples) |
+| `assessment_jobs` | Assessment run tracking (migration 013) — columns: `synthesis`, `review_model`, `error_summary` added in 014 |
+| `assessment_job_results` | Per-sample results per job — `analysis_raw` column added in 014 |
+
+> `assessment_runs` and `doctor_examples` were dropped in migration 015.
 
 All tables: service_role key only. No anon/user RLS. Never expose service_role key to browser.
 
@@ -299,8 +303,8 @@ git fetch origin main && git rebase origin/main && git push origin HEAD:main
 git stash && git rebase origin/main && git stash pop && git push origin HEAD:main
 ```
 
-**`ASSESSMENT_API_KEY` missing in CLI**
-The assessment HTTP client throws early if the key is absent. Add it to `.env.local`.
+**`ASSESSMENT_API_KEY` missing**
+Add it to `.env.local` and Vercel env vars. Still required for the `/api/analyze` route guard.
 
 **DeepSeek returns malformed JSON**
 Expected — repair is built in. Check `repairedJson: true` in logs. If repair triggers consistently, the prompt output format needs tightening.
@@ -341,5 +345,3 @@ Do not say done until the changed path is verified, not merely coded.
 
 1. Doctor feedback capture — accepted/rejected suggestion tracking
 2. External citation retrieval layer
-3. Assessment job runner — admin triggers a run from `/admin/assessments`, results saved to `assessment_jobs` + `assessment_job_results`
-4. Assessment results UI — `/admin/assessments/[jobId]` showing per-sample analysis output
