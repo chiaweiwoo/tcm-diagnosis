@@ -63,7 +63,7 @@ export type SessionReviewRow = {
 };
 
 // ---------------------------------------------------------------------------
-// Sampling — stratified by prescriptionType, up to maxSamples total
+// Sampling — stratified by prescriptionType, up to perGroupMax per group
 // ---------------------------------------------------------------------------
 
 type RawRow = {
@@ -72,9 +72,12 @@ type RawRow = {
   analyzed_at: string | null;
 };
 
-function stratifiedSample(rows: RawRow[], maxSamples: number): RawRow[] {
-  if (rows.length <= maxSamples) return rows;
-
+/**
+ * Returns up to perGroupMax rows from each prescriptionType bucket.
+ * Total = numGroups × perGroupMax (each group contributes independently).
+ * If a group has fewer than perGroupMax rows, all rows from that group are kept.
+ */
+function stratifiedSample(rows: RawRow[], perGroupMax: number): RawRow[] {
   const buckets: Record<string, RawRow[]> = {};
   for (const row of rows) {
     const types = Array.isArray(row.form_data?.prescriptionType)
@@ -83,15 +86,11 @@ function stratifiedSample(rows: RawRow[], maxSamples: number): RawRow[] {
     (buckets[types] ??= []).push(row);
   }
 
-  const keys = Object.keys(buckets);
-  const perBucket = Math.ceil(maxSamples / keys.length);
   const sampled: RawRow[] = [];
-
-  for (const key of keys) {
-    sampled.push(...buckets[key].slice(0, perBucket));
+  for (const bucket of Object.values(buckets)) {
+    sampled.push(...bucket.slice(0, perGroupMax));
   }
-
-  return sampled.slice(0, maxSamples);
+  return sampled;
 }
 
 // ---------------------------------------------------------------------------
@@ -102,12 +101,13 @@ export async function reviewSession({
   client,
   priorReviewId,
   windowDays = 14,
-  maxSamples = 40,
+  perGroupMax = 10,
 }: {
   client: SupabaseClient;
   priorReviewId?: string | null;
   windowDays?: number;
-  maxSamples?: number;
+  /** Max consultations to sample per prescriptionType group. Default 10. */
+  perGroupMax?: number;
 }): Promise<SessionReviewRow> {
   const { windowStart, windowEnd } = buildWindow(windowDays);
 
@@ -123,7 +123,7 @@ export async function reviewSession({
   if (error) throw new Error(error.message);
 
   const allRows = (rawRows ?? []) as RawRow[];
-  const sampled = stratifiedSample(allRows, maxSamples);
+  const sampled = stratifiedSample(allRows, perGroupMax);
   const sampleSize = sampled.length;
 
   if (sampleSize === 0) {
@@ -185,6 +185,7 @@ export async function reviewSession({
     name: "session-review",
     metadata: {
       windowDays,
+      perGroupMax,
       sampleSize,
       promptVersion: TCM_ANALYSIS_PROMPT_VERSION,
       hasPrior: !!priorReview,
@@ -199,7 +200,7 @@ export async function reviewSession({
       { role: "user", content: userPrompt },
     ],
     model,
-    maxTokens: 3000,
+    maxTokens: 4000,
     repairJson: true,
   });
 

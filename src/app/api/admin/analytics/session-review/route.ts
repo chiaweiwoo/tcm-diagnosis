@@ -12,7 +12,7 @@ import { apiError } from "@/lib/apiResponses";
 import { reviewSession } from "@/lib/analytics/sessionReview";
 import { logServerEvent } from "@/lib/logging";
 
-// Session review involves a large DeepSeek call with up to 40 cases
+// Session review: up to 10 cases per prescriptionType group (smart model, can be 50+ cases total)
 export const maxDuration = 120;
 
 async function guardAdmin() {
