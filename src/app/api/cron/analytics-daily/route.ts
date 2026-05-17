@@ -1,6 +1,19 @@
+/**
+ * Daily analytics cron endpoint — Sprint 5.
+ *
+ * Called by GitHub Actions on schedule (0 18 * * * UTC = 02:00 CST).
+ * Also callable on-demand via workflow_dispatch.
+ *
+ * Auth: CRON_SECRET header must match the CRON_SECRET env var.
+ * This is NOT a doctor-facing route — no Supabase session required.
+ *
+ * Smart skip: per doctor, skip narrative re-generation if their last
+ * analytics_usage_runs row has a window_end matching today's window
+ * AND a non-null narrative. This keeps cost proportional to activity.
+ */
+
 import { type NextRequest, NextResponse } from "next/server";
-import { createServerSupabaseClient, getServiceRoleClient } from "@/lib/supabase/server";
-import { isAdminDoctorEmail } from "@/lib/auth";
+import { getServiceRoleClient } from "@/lib/supabase/server";
 import { apiError } from "@/lib/apiResponses";
 import {
   buildWindow,
@@ -14,23 +27,21 @@ import {
   generatePromptQualityNarrative,
 } from "@/lib/analytics/narrative";
 
-// Allow up to 60 s for cross-doctor computation on Vercel Pro
-export const maxDuration = 60;
+export const maxDuration = 120;
 
-export async function POST(_req: NextRequest) {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user || !(await isAdminDoctorEmail(user.email))) {
-    return apiError(403, "UNAUTHORIZED", "仅管理员可运行分析。");
+export async function POST(req: NextRequest) {
+  // Auth
+  const secret = process.env.CRON_SECRET;
+  if (!secret) {
+    return apiError(500, "INTERNAL_ERROR", "CRON_SECRET 未配置。");
+  }
+  if (req.headers.get("x-cron-secret") !== secret) {
+    return apiError(401, "UNAUTHORIZED", "无效的 cron 密钥。");
   }
 
   const admin = getServiceRoleClient();
 
-  // ---------------------------------------------------------------------------
   // Resolve all active doctors
-  // ---------------------------------------------------------------------------
   const [allowlistResult, usersResult] = await Promise.all([
     admin.from("doctor_allowlist").select("email").eq("is_active", true),
     admin.auth.admin.listUsers({ perPage: 1000 }),
@@ -50,29 +61,35 @@ export async function POST(_req: NextRequest) {
     }))
     .filter((d): d is { email: string; doctorId: string } => Boolean(d.doctorId));
 
-  // ---------------------------------------------------------------------------
-  // Compute windows
-  // ---------------------------------------------------------------------------
   const { windowStart: usageStart, windowEnd: usageEnd } = buildWindow(30);
   const { windowStart: qualityStart, windowEnd: qualityEnd } = buildWindow(7);
 
-  // ---------------------------------------------------------------------------
-  // Per-doctor stats
-  // ---------------------------------------------------------------------------
   let doctorsProcessed = 0;
+  let doctorsSkipped = 0;
   let doctorsFailed = 0;
 
   for (const doctor of doctors) {
     try {
+      // Smart skip: check if this doctor already has a narrative for today's window
+      const { data: existing } = await admin
+        .from("analytics_usage_runs")
+        .select("narrative")
+        .eq("doctor_id", doctor.doctorId)
+        .eq("window_end", usageEnd.toISOString())
+        .maybeSingle();
+
+      if (existing?.narrative) {
+        doctorsSkipped++;
+        continue;
+      }
+
       const [usage, performance] = await Promise.all([
         computeUsageStats(admin, doctor.doctorId, usageStart, usageEnd),
         computePerformanceStats(admin, doctor.doctorId, usageStart, usageEnd),
       ]);
 
-      // Skip doctors with no consultations in window
       if (usage.consultationCount === 0) continue;
 
-      // Generate narratives (Flash; errors are non-fatal — stats are still saved)
       const [usageNarrative, performanceNarrative] = await Promise.allSettled([
         generateUsageNarrative(usage, doctor.email),
         generatePerformanceNarrative(performance, doctor.email),
@@ -111,15 +128,11 @@ export async function POST(_req: NextRequest) {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Global prompt quality stats
-  // ---------------------------------------------------------------------------
+  // Global quality stats
   let qualityRunId: string | null = null;
-
   try {
     const qualityStats = await computePromptQualityStats(admin, qualityStart, qualityEnd);
 
-    // Generate quality narrative (non-fatal if it fails)
     let qualityNarrative: string | null = null;
     try {
       qualityNarrative = await generatePromptQualityNarrative(qualityStats);
@@ -143,17 +156,14 @@ export async function POST(_req: NextRequest) {
 
     qualityRunId = qualityRow?.id ?? null;
   } catch {
-    // non-fatal — per-doctor stats are still useful
+    // non-fatal
   }
 
   return NextResponse.json({
     ok: true,
     doctorsProcessed,
+    doctorsSkipped,
     doctorsFailed,
     qualityRunId,
-    windows: {
-      usage: { start: usageStart, end: usageEnd },
-      quality: { start: qualityStart, end: qualityEnd },
-    },
   });
 }

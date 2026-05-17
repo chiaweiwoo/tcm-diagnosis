@@ -113,6 +113,14 @@ export default async function AnalyticsPage() {
               ))}
             </div>
           )}
+
+          {/* Narrative */}
+          {latest.narrative && (
+            <div className="analytics-narrative">
+              <span className="analytics-narrative-label">质量小结</span>
+              <p className="analytics-narrative-text">{latest.narrative}</p>
+            </div>
+          )}
         </div>
       )}
 

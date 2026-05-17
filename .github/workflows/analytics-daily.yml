@@ -1,0 +1,24 @@
+name: Analytics Daily Cron
+
+on:
+  schedule:
+    # 02:00 CST = 18:00 UTC
+    - cron: "0 18 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  run-analytics:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Trigger analytics cron endpoint
+        run: |
+          STATUS=$(curl -s -o /tmp/body.json -w "%{http_code}" \
+            -X POST "${{ secrets.VERCEL_PRODUCTION_URL }}/api/cron/analytics-daily" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json")
+          cat /tmp/body.json
+          if [ "$STATUS" -ne 200 ]; then
+            echo "Analytics cron failed with HTTP $STATUS"
+            exit 1
+          fi

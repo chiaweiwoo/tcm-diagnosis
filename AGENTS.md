@@ -134,15 +134,18 @@ Doctor (browser)
 Admin (browser, is_admin=true only)
   └── GET  /api/admin/users                    → doctor list with 30-day stats
   └── GET  /api/admin/users/[doctorId]/consultations → per-doctor consultation list (service_role)
-  └── POST /api/admin/analytics/run            → compute stats for all doctors + global (writes to DB)
+  └── POST /api/admin/analytics/run            → compute stats + narratives for all doctors + global (writes to DB)
   └── GET  /api/admin/analytics/prompt-quality → latest global prompt-quality runs
   └── GET  /api/admin/analytics/users/[id]    → latest usage + performance for a doctor
   └── POST /api/admin/assessment-jobs          → runs all samples, saves results, runs synthesis (maxDuration=300s)
   └── GET  /api/admin/assessment-jobs          → lists assessment_jobs
   └── /admin/users                             → doctor list page
-  └── /admin/users/[doctorId]                  → read-only consultation view + clone buttons
-  └── /admin/analytics                         → prompt quality stats + RunAnalyticsButton
+  └── /admin/users/[doctorId]                  → read-only consultation view + 拷贝此病案 buttons
+  └── /admin/analytics                         → prompt quality stats + narrative + RunAnalyticsButton
   └── /admin/assessments                       → job list + RunButton → /admin/assessments/[runId] report
+
+Cron (GitHub Actions, CRON_SECRET auth)
+  └── POST /api/cron/analytics-daily           → smart-skip per-doctor narrative refresh (daily 02:00 CST)
 
 Doctor (browser)
   └── GET /api/analytics/me                   → own latest usage + performance stats (RLS-enforced)
@@ -234,8 +237,8 @@ Admin guard: `src/app/admin/layout.tsx` — server-side, redirects to `/?reason=
 
 Admin nav (3 tabs, `src/app/admin/AdminNav.tsx`):
 - **用户** — `/admin/users` — doctor list with 30-day stats + link to per-doctor view
-- **分析** — `/admin/analytics` — prompt quality stats + run button (Sprint 4)
-- **评估记录** — `/admin/assessments` — assessment job list (to be renamed → 分析 in Sprint 5)
+- **分析** — `/admin/analytics` — prompt quality stats + narrative + run button
+- **评估记录** — `/admin/assessments` — assessment job list
 
 `AdminNav` is a client component (needs `usePathname()` for active link highlighting). Admin layout is a server component.
 
@@ -351,6 +354,9 @@ Expected — repair is built in. Check `repairedJson: true` in logs. If repair t
 
 **Admin pages can't see brand CSS variables**
 Brand tokens (`--brand`, etc.) must be defined in `globals.css`, not only in `workbench.css`. `workbench.css` only loads on `/` route.
+
+**Daily analytics cron fails with 401**
+`CRON_SECRET` must be set in: `.env.local`, Vercel env vars (all environments), and GitHub Actions secrets. The `analytics-daily.yml` workflow also requires `VERCEL_PRODUCTION_URL` as a GitHub Actions secret (e.g. `https://your-app.vercel.app`).
 
 ---
 
