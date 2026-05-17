@@ -18,17 +18,12 @@ import { buildWindow } from "@/lib/analytics/stats";
 export const maxDuration = 120;
 
 export async function POST(req: NextRequest) {
-  const cronSecret   = process.env.CRON_SECRET;
   const assessSecret = process.env.ASSESSMENT_API_KEY;
+  const givenAssess  = req.headers.get("x-assessment-key");
 
-  const givenCron   = req.headers.get("x-cron-secret");
-  const givenAssess = req.headers.get("x-assessment-key");
-
-  const authed =
-    (cronSecret   && givenCron   === cronSecret)   ||
-    (assessSecret && givenAssess === assessSecret);
-
-  if (!authed) return apiError(401, "UNAUTHORIZED", "无效的密钥。");
+  if (!assessSecret || givenAssess !== assessSecret) {
+    return apiError(401, "UNAUTHORIZED", "无效的密钥。");
+  }
 
   // Optional body: { doctorEmail?: string, force?: boolean }
   let targetEmail: string | null = null;

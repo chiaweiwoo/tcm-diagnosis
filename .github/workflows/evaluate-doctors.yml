@@ -1,6 +1,8 @@
 name: Evaluate Doctors
 
 on:
+  schedule:
+    - cron: "0 18 * * *"  # 02:00 CST (UTC+8)
   workflow_dispatch:
     inputs:
       email:
