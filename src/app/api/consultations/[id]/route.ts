@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { apiError } from "@/lib/apiResponses";
 import { deleteConsultation, getConsultation, updateConsultation } from "@/lib/consultations";
-import { getCurrentDoctorEmail } from "@/lib/currentDoctor";
+import { getCurrentDoctor } from "@/lib/currentDoctor";
+import { createServerSupabaseClient, getServiceRoleClient } from "@/lib/supabase/server";
 import { logServerEvent } from "@/lib/logging";
 
 type RouteContext = {
@@ -18,9 +19,11 @@ function isUnauthorized(error: unknown) {
 
 export async function GET(_request: Request, context: RouteContext) {
   try {
-    const doctorEmail = await getCurrentDoctorEmail();
+    const doctor = await getCurrentDoctor();
+    const supabase = doctor.isDevBypass ? getServiceRoleClient() : await createServerSupabaseClient();
+    const dbOpts = doctor.isDevBypass ? { doctorEmail: doctor.email } : {};
     const { id } = await context.params;
-    const record = await getConsultation(id, doctorEmail);
+    const record = await getConsultation(supabase, id, dbOpts);
 
     if (!record) {
       return apiError(404, "NOT_FOUND", "找不到病案记录。");
@@ -43,9 +46,11 @@ export async function GET(_request: Request, context: RouteContext) {
 
 export async function PATCH(request: Request, context: RouteContext) {
   try {
-    const doctorEmail = await getCurrentDoctorEmail();
+    const doctor = await getCurrentDoctor();
+    const supabase = doctor.isDevBypass ? getServiceRoleClient() : await createServerSupabaseClient();
+    const dbOpts = doctor.isDevBypass ? { doctorEmail: doctor.email } : {};
     const { id } = await context.params;
-    const existing = await getConsultation(id, doctorEmail);
+    const existing = await getConsultation(supabase, id, dbOpts);
 
     if (!existing) {
       return apiError(404, "NOT_FOUND", "找不到病案记录。");
@@ -66,31 +71,36 @@ export async function PATCH(request: Request, context: RouteContext) {
       newFormData !== undefined &&
       JSON.stringify(newFormData) !== JSON.stringify(existing.form_data);
 
-    const record = await updateConsultation(id, doctorEmail, {
-      consultation_name: Object.hasOwn(body, "consultationName")
-        ? normalizeName(body.consultationName)
-        : existing.consultation_name,
-      ...(newFormData !== undefined
-        ? {
-            form_data: newFormData,
-            analysis_status: formDataChanged ? "draft" : existing.analysis_status,
-            ...(formDataChanged
-              ? {
-                  analysis_result: null,
-                  analysis_raw: null,
-                  model_meta: null,
-                  analyzed_at: null,
-                }
-              : {}),
-          }
-        : {}),
-      ...(Object.hasOwn(body, "analysisResult") ? { analysis_result: body.analysisResult ?? null } : {}),
-      ...(Object.hasOwn(body, "analysisRaw") ? { analysis_raw: body.analysisRaw ?? null } : {}),
-      ...(Object.hasOwn(body, "modelMeta") ? { model_meta: body.modelMeta ?? null } : {}),
-      ...(body.analysisStatus === "analyzed"
-        ? { analysis_status: "analyzed", analyzed_at: new Date().toISOString() }
-        : {}),
-    });
+    const record = await updateConsultation(
+      supabase,
+      id,
+      {
+        consultation_name: Object.hasOwn(body, "consultationName")
+          ? normalizeName(body.consultationName)
+          : existing.consultation_name,
+        ...(newFormData !== undefined
+          ? {
+              form_data: newFormData,
+              analysis_status: formDataChanged ? "draft" : existing.analysis_status,
+              ...(formDataChanged
+                ? {
+                    analysis_result: null,
+                    analysis_raw: null,
+                    model_meta: null,
+                    analyzed_at: null,
+                  }
+                : {}),
+            }
+          : {}),
+        ...(Object.hasOwn(body, "analysisResult") ? { analysis_result: body.analysisResult ?? null } : {}),
+        ...(Object.hasOwn(body, "analysisRaw") ? { analysis_raw: body.analysisRaw ?? null } : {}),
+        ...(Object.hasOwn(body, "modelMeta") ? { model_meta: body.modelMeta ?? null } : {}),
+        ...(body.analysisStatus === "analyzed"
+          ? { analysis_status: "analyzed", analyzed_at: new Date().toISOString() }
+          : {}),
+      },
+      dbOpts,
+    );
 
     return NextResponse.json({ record });
   } catch (error) {
@@ -109,9 +119,11 @@ export async function PATCH(request: Request, context: RouteContext) {
 
 export async function DELETE(_request: Request, context: RouteContext) {
   try {
-    const doctorEmail = await getCurrentDoctorEmail();
+    const doctor = await getCurrentDoctor();
+    const supabase = doctor.isDevBypass ? getServiceRoleClient() : await createServerSupabaseClient();
+    const dbOpts = doctor.isDevBypass ? { doctorEmail: doctor.email } : {};
     const { id } = await context.params;
-    await deleteConsultation(id, doctorEmail);
+    await deleteConsultation(supabase, id, dbOpts);
     return NextResponse.json({ ok: true });
   } catch (error) {
     if (isUnauthorized(error)) {

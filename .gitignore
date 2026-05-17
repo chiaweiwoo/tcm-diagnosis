@@ -33,6 +33,10 @@ yarn-error.log*
 .pnpm-debug.log*
 local-data/
 
+# clinical sample data (never commit)
+/samples_data.csv
+/data/seed-cases.json
+
 # env files (can opt-in for committing if needed)
 .env*
 

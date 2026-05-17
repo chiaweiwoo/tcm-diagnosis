@@ -72,7 +72,28 @@ Any meaningful change to product behavior, architecture, security rules, or cali
 
 ### 10. Assessment samples live in DB only — never in the codebase
 
+> **Planned removal.** Once the seed-script direction (see Analytics Architecture) lands, `assessment_samples` will be dropped and sample data will live only in a local gitignored JSON consumed by a CLI seed script that writes to `consultations` under a dedicated test user UUID. Until then, this invariant still holds.
+
 Sample records for testing are stored exclusively in the `assessment_samples` Supabase table. The CSV source file is local-only and gitignored. Do not add sample data to any TypeScript file or config file.
+
+### 11. doctor_id (UUID) is the stable identity, not email
+
+`auth.users.id` UUID is the only stable identifier for a doctor. Email can change. Auth provider behavior can change.
+
+All new tables that reference a doctor must use `doctor_id UUID` (FK to `auth.users.id`). The legacy `consultations.doctor_email` column will be supplemented by `doctor_id` (migration pending). RLS policies on per-doctor tables must read `auth.uid()`, not email.
+
+Email is retained only as a denormalized display field. Never use it as a join key in new code.
+
+### 12. RLS is the last line of defense
+
+Per-doctor tables (`consultations`, future `analytics_usage_runs`, `analytics_performance_runs`) must have Row Level Security policies that restrict reads to `doctor_id = auth.uid()`. Admin routes use service_role to bypass RLS — but only those routes. The database itself must refuse cross-doctor reads even if application code asks. A missed `.eq("doctor_id", ...)` in a future PR must not be able to cause a data leak.
+
+### 13. Model selection — DeepSeek by default, smart model only with written justification
+
+- **Clinical analysis is DeepSeek-only.** Chinese clinical content, established prompts. Never route clinical content through any other provider.
+- **Analytics narrative starts with DeepSeek.** Use Flash unless a tone or quality requirement demonstrably fails Flash. Escalate to Pro (`deepseek-reasoner`) before considering any other provider.
+- **Any commit that introduces a smart model (Claude, GPT, etc.) must include a written justification in the commit body explaining why DeepSeek Pro was insufficient, with concrete examples.** Reviewer must also explicitly state whether Flash would have been enough — if yes, downgrade before merging.
+- **No `ANTHROPIC_API_KEY` in this project unless invariant #13 has been formally satisfied.** Until then, the env var should not exist in `.env.local`, Vercel, or GitHub Actions.
 
 ---
 
@@ -277,6 +298,8 @@ Env var: `LANGFUSE_BASE_URL` — defaults to `https://jp.cloud.langfuse.com` if 
 - AI pricing is hardcoded in `config/rates.json`. Updated automatically by `.github/workflows/update-rates.yml` (daily). When updating manually, update the `_comment` date field.
 - Token usage and cost are internal only — never shown to doctors.
 
+> **Planned removal in Sprint 2.** `config/rates.json` + the rates updater workflow will be dropped. Cost will be tracked exclusively in Langfuse (its model registry handles pricing). `model_meta.costUsd` written to `consultations` will go away. Until Sprint 2 ships, the above remains accurate.
+
 ---
 
 ## Logging Rules
@@ -341,7 +364,141 @@ Do not say done until the changed path is verified, not merely coded.
 
 ---
 
+## Analytics Architecture (Planning — Not Yet Built)
+
+> Decisions captured during brainstorming. Use this as the spine when implementation begins. Nothing in this section is in the code yet.
+>
+> **Execution sequence lives in `PLAN.md` at repo root.** Read PLAN.md before starting any analytics/identity sprint. PLAN.md contains the linear sprint order, migration SQL, exact file paths, concrete stat queries, model + cron choices, and per-sprint verification steps.
+
+### Two-layer product split (most important architectural decision)
+
+Analytics is not one product — it is two, with overlapping data but different purposes, audiences, and tone:
+
+**Doctor-growth layer (doctor + admin both see):**
+- Supportive, observational, encouraging
+- Strengths first; growth notes as questions
+- L1/L2 only by default; L3/L4 always wrapped as questions
+- Self vs self only — never peer comparison
+- Examples: "你的 现病史 比上月更详细了", "本月你处理了 12 例 失眠 主诉"
+
+**Manager / pattern-alert layer (admin-only — doctor never sees these):**
+- Proactive early-warning system for the senior doctor / product owner
+- Surfaces uncomfortable signals: declining quality, fatigue, modality drift, anomalous cases
+- Triggers a human conversation, not an automated message to the doctor
+- Example signal: "Dr X's 针灸 ratio dropped 40% over the last 3 months — any reason?"
+- This is the layer that solves the clinic-branch visibility problem: by the time harm surfaces, it's usually too late. The manager needs proactive alerts.
+
+The split is enforced at the table level (see "Tables" below) and at the RLS level — manager-layer tables must never be readable by doctors.
+
+### Locked decisions
+
+- **Rename:** `assessment_*` → `analytics_*` everywhere. The legacy `assessment_runs` table was already dropped in migration 015.
+- **No impersonation.** Replaced by (a) read-only admin view of any doctor's history and (b) a "clone to my account" button on individual consultations for debugging. Rationale: writing as another doctor creates clinical liability; debugging only needs read + clone.
+- **RLS migration is the foundation** (see invariant #12). Before any analytics work, every `consultations` query must run under the user's own Supabase JWT, not service_role. Service_role is restricted to admin routes only.
+- **doctor_id (UUID) is the stable key** (see invariant #11). All analytics tables key on `doctor_id`, never email.
+- **No signup page. Doctors are onboarded by admin CLI** (`scripts/allowlist-add.mjs`), which adds the email to `doctor_allowlist` AND (if not already present) creates the `auth.users` row via Supabase admin API. The doctor can later sign in via Google OAuth and the existing row matches by email.
+- **Seed script** (`scripts/seed-cases.mjs --email X`) targets any allowlisted doctor by looking up their UUID from `auth.users` and writing consultations under it using service_role. Reads a gitignored local JSON. Admin can seed on behalf of any user.
+- **No opt-in modal.** Pilot scope, small group, doctors understand the platform's purpose. T&C disclosure deferred until later.
+
+### Tables
+
+Four tables. Separate per dimension. Join via SQL views for dashboards.
+
+| Table | Scope | Layer | RLS |
+|---|---|---|---|
+| `analytics_prompt_quality_runs` | Global (no doctor_id) | Manager/admin | service_role only |
+| `analytics_usage_runs` | Per-doctor | Doctor-growth | doctor sees own; admin sees all |
+| `analytics_performance_runs` | Per-doctor | Doctor-growth | doctor sees own; admin sees all |
+| `analytics_admin_alerts` | Per-doctor | Manager/admin | service_role only |
+
+Why separate (not one table with a `dimension` column):
+- Different schemas (global vs per-doctor)
+- Different RLS policies per layer — much cleaner than conditionals on a single table
+- `analytics_admin_alerts` must be strictly invisible to doctors; separate table makes this trivial
+- TypeScript types stay simple
+- Schema migrations stay isolated
+
+### Database tooling — views and stored procedures
+
+Until analytics, the app was CRUD-on-single-table simple. Analytics changes that.
+
+**Use SQL views for:**
+- Admin dashboard reads — e.g. `analytics_doctor_dashboard` view = LEFT JOIN of usage + performance + recent alerts, keyed by doctor_id
+- Doctor-facing rollups that filter out admin-only columns
+- Anonymized cohort views (future)
+
+**Use stored procedures (PL/pgSQL via `rpc()`) sparingly for:**
+- Atomic multi-table operations (e.g. daily rollup that inserts into usage + performance in one transaction)
+- Heavy aggregations where pulling raw rows to Node would be wasteful
+
+**Keep in TypeScript:**
+- Anything that calls external APIs (LLM, fetch)
+- Logic that benefits from unit tests
+- Anything where SQL would obscure intent
+
+### Tone principles (doctor-facing analytics only)
+
+This is a partner tool, not a judge. Every doctor-facing analytics prompt and UI string must follow these:
+
+1. **Self vs self, never doctor vs doctor.** No leaderboards, no peer comparison.
+2. **Observations, not verdicts.** "我注意到..." / "数据显示...", not "你做得好/不好".
+3. **Strengths first.** Every report opens with what the doctor is doing well.
+4. **Questions, not commands.** L3 (predictive) and L4 (prescriptive) insights end in a question, never a directive.
+5. **No precision theater.** No fabricated percentages or scores. We have no ground truth for clinical accuracy.
+6. **No clinical scoring.** Describe patterns, do not grade judgment.
+
+Manager-layer (admin) output is exempt from these — it can be direct, ranked, and surface uncomfortable patterns. It just must never leak into doctor-facing surfaces.
+
+### 4-level analytics framework
+
+| Level | Question | Doctor-growth framing | Manager framing |
+|---|---|---|---|
+| L1 Descriptive | What happened? | Direct facts | Direct facts |
+| L2 Diagnostic | Why did it happen? | Observation + possible factor | Direct factor analysis |
+| L3 Predictive | What will happen? | Soft hint, ends in a question | Direct projection |
+| L4 Prescriptive | How to improve? | Suggestion only, never directive | Direct recommendation |
+
+### Context window strategy
+
+Don't feed raw consultations into the LLM in bulk. Two-stage pipeline:
+
+1. **Stats in code (no LLM):** coverage rates, length distributions, frequencies, completeness, repaired JSON rate. Run on full dataset via SQL (often via a view or PL/pgSQL function).
+2. **Narrative on a sample (with LLM):** sample ~20-30 consultations per run, send to DeepSeek (Flash first per invariant #13; escalate to Pro only on tone failure) with Stage 1 stats as context. Bounded token cost.
+
+### Cadence (start daily, observe, adjust)
+
+- **Stats stage** — live on every view. No materialization. Cheap SQL.
+- **LLM narrative stage** — daily cron with **smart skip**: only re-narrate for doctors who have logged a new consultation since their last narrative. Cost scales with activity, not headcount.
+- **Cron mechanism**: GitHub Actions (`.github/workflows/analytics-daily.yml`) hitting an authenticated endpoint with a `CRON_SECRET` header. Chosen over Vercel Cron because it's free, logs cleanly in the GH Actions UI alongside `update-rates.yml`, supports `workflow_dispatch` for manual runs, and has no Pro-plan dependency.
+- **Pattern alerts** — backlogged. Will be added after Sprint 4/5 data has been collected for a few weeks.
+- Idempotent: keyed by `(doctor_id, window_start, window_end)`. Re-running overwrites.
+- On-demand admin button to trigger any window.
+
+Daily was chosen for the pilot. Will likely change after we see real usage and cost.
+
+### Deferred (need data before deciding)
+
+These were raised during planning but cannot be decided without real consultation data flowing:
+
+- **Pattern-alert thresholds** — fixed thresholds set with the senior-doctor partner, vs LLM open-ended anomaly detection. Currently leaning fixed thresholds (predictable, explainable, no hallucination risk), but pending real data.
+- **Alert delivery channel** — dashboard card only, vs email/push. Pending: do cards get ignored?
+
+### Open brainstorm topics
+
+To revisit once L1/L2 ships and we have real data:
+
+- **Cohort comparison** — doctor vs average (anonymized). Tricky for vibe; may never ship doctor-facing, manager-facing is fine.
+- **Time series** — doctor's own metrics month over month. Likely valuable.
+- **Anomaly detection** — flag consultations that diverge from the doctor's own pattern (fatigue, edge cases).
+- **Section pair-wise drift** — does 建议优化 meaningfully differ from 当前思路, or is the AI rephrasing?
+- **Diagnosis-pattern consistency** — does AI reasoning align with the doctor's stated 证型?
+- **AI agreement rate** — proxy for "does the doctor seem to act on 建议优化?" Requires post-consultation feedback signal we don't yet capture.
+- **Time-of-day fatigue** — quality variation by hour.
+- **Modality drift detection** (manager layer) — e.g. 针灸 ratio shift, herb-complexity trend, risk-flag rate change.
+
+---
+
 ## Deferred Scope
 
-1. Doctor feedback capture — accepted/rejected suggestion tracking
+1. Doctor feedback capture — accepted/rejected suggestion tracking (also blocks "AI agreement rate" analytics)
 2. External citation retrieval layer

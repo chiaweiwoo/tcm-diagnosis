@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { apiError } from "@/lib/apiResponses";
 import { createConsultation, listConsultations, updateConsultation } from "@/lib/consultations";
-import { getCurrentDoctorEmail } from "@/lib/currentDoctor";
+import { getCurrentDoctor } from "@/lib/currentDoctor";
+import { createServerSupabaseClient, getServiceRoleClient } from "@/lib/supabase/server";
 import { logServerEvent } from "@/lib/logging";
 
 function normalizeName(value: unknown) {
@@ -10,8 +11,10 @@ function normalizeName(value: unknown) {
 
 export async function GET() {
   try {
-    const doctorEmail = await getCurrentDoctorEmail();
-    const records = await listConsultations(doctorEmail);
+    const doctor = await getCurrentDoctor();
+    const supabase = doctor.isDevBypass ? getServiceRoleClient() : await createServerSupabaseClient();
+    const dbOpts = doctor.isDevBypass ? { doctorEmail: doctor.email } : {};
+    const records = await listConsultations(supabase, dbOpts);
     return NextResponse.json({ records });
   } catch (error) {
     if (error instanceof Error && error.message === "Unauthorized") {
@@ -29,7 +32,10 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const doctorEmail = await getCurrentDoctorEmail();
+    const doctor = await getCurrentDoctor();
+    const supabase = doctor.isDevBypass ? getServiceRoleClient() : await createServerSupabaseClient();
+    const dbOpts = doctor.isDevBypass ? { doctorEmail: doctor.email } : {};
+
     const body = (await request.json()) as {
       consultationName?: unknown;
       formData?: unknown;
@@ -39,20 +45,26 @@ export async function POST(request: Request) {
       analysisStatus?: unknown;
     };
 
-    const record = await createConsultation({
-      doctorEmail,
+    const record = await createConsultation(supabase, {
+      doctorId: doctor.id,
+      doctorEmail: doctor.email,
       consultationName: normalizeName(body.consultationName),
       formData: body.formData ?? null,
     });
 
     if (body.analysisStatus === "analyzed") {
-      const saved = await updateConsultation(record.id, doctorEmail, {
-        analysis_result: body.analysisResult ?? null,
-        analysis_raw: body.analysisRaw ?? null,
-        model_meta: body.modelMeta ?? null,
-        analysis_status: "analyzed",
-        analyzed_at: new Date().toISOString(),
-      });
+      const saved = await updateConsultation(
+        supabase,
+        record.id,
+        {
+          analysis_result: body.analysisResult ?? null,
+          analysis_raw: body.analysisRaw ?? null,
+          model_meta: body.modelMeta ?? null,
+          analysis_status: "analyzed",
+          analyzed_at: new Date().toISOString(),
+        },
+        dbOpts,
+      );
       return NextResponse.json({ record: saved });
     }
 
