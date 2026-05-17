@@ -5,13 +5,13 @@
  * Trigger Goal 1+2 evaluation for one doctor or all active doctors.
  *
  * Usage:
- *   npm run evaluate                        # all active doctors
+ *   npm run evaluate                              # all active doctors
  *   npm run evaluate -- --email dr@example.com   # single doctor
- *   npm run evaluate -- --force             # ignore smart-skip
+ *   npm run evaluate -- --email dr@example.com --force  # re-run even if already evaluated today
  *
  * Requires in .env.local:
- *   CRON_SECRET
- *   APP_BASE_URL  (defaults to http://localhost:3000)
+ *   ASSESSMENT_API_KEY
+ *   APP_BASE_URL  (e.g. https://tcm.chiawei.me)
  */
 
 import { parseArgs } from "node:util";
@@ -24,11 +24,11 @@ const { values } = parseArgs({
   strict: true,
 });
 
-const secret  = process.env.CRON_SECRET;
-const baseUrl = (process.env.APP_BASE_URL ?? "http://localhost:3000").replace(/\/$/, "");
+const assessKey = process.env.ASSESSMENT_API_KEY;
+const baseUrl   = (process.env.APP_BASE_URL ?? "http://localhost:3000").replace(/\/$/, "");
 
-if (!secret) {
-  console.error("Error: CRON_SECRET must be set in .env.local");
+if (!assessKey) {
+  console.error("Error: ASSESSMENT_API_KEY must be set in .env.local");
   process.exit(1);
 }
 
@@ -45,7 +45,7 @@ const res = await fetch(`${baseUrl}/api/cron/evaluate-doctors`, {
   method: "POST",
   headers: {
     "Content-Type": "application/json",
-    "x-cron-secret": secret,
+    "X-Assessment-Key": assessKey,
   },
   body: JSON.stringify(body),
 });
