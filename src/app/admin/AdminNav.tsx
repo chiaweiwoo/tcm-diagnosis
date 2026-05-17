@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const NAV_LINKS = [
+  { href: "/admin/users", label: "用户" },
   { href: "/admin/assessments", label: "评估记录" },
 ];
 

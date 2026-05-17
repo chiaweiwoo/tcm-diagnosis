@@ -29,6 +29,7 @@ type ApiMeta = {
   promptVersion?: string;
   durationSeconds?: number;
   repairedJson?: boolean;
+  cloned_from_doctor_email?: string;
 };
 
 type ConsultationSummary = {
@@ -738,6 +739,13 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
       <main className="workbench__main">
         <section className="form-section">
           <div className="form-card">
+            {/* Clone provenance banner — shown when a consultation was cloned from another doctor */}
+            {meta?.cloned_from_doctor_email && (
+              <div className="clone-source-banner">
+                克隆自 {meta.cloned_from_doctor_email} 的病案 — 修改与保存只影响你的账户
+              </div>
+            )}
+
             {/* Row 1: Meta strip — sex / age / prescription type */}
             <div className="form-row--meta">
               <div className="form-group">
