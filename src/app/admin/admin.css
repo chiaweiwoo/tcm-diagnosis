@@ -1179,6 +1179,95 @@ details[open] .sample-details__toggle::before {
 .tag-combo  { background: #fef3c7; color: #92400e; }
 .tag-default { background: var(--sage); color: var(--muted); }
 
+/* ── Analytics page ── */
+.analytics-window-label {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: -8px;
+}
+
+.analytics-coverage-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 16px;
+  max-width: 480px;
+}
+
+.coverage-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.coverage-label {
+  width: 80px;
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.coverage-bar-wrap {
+  flex: 1;
+  height: 8px;
+  background: var(--line);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.coverage-bar {
+  height: 100%;
+  background: var(--clinic-red, #9B2226);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.coverage-pct {
+  width: 38px;
+  text-align: right;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--foreground);
+}
+
+.analytics-dist {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+.analytics-dist-label {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.analytics-dist-chip {
+  font-size: 12px;
+  padding: 2px 9px;
+  border-radius: 12px;
+  background: var(--mint);
+  color: var(--foreground);
+  font-weight: 600;
+}
+
+.run-analytics-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.run-analytics-result {
+  font-size: 12px;
+  color: var(--muted);
+}
+
 /* ── Users list + doctor consultation cards ── */
 .admin-back-link {
   color: var(--muted);
