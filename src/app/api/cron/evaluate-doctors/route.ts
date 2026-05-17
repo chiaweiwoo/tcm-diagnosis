@@ -112,10 +112,14 @@ export async function POST(req: NextRequest) {
   );
 
   let processed = 0, skipped = 0, failed = 0;
+  const errors: string[] = [];
   for (const r of results) {
     if (r.status === "fulfilled") r.value.skipped ? skipped++ : processed++;
-    else failed++;
+    else {
+      failed++;
+      errors.push(r.reason instanceof Error ? r.reason.message : String(r.reason));
+    }
   }
 
-  return NextResponse.json({ ok: true, processed, skipped, failed });
+  return NextResponse.json({ ok: true, processed, skipped, failed, errors });
 }
