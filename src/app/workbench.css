@@ -314,8 +314,8 @@
 }
 
 .form-card {
-  background: var(--brand-light);
-  border: 1px solid rgba(155, 34, 38, 0.1);
+  background: #FAF7F2;
+  border: 1px solid #DDD0BF;
   border-radius: var(--radius-lg);
   padding: 20px 24px;
   box-shadow: var(--shadow);
@@ -629,16 +629,16 @@
 .result-column--green .result-column__icon { color: #2F5D3A; }
 .result-column--green .result-column__title { color: #2F5D3A; }
 
-/* 风险与提醒 — warm sand / parchment (soft caution) */
+/* 风险与提醒 — warm amber (secondary attention) */
 .result-column--amber {
-  border-left: 3px solid #B8956A;
+  border-left: 3px solid #D89B42;
 }
 .result-column--amber .result-column__header {
-  background: #FAF7F2;
-  border-bottom-color: #DDD0BF;
+  background: #FFF5E8;
+  border-bottom-color: #F5D2A0;
 }
-.result-column--amber .result-column__icon { color: #6B4820; }
-.result-column--amber .result-column__title { color: #6B4820; }
+.result-column--amber .result-column__icon { color: #9A5B00; }
+.result-column--amber .result-column__title { color: #9A5B00; }
 
 /* 方案 — cool blue-gray (structured action plan) */
 .result-column--blue {
@@ -700,7 +700,7 @@
 
 .cautions-list li {
   font-size: 13.5px;
-  color: #4A3520;
+  color: #713F12;
   line-height: 1.55;
   padding-left: 12px;
   position: relative;
@@ -710,7 +710,7 @@
   content: "▸";
   position: absolute;
   left: 0;
-  color: #B8956A;
+  color: #D89B42;
   font-size: 10px;
   top: 3px;
 }
