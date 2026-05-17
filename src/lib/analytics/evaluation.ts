@@ -15,6 +15,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { callDeepSeekJson, getDeepSeekFastModel } from "@/lib/ai/deepseek";
 import { DOCTOR_EVALUATION_SYSTEM_PROMPT } from "./prompts";
 import { buildWindow } from "./stats";
+import { getLangfuse } from "@/lib/langfuse";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -182,6 +183,13 @@ export async function evaluateDoctor(
   ].join("\n");
 
   const model = getDeepSeekFastModel();
+  const langfuse = getLangfuse();
+  const trace = langfuse?.trace({
+    name: "evaluate-doctor",
+    metadata: { doctorId, windowDays, consultationCount },
+  });
+
+  const callStartedAt = Date.now();
 
   const result = await callDeepSeekJson<DoctorEvaluation>({
     messages: [
@@ -192,6 +200,29 @@ export async function evaluateDoctor(
     maxTokens: 3000,
     repairJson: true,
   });
+
+  if (langfuse && trace) {
+    trace.generation({
+      name: "deepseek-evaluate",
+      model: result.model,
+      startTime: new Date(callStartedAt),
+      endTime: new Date(),
+      usageDetails: {
+        input:     result.usage?.prompt_tokens             ?? 0,
+        output:    result.usage?.completion_tokens         ?? 0,
+        total:     result.usage?.total_tokens              ?? 0,
+        cacheHit:  result.usage?.prompt_cache_hit_tokens   ?? 0,
+        cacheMiss: result.usage?.prompt_cache_miss_tokens  ?? 0,
+      },
+      metadata: {
+        repairedJson:     result.repairedJson ?? false,
+        latencyMs:        Date.now() - callStartedAt,
+        consultationCount,
+        windowDays,
+      },
+    });
+    try { await langfuse.flushAsync(); } catch { /* non-critical */ }
+  }
 
   return { evaluation: result.data, consultationCount, model };
 }
