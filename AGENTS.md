@@ -127,13 +127,18 @@ Helps registered TCM doctors:
 
 ```
 Doctor (browser)
-  └── POST /api/analyze        → DeepSeek flash model → clinical review JSON (3-column layout)
-  └── /api/consultations/*     → Supabase (save / load / delete history)
+  └── POST /api/analyze                        → DeepSeek flash model → clinical review JSON (3-column layout)
+  └── /api/consultations/*                     → Supabase (save / load / delete history)
+  └── POST /api/consultations/[id]/clone       → clone another doctor's consultation to own account (admin only)
 
 Admin (browser, is_admin=true only)
-  └── POST /api/admin/assessment-jobs → runs all samples, saves results, runs synthesis (maxDuration=300s)
-  └── GET  /api/admin/assessment-jobs → lists assessment_jobs
-  └── /admin/assessments              → job list + RunButton → /admin/assessments/[runId] report
+  └── GET  /api/admin/users                    → doctor list with 30-day stats
+  └── GET  /api/admin/users/[doctorId]/consultations → per-doctor consultation list (service_role)
+  └── POST /api/admin/assessment-jobs          → runs all samples, saves results, runs synthesis (maxDuration=300s)
+  └── GET  /api/admin/assessment-jobs          → lists assessment_jobs
+  └── /admin/users                             → doctor list page
+  └── /admin/users/[doctorId]                  → read-only consultation view + clone buttons
+  └── /admin/assessments                       → job list + RunButton → /admin/assessments/[runId] report
 
 Workbench header (admin only):
   └── ⚙ Settings2 icon → /admin
@@ -220,10 +225,17 @@ Admin entry point: `⚙` icon (Settings2) in workbench header, visible only when
 
 Admin guard: `src/app/admin/layout.tsx` — server-side, redirects to `/?reason=not_admin` if not admin.
 
-Admin nav (1 tab, `src/app/admin/AdminNav.tsx`):
+Admin nav (2 tabs, `src/app/admin/AdminNav.tsx`):
+- **用户** — `/admin/users` — doctor list with 30-day stats + link to per-doctor view
 - **评估记录** — `/admin/assessments` — assessment job list
 
 `AdminNav` is a client component (needs `usePathname()` for active link highlighting). Admin layout is a server component.
+
+Per-doctor read-only view (`/admin/users/[doctorId]`):
+- Lists the doctor's consultations as cards (form summary fields, status, date)
+- Each card has a **克隆此病案** button — clones `form_data` only to admin's own account
+- Clone inserts a new draft consultation under admin's UUID with `model_meta = { cloned_from_doctor_email: "..." }`
+- Workbench shows a blue info banner when a cloned consultation is loaded; banner disappears after re-analysis
 
 Token usage: tracked in Langfuse only. No admin page for it.
 Activity logs: written to Supabase `activity_logs` but no admin UI page for now.
