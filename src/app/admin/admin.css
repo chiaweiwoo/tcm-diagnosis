@@ -1782,3 +1782,96 @@ details[open] .sample-details__toggle::before {
   padding: 6px 10px;
   border-radius: 6px;
 }
+
+/* ── Compact consultation table ── */
+.ctable-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ctable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.ctable-th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  padding: 0 10px 8px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.ctable-th--name  { width: 45%; }
+.ctable-th--type  { width: 14%; }
+.ctable-th--status{ width: 8%;  }
+.ctable-th--date  { width: 18%; }
+.ctable-th--action{ width: 15%; }
+
+.ctable-row {
+  border-bottom: 1px solid var(--border, #EAE6E2);
+}
+.ctable-row:last-child { border-bottom: none; }
+.ctable-row:hover { background: #FAFAF9; }
+
+.ctable-td {
+  padding: 8px 10px;
+  vertical-align: middle;
+  color: var(--text, #1A1A1A);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 0;
+}
+
+.ctable-td--name {
+  font-weight: 500;
+  max-width: 0;
+}
+
+.ctable-td--type {
+  color: var(--muted);
+}
+
+.ctable-td--date {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.ctable-td--action {
+  white-space: nowrap;
+  overflow: visible;
+  max-width: none;
+}
+
+.ctable-pagination {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.ctable-page-btn {
+  font-size: 13px;
+  padding: 5px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface, #fff);
+  color: var(--text, #1A1A1A);
+  cursor: pointer;
+}
+.ctable-page-btn:hover:not(:disabled) { background: #F5F4F2; }
+.ctable-page-btn:disabled { opacity: 0.38; cursor: default; }
+
+.ctable-page-info {
+  font-size: 13px;
+  color: var(--muted);
+  flex: 1;
+  text-align: center;
+}

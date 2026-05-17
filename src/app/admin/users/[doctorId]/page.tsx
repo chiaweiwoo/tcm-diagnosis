@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { getServiceRoleClient } from "@/lib/supabase/server";
-import { CloneButton } from "./CloneButton";
+import { ConsultationTable } from "./ConsultationTable";
 import { DoctorTabs } from "./DoctorTabs";
 import { EvaluationPanel } from "./EvaluationPanel";
 import type { StructuredCaseForm } from "@/lib/forms/caseSchema";
@@ -96,52 +96,19 @@ export default async function DoctorPage({ params, searchParams }: RouteContext)
               <p>该医生暂无病案记录。</p>
             </div>
           ) : (
-            <div className="consultation-list">
-              {records.map((rec) => (
-                <div key={rec.id} className="consultation-card">
-                  <div className="consultation-card__header">
-                    <span className="consultation-card__name">{buildDisplayName(rec)}</span>
-                    <span
-                      className={`status-pill ${rec.analysis_status === "analyzed" ? "done" : "raw"}`}
-                    >
-                      {rec.analysis_status === "analyzed" ? "已分析" : "草稿"}
-                    </span>
-                    <span className="consultation-card__date">{formatSGT(rec.updated_at)}</span>
-                  </div>
-
-                  {rec.form_data && (
-                    <div className="consultation-card__fields">
-                      <div className="consultation-field">
-                        <span className="consultation-field__label">主诉</span>
-                        <span className="consultation-field__value">
-                          {rec.form_data.chiefComplaint}
-                        </span>
-                      </div>
-                      <div className="consultation-field">
-                        <span className="consultation-field__label">诊断</span>
-                        <span className="consultation-field__value">{rec.form_data.diagnosis}</span>
-                      </div>
-                      <div className="consultation-field">
-                        <span className="consultation-field__label">证型</span>
-                        <span className="consultation-field__value">{rec.form_data.pattern}</span>
-                      </div>
-                      <div className="consultation-field">
-                        <span className="consultation-field__label">类型</span>
-                        <span className="consultation-field__value">
-                          {Array.isArray(rec.form_data.prescriptionType)
-                            ? rec.form_data.prescriptionType.join("、")
-                            : rec.form_data.prescriptionType}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="consultation-card__actions">
-                    <CloneButton consultationId={rec.id} />
-                  </div>
-                </div>
-              ))}
-            </div>
+            <ConsultationTable
+              rows={records.map((rec) => ({
+                id: rec.id,
+                displayName: buildDisplayName(rec),
+                prescriptionType: rec.form_data
+                  ? (Array.isArray(rec.form_data.prescriptionType)
+                      ? rec.form_data.prescriptionType.join("、")
+                      : rec.form_data.prescriptionType)
+                  : "—",
+                analysis_status: rec.analysis_status,
+                date: formatSGT(rec.updated_at),
+              }))}
+            />
           )}
         </>
       )}
