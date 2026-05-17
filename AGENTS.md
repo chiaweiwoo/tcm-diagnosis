@@ -137,10 +137,12 @@ Admin (browser, is_admin=true only)
   └── POST /api/admin/analytics/run            → compute stats + narratives for all doctors + global (writes to DB)
   └── GET  /api/admin/analytics/prompt-quality → latest global prompt-quality runs
   └── GET  /api/admin/analytics/users/[id]    → latest usage + performance for a doctor
+  └── GET  /api/admin/analytics/evaluate/[doctorId] → latest doctor evaluation (Goal 1+2)
+  └── POST /api/admin/analytics/evaluate/[doctorId] → trigger new evaluation for a doctor
   └── POST /api/admin/assessment-jobs          → runs all samples, saves results, runs synthesis (maxDuration=300s)
   └── GET  /api/admin/assessment-jobs          → lists assessment_jobs
   └── /admin/users                             → doctor list page
-  └── /admin/users/[doctorId]                  → read-only consultation view + 拷贝此病案 buttons
+  └── /admin/users/[doctorId]                  → 3-tab view: 病案列表 | AI输出审核 | 临床画像
   └── /admin/analytics                         → prompt quality stats + narrative + RunAnalyticsButton
   └── /admin/assessments                       → job list + RunButton → /admin/assessments/[runId] report
 
@@ -293,6 +295,7 @@ Migrations: `supabase/migrations/` (numbered SQL). Applied manually in Supabase 
 | `analytics_performance_runs` | Per-doctor performance stats per 30-day window. RLS: doctor sees own. (migration 019) |
 | `analytics_admin_alerts` | Manager-layer alerts. No RLS policies — service_role only. (migration 019) |
 | `analytics_doctor_dashboard` | View joining usage + performance runs. security_invoker=on. (migration 020) |
+| `analytics_doctor_evaluations` | Per-doctor Goal 1+2 evaluation results. No RLS (admin service_role only). UNIQUE (doctor_id, window_start, window_end). (migration 021) |
 
 > `assessment_runs`, `doctor_examples`, and `assessment_samples` were dropped in migrations 015 and 018.
 

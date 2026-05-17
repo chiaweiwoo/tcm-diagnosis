@@ -1,9 +1,15 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { getServiceRoleClient } from "@/lib/supabase/server";
 import { CloneButton } from "./CloneButton";
+import { DoctorTabs } from "./DoctorTabs";
+import { EvaluationPanel } from "./EvaluationPanel";
 import type { StructuredCaseForm } from "@/lib/forms/caseSchema";
 
-type RouteContext = { params: Promise<{ doctorId: string }> };
+type RouteContext = {
+  params: Promise<{ doctorId: string }>;
+  searchParams: Promise<{ tab?: string }>;
+};
 
 type ConsultationRow = {
   id: string;
@@ -21,9 +27,7 @@ async function loadData(doctorId: string): Promise<{ email: string; records: Con
     admin.auth.admin.getUserById(doctorId),
     admin
       .from("consultations")
-      .select(
-        "id,doctor_email,consultation_name,form_data,analysis_status,updated_at",
-      )
+      .select("id,doctor_email,consultation_name,form_data,analysis_status,updated_at")
       .eq("doctor_id", doctorId)
       .order("updated_at", { ascending: false }),
   ]);
@@ -57,8 +61,9 @@ function formatSGT(iso: string) {
   });
 }
 
-export default async function DoctorConsultationsPage({ params }: RouteContext) {
+export default async function DoctorPage({ params, searchParams }: RouteContext) {
   const { doctorId } = await params;
+  const { tab = "records" } = await searchParams;
   const { email, records } = await loadData(doctorId);
 
   return (
@@ -71,66 +76,88 @@ export default async function DoctorConsultationsPage({ params }: RouteContext) 
             </Link>
           </p>
           <h1>{email}</h1>
-          <p className="admin-meta">
-            只读模式 · {records.length} 条病案记录
-          </p>
+          <p className="admin-meta">只读模式 · {records.length} 条病案记录</p>
         </div>
         <div className="admin-readonly-banner">
           正在以只读模式查看 {email} 的记录
         </div>
       </div>
 
-      {records.length === 0 ? (
-        <div className="admin-empty">
-          <p>该医生暂无病案记录。</p>
-        </div>
-      ) : (
-        <div className="consultation-list">
-          {records.map((rec) => (
-            <div key={rec.id} className="consultation-card">
-              <div className="consultation-card__header">
-                <span className="consultation-card__name">{buildDisplayName(rec)}</span>
-                <span
-                  className={`status-pill ${rec.analysis_status === "analyzed" ? "done" : "raw"}`}
-                >
-                  {rec.analysis_status === "analyzed" ? "已分析" : "草稿"}
-                </span>
-                <span className="consultation-card__date">{formatSGT(rec.updated_at)}</span>
-              </div>
+      {/* Tab navigation — client component needs Suspense for useSearchParams */}
+      <Suspense>
+        <DoctorTabs doctorId={doctorId} />
+      </Suspense>
 
-              {rec.form_data && (
-                <div className="consultation-card__fields">
-                  <div className="consultation-field">
-                    <span className="consultation-field__label">主诉</span>
-                    <span className="consultation-field__value">
-                      {rec.form_data.chiefComplaint}
+      {/* Tab: 病案列表 */}
+      {tab === "records" && (
+        <>
+          {records.length === 0 ? (
+            <div className="admin-empty">
+              <p>该医生暂无病案记录。</p>
+            </div>
+          ) : (
+            <div className="consultation-list">
+              {records.map((rec) => (
+                <div key={rec.id} className="consultation-card">
+                  <div className="consultation-card__header">
+                    <span className="consultation-card__name">{buildDisplayName(rec)}</span>
+                    <span
+                      className={`status-pill ${rec.analysis_status === "analyzed" ? "done" : "raw"}`}
+                    >
+                      {rec.analysis_status === "analyzed" ? "已分析" : "草稿"}
                     </span>
+                    <span className="consultation-card__date">{formatSGT(rec.updated_at)}</span>
                   </div>
-                  <div className="consultation-field">
-                    <span className="consultation-field__label">诊断</span>
-                    <span className="consultation-field__value">{rec.form_data.diagnosis}</span>
-                  </div>
-                  <div className="consultation-field">
-                    <span className="consultation-field__label">证型</span>
-                    <span className="consultation-field__value">{rec.form_data.pattern}</span>
-                  </div>
-                  <div className="consultation-field">
-                    <span className="consultation-field__label">类型</span>
-                    <span className="consultation-field__value">
-                      {Array.isArray(rec.form_data.prescriptionType)
-                        ? rec.form_data.prescriptionType.join("、")
-                        : rec.form_data.prescriptionType}
-                    </span>
+
+                  {rec.form_data && (
+                    <div className="consultation-card__fields">
+                      <div className="consultation-field">
+                        <span className="consultation-field__label">主诉</span>
+                        <span className="consultation-field__value">
+                          {rec.form_data.chiefComplaint}
+                        </span>
+                      </div>
+                      <div className="consultation-field">
+                        <span className="consultation-field__label">诊断</span>
+                        <span className="consultation-field__value">{rec.form_data.diagnosis}</span>
+                      </div>
+                      <div className="consultation-field">
+                        <span className="consultation-field__label">证型</span>
+                        <span className="consultation-field__value">{rec.form_data.pattern}</span>
+                      </div>
+                      <div className="consultation-field">
+                        <span className="consultation-field__label">类型</span>
+                        <span className="consultation-field__value">
+                          {Array.isArray(rec.form_data.prescriptionType)
+                            ? rec.form_data.prescriptionType.join("、")
+                            : rec.form_data.prescriptionType}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="consultation-card__actions">
+                    <CloneButton consultationId={rec.id} />
                   </div>
                 </div>
-              )}
-
-              <div className="consultation-card__actions">
-                <CloneButton consultationId={rec.id} />
-              </div>
+              ))}
             </div>
-          ))}
-        </div>
+          )}
+        </>
+      )}
+
+      {/* Tab: AI 输出审核 (Goal 1) */}
+      {tab === "output-review" && (
+        <Suspense fallback={<div className="eval-loading">加载中…</div>}>
+          <EvaluationPanel doctorId={doctorId} mode="output-review" />
+        </Suspense>
+      )}
+
+      {/* Tab: 临床画像 (Goal 2) */}
+      {tab === "profile" && (
+        <Suspense fallback={<div className="eval-loading">加载中…</div>}>
+          <EvaluationPanel doctorId={doctorId} mode="profile" />
+        </Suspense>
       )}
     </main>
   );
