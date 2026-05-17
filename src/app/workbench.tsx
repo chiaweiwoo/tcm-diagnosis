@@ -969,7 +969,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
 
                 {/* 判断 — with 重点结论 folded in as summary */}
                 {result.groups[0] && (
-                  <ResultColumn title="判断" colorVariant="green" icon={<Brain size={15} />}>
+                  <ResultColumn title="判断 Assessment" colorVariant="green" icon={<Brain size={15} />}>
                     {result.keyPoints.length > 0 && (
                       <div className="result-keypoints">
                         {result.keyPoints.map((kp, i) => (
@@ -985,7 +985,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
 
                 {/* 风险与提醒 */}
                 {result.cautions.length > 0 && !result.cautions.every((c) => c.includes("请结合面诊")) && (
-                  <ResultColumn title="风险与提醒" colorVariant="amber" icon={<AlertTriangle size={15} />}>
+                  <ResultColumn title="风险与提醒 Cautions" colorVariant="amber" icon={<AlertTriangle size={15} />}>
                     <ul className="cautions-list">
                       {result.cautions.map((c, i) => (
                         <li key={i}>{c}</li>
@@ -998,14 +998,14 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
               {/* Bottom row: 方案 (50%) + 随访监测 (50%) */}
               <div className="result-bottom-row">
                 {result.groups[1] && (
-                  <ResultColumn title="方案" colorVariant="blue" icon={<FileText size={15} />}>
+                  <ResultColumn title="方案 Plan" colorVariant="blue" icon={<FileText size={15} />}>
                     {result.groups[1].sections.map((section) => (
                       <ResultSection key={section.title} title={section.title} items={section.items} />
                     ))}
                   </ResultColumn>
                 )}
                 {result.groups[2] && (
-                  <ResultColumn title="随访监测" colorVariant="teal" icon={<AlertTriangle size={15} />}>
+                  <ResultColumn title="随访监测 Follow-up" colorVariant="teal" icon={<AlertTriangle size={15} />}>
                     {result.groups[2].sections.map((section) => (
                       <ResultSection key={section.title} title={section.title} items={section.items} />
                     ))}
