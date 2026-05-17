@@ -1783,6 +1783,134 @@ details[open] .sample-details__toggle::before {
   border-radius: 6px;
 }
 
+/* ══════════════════════════════════════════════════════════════
+   Mobile responsive — admin site
+   Breakpoint: 640px (phones), 768px (tablets)
+   ══════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+  /* Page shell */
+  .admin-page {
+    padding: 20px 16px 48px;
+  }
+
+  /* Top bar */
+  .admin-bar {
+    padding: 0 16px;
+    gap: 8px;
+  }
+  .admin-bar-section,
+  .admin-bar-sep {
+    display: none;
+  }
+
+  /* Page header — stack title + banner */
+  .admin-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  .admin-header h1 {
+    font-size: 20px;
+  }
+  .admin-readonly-banner {
+    white-space: normal;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* Stats grid — 2 columns on tablet */
+  .admin-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Users table — horizontal scroll */
+  .admin-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .admin-table {
+    min-width: 560px;
+  }
+
+  /* Doctor tabs — allow scroll if they overflow */
+  .doctor-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    gap: 0;
+    padding-bottom: 0;
+  }
+  .doctor-tab-btn {
+    padding: 8px 14px;
+    font-size: 13px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* Consultation table — horizontal scroll */
+  .ctable-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .ctable {
+    min-width: 520px;
+  }
+
+  /* Eval panel */
+  .eval-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  /* Case grid — 1 column */
+  .eval-case-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Profile grid — stack */
+  .eval-profile-grid {
+    flex-direction: column;
+  }
+  .eval-profile-card {
+    min-width: 0;
+  }
+
+  /* Verdict row */
+  .eval-verdict-row {
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Tighter page padding on phones */
+  .admin-page {
+    padding: 16px 12px 40px;
+  }
+
+  /* Stats grid — 1 column on small phones */
+  .admin-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Hide type column in consultation table on small phones */
+  .ctable-th--type,
+  .ctable-td--type {
+    display: none;
+  }
+
+  /* Pagination buttons */
+  .ctable-page-btn {
+    font-size: 12px;
+    padding: 4px 10px;
+  }
+  .ctable-page-info {
+    font-size: 12px;
+  }
+}
+
 /* ── Compact consultation table ── */
 .ctable-wrap {
   display: flex;

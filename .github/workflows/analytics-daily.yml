@@ -9,7 +9,7 @@ on:
 jobs:
   run-analytics:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - name: Trigger analytics cron endpoint
         run: |
@@ -20,5 +20,17 @@ jobs:
           cat /tmp/body.json
           if [ "$STATUS" -ne 200 ]; then
             echo "Analytics cron failed with HTTP $STATUS"
+            exit 1
+          fi
+
+      - name: Trigger doctor evaluations (Goal 1+2)
+        run: |
+          STATUS=$(curl -s -o /tmp/eval-body.json -w "%{http_code}" \
+            -X POST "${{ secrets.VERCEL_PRODUCTION_URL }}/api/cron/evaluate-doctors" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json")
+          cat /tmp/eval-body.json
+          if [ "$STATUS" -ne 200 ]; then
+            echo "Doctor evaluations cron failed with HTTP $STATUS"
             exit 1
           fi

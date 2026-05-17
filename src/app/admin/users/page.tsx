@@ -101,7 +101,7 @@ export default async function UsersPage() {
           </p>
         </div>
       ) : (
-        <table className="admin-table">
+        <div className="admin-table-wrap"><table className="admin-table">
           <thead>
             <tr>
               <th>邮箱</th>
@@ -139,7 +139,7 @@ export default async function UsersPage() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
     </main>
   );
