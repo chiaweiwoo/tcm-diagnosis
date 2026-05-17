@@ -274,7 +274,7 @@ npm run seed:cases -- --email doctor@example.com [--reset] [--yes]
 
 The doctor can then sign in via Google OAuth — Supabase matches the existing `auth.users` row by email.
 
-`data/seed-cases.json` is gitignored. 10 real cases converted from `samples_data.csv` (also gitignored). Seed script calls `/api/analyze` with `X-Assessment-Key` and writes results via service-role.
+`data/seed-cases.json` is gitignored — create locally, never commit. Contains `form_data` objects matching `structuredCaseSchema`. Seed script calls `/api/analyze` with `X-Assessment-Key` and writes results via service-role. See Sprint 6 for 10 example cases used for ardy + chiawei.
 
 ---
 
