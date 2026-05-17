@@ -134,11 +134,18 @@ Doctor (browser)
 Admin (browser, is_admin=true only)
   └── GET  /api/admin/users                    → doctor list with 30-day stats
   └── GET  /api/admin/users/[doctorId]/consultations → per-doctor consultation list (service_role)
+  └── POST /api/admin/analytics/run            → compute stats for all doctors + global (writes to DB)
+  └── GET  /api/admin/analytics/prompt-quality → latest global prompt-quality runs
+  └── GET  /api/admin/analytics/users/[id]    → latest usage + performance for a doctor
   └── POST /api/admin/assessment-jobs          → runs all samples, saves results, runs synthesis (maxDuration=300s)
   └── GET  /api/admin/assessment-jobs          → lists assessment_jobs
   └── /admin/users                             → doctor list page
   └── /admin/users/[doctorId]                  → read-only consultation view + clone buttons
+  └── /admin/analytics                         → prompt quality stats + RunAnalyticsButton
   └── /admin/assessments                       → job list + RunButton → /admin/assessments/[runId] report
+
+Doctor (browser)
+  └── GET /api/analytics/me                   → own latest usage + performance stats (RLS-enforced)
 
 Workbench header (admin only):
   └── ⚙ Settings2 icon → /admin
@@ -225,9 +232,10 @@ Admin entry point: `⚙` icon (Settings2) in workbench header, visible only when
 
 Admin guard: `src/app/admin/layout.tsx` — server-side, redirects to `/?reason=not_admin` if not admin.
 
-Admin nav (2 tabs, `src/app/admin/AdminNav.tsx`):
+Admin nav (3 tabs, `src/app/admin/AdminNav.tsx`):
 - **用户** — `/admin/users` — doctor list with 30-day stats + link to per-doctor view
-- **评估记录** — `/admin/assessments` — assessment job list
+- **分析** — `/admin/analytics` — prompt quality stats + run button (Sprint 4)
+- **评估记录** — `/admin/assessments` — assessment job list (to be renamed → 分析 in Sprint 5)
 
 `AdminNav` is a client component (needs `usePathname()` for active link highlighting). Admin layout is a server component.
 
@@ -277,6 +285,11 @@ Migrations: `supabase/migrations/` (numbered SQL). Applied manually in Supabase 
 | `activity_logs` | Doctor activity events (login, analyze) — no UI for now |
 | `assessment_jobs` | Assessment run tracking — columns: `synthesis`, `review_model`, `error_summary` |
 | `assessment_job_results` | Per-sample results per job — `analysis_raw` column |
+| `analytics_prompt_quality_runs` | Global prompt-quality stats per 7-day window. No RLS policies — service_role only. (migration 019) |
+| `analytics_usage_runs` | Per-doctor usage stats per 30-day window. RLS: doctor sees own. (migration 019) |
+| `analytics_performance_runs` | Per-doctor performance stats per 30-day window. RLS: doctor sees own. (migration 019) |
+| `analytics_admin_alerts` | Manager-layer alerts. No RLS policies — service_role only. (migration 019) |
+| `analytics_doctor_dashboard` | View joining usage + performance runs. security_invoker=on. (migration 020) |
 
 > `assessment_runs`, `doctor_examples`, and `assessment_samples` were dropped in migrations 015 and 018.
 
