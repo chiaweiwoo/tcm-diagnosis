@@ -69,8 +69,8 @@ beforeEach(() => {
           result: MOCK_RESULT,
           raw: {},
           model: "deepseek-flash",
-          costUsd: 0.001,
           promptVersion: "tcm-analysis-v0.8",
+          repairedJson: false,
         });
       }
       if (String(url).includes("/api/consultations/") && !String(url).endsWith("/consultations/")) {

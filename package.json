@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "check:deepseek": "node scripts/check-deepseek.mjs"
+    "check:deepseek": "node scripts/check-deepseek.mjs",
+    "allowlist:add": "node --env-file=.env.local scripts/allowlist-add.mjs",
+    "seed:cases": "node --env-file=.env.local scripts/seed-cases.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",

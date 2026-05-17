@@ -57,13 +57,6 @@ vi.mock("@/lib/ai/deepseek", () => ({
     data: MOCK_AI_JSON,
     model: "deepseek-chat",
     usage: { prompt_tokens: 100, completion_tokens: 200, total_tokens: 300 },
-    costUsd: 0.001,
-    costDetail: {
-      costUsd: 0.001,
-      cacheHitTokens: 0,
-      cacheMissTokens: 100,
-      rates: { inputCacheHitPer1M: 0.1, inputCacheMissPer1M: 0.27, outputPer1M: 1.1 },
-    },
     repairedJson: false,
   }),
   DeepSeekError: class DeepSeekError extends Error {
@@ -118,13 +111,6 @@ describe("POST /api/analyze", () => {
       data: MOCK_AI_JSON,
       model: "deepseek-chat",
       usage: { prompt_tokens: 100, completion_tokens: 200, total_tokens: 300 },
-      costUsd: 0.001,
-      costDetail: {
-        costUsd: 0.001,
-        cacheHitTokens: 0,
-        cacheMissTokens: 100,
-        rates: { inputCacheHitPer1M: 0.1, inputCacheMissPer1M: 0.27, outputPer1M: 1.1 },
-      },
       repairedJson: false,
     });
   });

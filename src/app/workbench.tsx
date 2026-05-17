@@ -7,7 +7,6 @@ import {
   ChevronDown,
   Clock,
   FileText,
-  FlaskConical,
   LoaderCircle,
   LogOut,
   Plus,
@@ -26,11 +25,10 @@ import "./workbench.css";
 // ---------------------------------------------------------------------------
 
 type ApiMeta = {
-  usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
-  costUsd?: number;
   model?: string;
   promptVersion?: string;
   durationSeconds?: number;
+  repairedJson?: boolean;
 };
 
 type ConsultationSummary = {
@@ -50,14 +48,6 @@ type ConsultationRecord = ConsultationSummary & {
 };
 
 type ToastState = { message: string; tone: "success" | "error" | "info" };
-
-type AssessmentSample = {
-  id: string;
-  label: string;
-  form_data: StructuredCaseForm;
-  notes: string | null;
-  sort_order: number;
-};
 
 type FormErrors = Partial<Record<keyof StructuredCaseForm, string>>;
 
@@ -109,8 +99,8 @@ async function apiAnalyze(form: StructuredCaseForm): Promise<{
   result: AnalysisResult;
   raw: unknown;
   model: string;
-  costUsd: number;
   promptVersion: string;
+  repairedJson: boolean;
 }> {
   const response = await fetch("/api/analyze", {
     method: "POST",
@@ -126,8 +116,8 @@ async function apiAnalyze(form: StructuredCaseForm): Promise<{
     result: AnalysisResult;
     raw: unknown;
     model: string;
-    costUsd: number;
     promptVersion: string;
+    repairedJson: boolean;
   }>;
 }
 
@@ -397,50 +387,6 @@ const StatusBar = memo(function StatusBar({
 });
 
 // ---------------------------------------------------------------------------
-// Samples panel (admin only)
-// ---------------------------------------------------------------------------
-
-const SamplesPanel = memo(function SamplesPanel({
-  samples,
-  loading,
-  onLoad,
-}: {
-  samples: AssessmentSample[];
-  loading: boolean;
-  onLoad: (sample: AssessmentSample) => void;
-}) {
-  return (
-    <div className="history-panel">
-      <div className="history-panel__header">
-        <span className="history-panel__title">
-          <FlaskConical size={14} />
-          评估样本
-        </span>
-      </div>
-      <div className="history-panel__list">
-        {loading && <div className="history-panel__empty">加载中…</div>}
-        {!loading && samples.length === 0 && (
-          <div className="history-panel__empty">暂无样本（请先运行 SQL 迁移）</div>
-        )}
-        {samples.map((s) => (
-          <div
-            key={s.id}
-            className="history-item"
-            onClick={() => onLoad(s)}
-            title={s.notes ?? undefined}
-          >
-            <div className="history-item__name">{s.label}</div>
-            <div className="history-item__meta">
-              <span>{s.form_data.diagnosis} · {s.form_data.pattern}</span>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-});
-
-// ---------------------------------------------------------------------------
 // History panel
 // ---------------------------------------------------------------------------
 
@@ -537,10 +483,6 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyOpen, setHistoryOpen] = useState(false);
 
-  const [samples, setSamples] = useState<AssessmentSample[]>([]);
-  const [samplesOpen, setSamplesOpen] = useState(false);
-  const [samplesLoading, setSamplesLoading] = useState(false);
-
   const [toast, setToast] = useState<ToastState | null>(null);
   const resultRef = useRef<HTMLDivElement>(null);
 
@@ -576,42 +518,6 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
     setHistoryOpen(false);
     setSaveStatus("new");
     setSavedAt(null);
-  }
-
-  async function handleToggleSamples() {
-    if (!samplesOpen && samples.length === 0) {
-      setSamplesLoading(true);
-      try {
-        const res = await fetch("/api/admin/samples", { cache: "no-store" });
-        if (!res.ok) throw new Error();
-        const data = (await res.json()) as { samples: AssessmentSample[] };
-        setSamples(data.samples);
-      } catch {
-        showToast("读取样本失败。", "error");
-      } finally {
-        setSamplesLoading(false);
-      }
-    }
-    setSamplesOpen((o) => !o);
-    setHistoryOpen(false);
-  }
-
-  function handleLoadSample(sample: AssessmentSample) {
-    const parsed = structuredCaseSchema.safeParse(sample.form_data);
-    if (!parsed.success) {
-      showToast("样本数据格式有误。", "error");
-      return;
-    }
-    setForm(parsed.data);
-    setTouched(new Set(REQUIRED_FIELDS));
-    setResult(null);
-    setMeta(null);
-    setRawResult(null);
-    setActiveId(null);
-    setSaveStatus("new");
-    setSavedAt(null);
-    setSamplesOpen(false);
-    showToast(`已加载：${sample.label}`, "success");
   }
 
   async function handleSelectHistory(id: string) {
@@ -668,14 +574,14 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
       const durationSeconds = (Date.now() - startedAt) / 1000;
       setResult(data.result);
       setRawResult(data.raw);
-      setMeta({ model: data.model, costUsd: data.costUsd, promptVersion: data.promptVersion, durationSeconds });
+      setMeta({ model: data.model, repairedJson: data.repairedJson, promptVersion: data.promptVersion, durationSeconds });
       setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
 
       // Auto-save or update
       try {
         const newMeta: ApiMeta = {
           model: data.model,
-          costUsd: data.costUsd,
+          repairedJson: data.repairedJson,
           promptVersion: data.promptVersion,
           durationSeconds,
         };
@@ -776,32 +682,10 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
             </div>
           </div>
           <div className="workbench__actions">
-            {isAdmin && (
-              <div className="btn-with-dropdown">
-                <button
-                  className="btn btn--ghost btn--sm"
-                  onClick={() => void handleToggleSamples()}
-                  title="评估样本"
-                >
-                  <FlaskConical size={15} />
-                  <span>样本</span>
-                  <ChevronDown size={13} className={samplesOpen ? "rotate-180" : ""} />
-                </button>
-                {samplesOpen && (
-                  <div className="header-dropdown">
-                    <SamplesPanel
-                      samples={samples}
-                      loading={samplesLoading}
-                      onLoad={handleLoadSample}
-                    />
-                  </div>
-                )}
-              </div>
-            )}
             <div className="btn-with-dropdown">
               <button
                 className="btn btn--ghost btn--sm"
-                onClick={() => { setHistoryOpen((o) => !o); setSamplesOpen(false); }}
+                onClick={() => setHistoryOpen((o) => !o)}
                 title="历史记录"
               >
                 <Clock size={15} />

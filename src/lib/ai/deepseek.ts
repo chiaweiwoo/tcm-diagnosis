@@ -26,38 +26,17 @@ type DeepSeekCall = {
   model: string;
 };
 
-export type DeepSeekRates = {
-  inputCacheHitPer1M: number;
-  inputCacheMissPer1M: number;
-  outputPer1M: number;
-};
-
-export type DeepSeekCostDetail = {
-  costUsd: number;
-  cacheHitTokens: number;
-  cacheMissTokens: number;
-  rates: DeepSeekRates;
-};
-
 type DeepSeekJsonResult<T> = {
   data: T;
   usage?: DeepSeekUsage;
-  costUsd: number;
-  costDetail: DeepSeekCostDetail;
   model: string;
   repairedJson?: boolean;
 };
 
 type DeepSeekErrorDetails = Record<string, unknown>;
 
-import RATES from "../../../config/rates.json";
-
 const DEEPSEEK_URL = "https://api.deepseek.com/chat/completions";
 const DEFAULT_TIMEOUT_MS = 45_000;
-
-function getModelRates() {
-  return RATES.deepseek;
-}
 
 export class DeepSeekError extends Error {
   status: number;
@@ -85,39 +64,6 @@ export function getDeepSeekSmartModel() {
 
 export function getDeepSeekFastModel() {
   return process.env.DEEPSEEK_MODEL_FAST || "deepseek-v4-flash";
-}
-
-function getPricingTier(model?: string) {
-  if (!model) return "pro" as const;
-
-  const normalized = model.toLowerCase();
-  if (normalized.includes("flash") || normalized === "deepseek-chat" || normalized === "deepseek-reasoner") {
-    return "flash" as const;
-  }
-
-  return "pro" as const;
-}
-
-export function estimateDeepSeekCost(usage?: DeepSeekUsage, model?: string): number {
-  return estimateDeepSeekCostDetail(usage, model).costUsd;
-}
-
-export function estimateDeepSeekCostDetail(usage?: DeepSeekUsage, model?: string): DeepSeekCostDetail {
-  const rates = getModelRates()[getPricingTier(model)];
-  const promptTokens = usage?.prompt_tokens ?? 0;
-  const cacheHitTokens = usage?.prompt_cache_hit_tokens ?? 0;
-  const cacheMissTokens = usage?.prompt_cache_miss_tokens ?? Math.max(0, promptTokens - cacheHitTokens);
-  const output = usage?.completion_tokens ?? 0;
-
-  const costUsd = Number(
-    (
-      (cacheHitTokens / 1_000_000) * rates.inputCacheHitPer1M +
-      (cacheMissTokens / 1_000_000) * rates.inputCacheMissPer1M +
-      (output / 1_000_000) * rates.outputPer1M
-    ).toFixed(6),
-  );
-
-  return { costUsd, cacheHitTokens, cacheMissTokens, rates };
 }
 
 function combineUsage(...usages: Array<DeepSeekUsage | undefined>): DeepSeekUsage | undefined {
@@ -292,8 +238,7 @@ export async function callDeepSeekJson<T>({
 
   try {
     const data = parseJson<T>(first.content, "first_parse");
-    const costDetail = estimateDeepSeekCostDetail(first.usage, model);
-    return { data, usage: first.usage, costUsd: costDetail.costUsd, costDetail, model };
+    return { data, usage: first.usage, model };
   } catch (error) {
     if (!repairJson) {
       throw error;
@@ -312,8 +257,7 @@ export async function callDeepSeekJson<T>({
 
     const data = parseJson<T>(fastRepair.content, "fast_repair_parse");
     const usage = combineUsage(first.usage, fastRepair.usage);
-    const costDetail = estimateDeepSeekCostDetail(usage, model);
-    return { data, usage, costUsd: costDetail.costUsd, costDetail, model, repairedJson: true };
+    return { data, usage, model, repairedJson: true };
   } catch {
     // Fall through to deep repair.
   }
@@ -328,8 +272,7 @@ export async function callDeepSeekJson<T>({
 
     const data = parseJson<T>(deepRepair.content, "deep_repair_parse");
     const usage = combineUsage(first.usage, fastRepair?.usage, deepRepair.usage);
-    const costDetail = estimateDeepSeekCostDetail(usage, model);
-    return { data, usage, costUsd: costDetail.costUsd, costDetail, model, repairedJson: true };
+    return { data, usage, model, repairedJson: true };
   } catch (error) {
     if (error instanceof DeepSeekError) {
       throw new DeepSeekError("DeepSeek返回的JSON无法解析。", 502, {

@@ -70,25 +70,19 @@ Enforced by code convention in `src/lib/langfuse.ts` and `src/app/api/analyze/ro
 
 Any meaningful change to product behavior, architecture, security rules, or calibration workflow must be reflected in this file before the session ends. README updates are required when user-visible behavior changes.
 
-### 10. Assessment samples live in DB only — never in the codebase
-
-> **Planned removal.** Once the seed-script direction (see Analytics Architecture) lands, `assessment_samples` will be dropped and sample data will live only in a local gitignored JSON consumed by a CLI seed script that writes to `consultations` under a dedicated test user UUID. Until then, this invariant still holds.
-
-Sample records for testing are stored exclusively in the `assessment_samples` Supabase table. The CSV source file is local-only and gitignored. Do not add sample data to any TypeScript file or config file.
-
-### 11. doctor_id (UUID) is the stable identity, not email
+### 10. doctor_id (UUID) is the stable identity, not email
 
 `auth.users.id` UUID is the only stable identifier for a doctor. Email can change. Auth provider behavior can change.
 
-All new tables that reference a doctor must use `doctor_id UUID` (FK to `auth.users.id`). The legacy `consultations.doctor_email` column will be supplemented by `doctor_id` (migration pending). RLS policies on per-doctor tables must read `auth.uid()`, not email.
+All new tables that reference a doctor must use `doctor_id UUID` (FK to `auth.users.id`). `consultations.doctor_id` was added in migration 016 (backfilled from auth.users, NOT NULL enforced). RLS policies on per-doctor tables must read `auth.uid()`, not email.
 
 Email is retained only as a denormalized display field. Never use it as a join key in new code.
 
-### 12. RLS is the last line of defense
+### 11. RLS is the last line of defense
 
 Per-doctor tables (`consultations`, future `analytics_usage_runs`, `analytics_performance_runs`) must have Row Level Security policies that restrict reads to `doctor_id = auth.uid()`. Admin routes use service_role to bypass RLS — but only those routes. The database itself must refuse cross-doctor reads even if application code asks. A missed `.eq("doctor_id", ...)` in a future PR must not be able to cause a data leak.
 
-### 13. Model selection — DeepSeek by default, smart model only with written justification
+### 12. Model selection — DeepSeek by default, smart model only with written justification
 
 - **Clinical analysis is DeepSeek-only.** Chinese clinical content, established prompts. Never route clinical content through any other provider.
 - **Analytics narrative starts with DeepSeek.** Use Flash unless a tone or quality requirement demonstrably fails Flash. Escalate to Pro (`deepseek-reasoner`) before considering any other provider.
@@ -137,15 +131,12 @@ Doctor (browser)
   └── /api/consultations/*     → Supabase (save / load / delete history)
 
 Admin (browser, is_admin=true only)
-  └── GET  /api/admin/samples         → returns active assessment_samples rows
   └── POST /api/admin/assessment-jobs → runs all samples, saves results, runs synthesis (maxDuration=300s)
   └── GET  /api/admin/assessment-jobs → lists assessment_jobs
   └── /admin/assessments              → job list + RunButton → /admin/assessments/[runId] report
-  └── /admin/examples                 → read-only sample library view
 
 Workbench header (admin only):
   └── ⚙ Settings2 icon → /admin
-  └── 🧪 样本 button  → samples panel (lazy-loads /api/admin/samples, populates form)
 ```
 
 ---
@@ -215,12 +206,11 @@ Errors show once field is touched (`touched` set). Submit button disabled when `
 | `handleNew()` | → `"new"`, `savedAt = null` |
 | `setField(...)` | → `"unsaved"` (unless currently `"saving"`) |
 | `handleSelectHistory` success | → `"saved"`, `savedAt = record.updated_at` |
-| `handleLoadSample` | → `"new"`, `savedAt = null` (not a consultation yet) |
 | `handleAnalyze` / `handleSave` start | → `"saving"` |
 | save success | → `"saved"`, `savedAt = new Date()` |
 | save failure | → `"unsaved"` |
 
-Status bar renders below submit button inside `form-card`. Toast fires on: analyze error, save success/failure, delete, history load success/failure, sample load.
+Status bar renders below submit button inside `form-card`. Toast fires on: analyze error, save success/failure, delete, history load success/failure.
 
 ---
 
@@ -230,9 +220,8 @@ Admin entry point: `⚙` icon (Settings2) in workbench header, visible only when
 
 Admin guard: `src/app/admin/layout.tsx` — server-side, redirects to `/?reason=not_admin` if not admin.
 
-Admin nav (2 tabs, `src/app/admin/AdminNav.tsx`):
+Admin nav (1 tab, `src/app/admin/AdminNav.tsx`):
 - **评估记录** — `/admin/assessments` — assessment job list
-- **样本库** — `/admin/examples` — read-only sample library
 
 `AdminNav` is a client component (needs `usePathname()` for active link highlighting). Admin layout is a server component.
 
@@ -243,19 +232,24 @@ Only `chiaweiwoo123@gmail.com` is seeded as admin.
 
 ---
 
-## Assessment Samples
+## Doctor Onboarding
 
-10 real doctor case samples for pipeline testing. Live in `assessment_samples` Supabase table only.
+No signup page. All onboarding is admin-driven via CLI:
 
-**To seed:** Run `supabase/migrations/013_assessment_samples.sql` once in Supabase SQL editor.
-**To add/disable:** Edit rows directly in Supabase table editor (`is_active = false` to hide without deleting).
-**Never store sample data in the codebase** — no TypeScript arrays, no CSV in git.
+```bash
+# Add a doctor (creates auth.users row if absent + upserts doctor_allowlist)
+npm run allowlist:add -- --email doctor@example.com [--admin]
 
-Admin shortcut in workbench:
-- `🧪 样本` button (header, admin only) → opens samples panel
-- Panel lazy-loads from `GET /api/admin/samples` on first open
-- Clicking a sample populates all form fields; `saveStatus` resets to `"new"`; toast confirms load
-- Doctor can then submit immediately for analysis
+# Remove a doctor (soft-remove: is_active=false, auth.users preserved)
+npm run allowlist:add -- --email doctor@example.com --remove
+
+# Seed test consultations from data/seed-cases.json (gitignored)
+npm run seed:cases -- --email doctor@example.com [--reset] [--yes]
+```
+
+The doctor can then sign in via Google OAuth — Supabase matches the existing `auth.users` row by email.
+
+`data/seed-cases.json` is gitignored. 10 real cases converted from `samples_data.csv` (also gitignored). Seed script calls `/api/analyze` with `X-Assessment-Key` and writes results via service-role.
 
 ---
 
@@ -265,26 +259,25 @@ Migrations: `supabase/migrations/` (numbered SQL). Applied manually in Supabase 
 
 | Table | Purpose |
 |---|---|
-| `consultations` | Doctor history — form_data JSONB, analysis JSON, model meta |
+| `consultations` | Doctor history — form_data JSONB, analysis JSON, model meta. Has `doctor_id` UUID FK (migration 016) with RLS (migration 017). |
 | `error_logs` | Pipeline errors (no form field values) |
 | `doctor_allowlist` | `email`, `is_active`, `is_admin` — access control source of truth |
 | `activity_logs` | Doctor activity events (login, analyze) — no UI for now |
-| `assessment_samples` | Test case library (migration 013) — seeded from CSV, admin-only read |
-| `assessment_jobs` | Assessment run tracking (migration 013) — columns: `synthesis`, `review_model`, `error_summary` added in 014 |
-| `assessment_job_results` | Per-sample results per job — `analysis_raw` column added in 014 |
+| `assessment_jobs` | Assessment run tracking — columns: `synthesis`, `review_model`, `error_summary` |
+| `assessment_job_results` | Per-sample results per job — `analysis_raw` column |
 
-> `assessment_runs` and `doctor_examples` were dropped in migration 015.
+> `assessment_runs`, `doctor_examples`, and `assessment_samples` were dropped in migrations 015 and 018.
 
-All tables: service_role key only. No anon/user RLS. Never expose service_role key to browser.
+`consultations`: doctor reads use user-scoped Supabase client (anon key + session JWT); RLS enforces isolation. Admin routes use service_role (bypasses RLS). Never expose service_role key to browser.
 
 ---
 
 ## Langfuse Integration
 
 SDK v3 API. Per analyze call, Langfuse receives:
-- `usageDetails`: `{ input, output, total, cacheHit, cacheMiss }` (token counts)
-- `costDetails`: `{ total }` (USD cost)
+- `usageDetails`: `{ input, output, total, cacheHit, cacheMiss }` (token counts from API response)
 - `metadata`: model, latency, prompt version, prescriptionType label, repairedJson flag
+- Cost is computed by Langfuse's own model registry from token counts — no local `costDetails` sent.
 
 **No clinical text ever reaches Langfuse.** Token usage and cost are monitored at `jp.cloud.langfuse.com`.
 
@@ -295,10 +288,9 @@ Env var: `LANGFUSE_BASE_URL` — defaults to `https://jp.cloud.langfuse.com` if 
 ## Model And Pricing Rules
 
 - Analyze: `DEEPSEEK_MODEL_FAST` (flash). No other model exposed to doctors.
-- AI pricing is hardcoded in `config/rates.json`. Updated automatically by `.github/workflows/update-rates.yml` (daily). When updating manually, update the `_comment` date field.
+- Cost is tracked exclusively in Langfuse via its model registry. `config/rates.json` and `update-rates.yml` were deleted in Sprint 2.
+- `model_meta` stored in `consultations` has shape `{ model, promptVersion, durationSeconds, repairedJson }`. Token counts and cost live in Langfuse only.
 - Token usage and cost are internal only — never shown to doctors.
-
-> **Planned removal in Sprint 2.** `config/rates.json` + the rates updater workflow will be dropped. Cost will be tracked exclusively in Langfuse (its model registry handles pricing). `model_meta.costUsd` written to `consultations` will go away. Until Sprint 2 ships, the above remains accurate.
 
 ---
 
@@ -335,9 +327,6 @@ Expected — repair is built in. Check `repairedJson: true` in logs. If repair t
 **Admin pages can't see brand CSS variables**
 Brand tokens (`--brand`, etc.) must be defined in `globals.css`, not only in `workbench.css`. `workbench.css` only loads on `/` route.
 
-**`assessment_samples` table missing**
-Run `supabase/migrations/013_assessment_samples.sql` in Supabase SQL editor.
-
 ---
 
 ## Documentation Direction
@@ -353,10 +342,9 @@ Run `supabase/migrations/013_assessment_samples.sql` in Supabase SQL editor.
 
 1. Fresh run path (form fill → analyze → auto-save)
 2. Load saved history path (status bar → "已保存", toast fires)
-3. Load sample path (admin only, form populated, status → "新病案")
-4. Blocked path (invalid form → submit disabled)
-5. Save/delete via toolbar
-6. Admin nav accessible from workbench header (⚙ icon, admin only)
+3. Blocked path (invalid form → submit disabled)
+4. Save/delete via toolbar
+5. Admin nav accessible from workbench header (⚙ icon, admin only)
 7. Docs synced (AGENTS.md + README if needed)
 8. CI green (`gh run list --limit 1`)
 
