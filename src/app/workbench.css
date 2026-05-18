@@ -572,12 +572,11 @@
   gap: 6px;
 }
 
-/* Top row: 判断 (70%) | 风险与提醒 (30%) */
+/* Top section: 判断 then 风险与提醒, each full width */
 .result-top-row {
-  display: grid;
-  grid-template-columns: 7fr 3fr;
+  display: flex;
+  flex-direction: column;
   gap: 6px;
-  align-items: stretch;
 }
 
 /* Bottom row: 方案 (50%) | 随访监测 (50%) */
