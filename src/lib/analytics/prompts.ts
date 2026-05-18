@@ -66,9 +66,8 @@ gaps 只收录有输入-输出双重证据的差距；最多 5 条；每条必�
 5. headline 是否 ≤ 25 字？
 6. doctorProfile 中是否有临床对错评价？若有，改为观察性描述。
 
-输出契约：
-- 只输出一个合法 JSON 对象
-- 不要 Markdown 代码块，不要 JSON 外说明文字
+输出契约（json 格式）：
+- 只输出一个合法 json 对象，不要 Markdown 代码块，不要任何说明文字
 - 全简体中文
 - 所有列表字段必须是数组
 
@@ -136,9 +135,8 @@ export const SESSION_REVIEW_SYSTEM_PROMPT = `
 2. priorImprovementStatus 中的状态判断是否有证据？若证据不足，使用 "partial"。
 3. 若样本不足 5 条，reviewSummary 是否已注明样本量有限？
 
-输出契约：
-- 只输出一个合法 JSON 对象
-- 不要 Markdown 代码块，不要 JSON 外说明文字
+输出契约（json 格式）：
+- 只输出一个合法 json 对象，不要 Markdown 代码块，不要任何说明文字
 - 全简体中文
 - 所有列表字段必须是数组
 

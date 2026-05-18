@@ -13,9 +13,8 @@ type DeepSeekUsage = {
 
 type DeepSeekResponse = {
   choices?: Array<{
-    message?: {
-      content?: string;
-    };
+    message?: { content?: string | null };
+    finish_reason?: string | null;
   }>;
   usage?: DeepSeekUsage;
 };
@@ -157,10 +156,18 @@ async function requestDeepSeek({
   }
 
   const payload = (await response.json()) as DeepSeekResponse;
-  const content = payload.choices?.[0]?.message?.content;
+  const choice = payload.choices?.[0];
+  const content = choice?.message?.content;
 
   if (!content) {
-    throw new DeepSeekError("DeepSeek返回为空，请稍后重试。", 502);
+    const finishReason = choice?.finish_reason ?? "none";
+    const inputTokens = payload.usage?.prompt_tokens ?? "?";
+    const outputTokens = payload.usage?.completion_tokens ?? "?";
+    throw new DeepSeekError(
+      `DeepSeek返回为空 [model=${model}, finish_reason=${finishReason}, tokens=${inputTokens}→${outputTokens}]`,
+      502,
+      { model, finishReason, inputTokens, outputTokens },
+    );
   }
 
   return { content, usage: payload.usage, model };
