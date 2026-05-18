@@ -28,9 +28,27 @@ export class NoConsultationsError extends Error {
 // Types
 // ---------------------------------------------------------------------------
 
+export type StrengthEntry = {
+  strength: string;
+  evidence: string; // "案例1、3、5"
+};
+
+export type FieldCompletenessEntry = {
+  field: string;
+  presentIn: string; // "9/10"
+};
+
+export type AiRecurringThemes = {
+  frequentSuggestions: string[];
+  frequentRisks: string[];
+  frequentClarifications: string[];
+};
+
 export type GapEntry = {
   gap: string;
-  frequency: string;
+  presentIn?: string;  // v1.1+: "3/10"
+  evidence?: string;   // v1.1+: "案例3、7、9"
+  frequency?: string;  // v1.0 compat
   guidanceHint: string;
 };
 
@@ -38,13 +56,21 @@ export type DoctorProfile = {
   internalScore: number;
   scoreDirection: "improving" | "stable" | "declining" | "first_run";
   prescriptionStyle: string;
-  inputCompleteness: "high" | "medium" | "low";
-  weakFields: string[];
+  profileSummary: string;
   gaps: GapEntry[];
   guidancePoints: string[];
-  profileSummary: string;
   /** Stored for Phase 2 doctor-facing surface. Not rendered in admin UI yet. */
   doctorFacingHint: string;
+
+  // v1.1+ fields (optional for backward compat with old DB records)
+  headline?: string;
+  strengths?: StrengthEntry[];
+  fieldCompleteness?: FieldCompletenessEntry[];
+  aiRecurringThemes?: AiRecurringThemes;
+
+  // v1.0 deprecated (kept for reading old DB records)
+  inputCompleteness?: "high" | "medium" | "low";
+  weakFields?: string[];
 };
 
 export type DoctorEvaluation = {
@@ -87,6 +113,9 @@ export function serializeConsultationsCompact(rows: EvalRow[]): string {
         ? (fd.prescriptionType as string[]).join("+")
         : String(fd.prescriptionType ?? "方药");
 
+      const physicalExam = String(fd.physicalExam ?? "");
+      const hasVitals = /血压|心率|体温|脉搏/.test(physicalExam);
+
       const lines: string[] = [
         `=== 案例 ${i + 1} | ${fd.patientSex ?? "?"}/${fd.patientAge ?? "?"}岁 | ${types} ===`,
         `主诉: ${truncate(String(fd.chiefComplaint ?? ""), 80)}`,
@@ -94,36 +123,41 @@ export function serializeConsultationsCompact(rows: EvalRow[]): string {
         fd.currentIllness
           ? `现病史: ${truncate(String(fd.currentIllness), 100)}`
           : "",
-        `体检: ${truncate(String(fd.physicalExam ?? ""), 60)}`,
+        `体格检查: ${truncate(physicalExam, 80)}`,
+        `生命体征: ${hasVitals ? "[有]" : "[无]"}`,
+        fd.pastHistory
+          ? `既往病史: ${truncate(String(fd.pastHistory), 60)}`
+          : "既往病史: [未填]",
         `处方: ${truncate(String(fd.prescription ?? ""), 100)}`,
         fd.doctorQuestion
           ? `医生问题: ${truncate(String(fd.doctorQuestion), 60)}`
           : "",
-        "---AI---",
+        "---AI输出---",
       ];
 
       if (ar && typeof ar === "object") {
         const kp = joinArray(ar.keyPoints, 2);
-        if (kp) lines.push(`重点: ${kp}`);
+        if (kp) lines.push(`重点结论: ${kp}`);
 
         const groups = ar.groups as Array<{ sections?: Array<{ items?: unknown[] }> }> | undefined;
         const g0 = groups?.[0];
         const merits = joinArray(g0?.sections?.[0]?.items, 2);
         const review = joinArray(g0?.sections?.[1]?.items, 2);
-        if (merits) lines.push(`可取: ${merits}`);
-        if (review) lines.push(`复核: ${review}`);
+        if (merits) lines.push(`可取之处: ${merits}`);
+        if (review) lines.push(`需要复核: ${review}`);
 
         const g1 = groups?.[1];
         const suggestions = joinArray(g1?.sections?.[0]?.items, 2);
-        if (suggestions) lines.push(`建议: ${suggestions}`);
+        const alternatives = joinArray(g1?.sections?.[1]?.items, 2);
+        if (suggestions) lines.push(`建议优化: ${suggestions}`);
+        if (alternatives) lines.push(`可选思路: ${alternatives}`);
 
         const cautions = joinArray(ar.cautions as unknown[], 2);
-        if (cautions) lines.push(`风险: ${cautions}`);
+        if (cautions) lines.push(`风险与提醒: ${cautions}`);
 
-        const evidenceArr = ar.evidence as unknown[];
-        if (Array.isArray(evidenceArr) && evidenceArr.length > 0) {
-          lines.push(`证据: ${truncate(String(evidenceArr[0]), 50)}`);
-        }
+        const g2 = groups?.[2];
+        const followUp = joinArray(g2?.sections?.[0]?.items, 2);
+        if (followUp) lines.push(`随访监测: ${followUp}`);
       }
 
       return lines.filter(Boolean).join("\n");
@@ -184,7 +218,7 @@ export async function evaluateDoctor(
       { role: "user", content: userPrompt },
     ],
     model,
-    maxTokens: 2000,
+    maxTokens: 2500,
     repairJson: true,
   });
 
