@@ -13,7 +13,7 @@ import { reviewSession } from "@/lib/analytics/sessionReview";
 import { logServerEvent } from "@/lib/logging";
 
 // Smart model + up to 10 cases per group — allow generous time
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 export async function POST(req: NextRequest) {
   const assessSecret = process.env.ASSESSMENT_API_KEY;

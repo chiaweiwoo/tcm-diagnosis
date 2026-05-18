@@ -6,11 +6,11 @@ on:
 jobs:
   review:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - name: Trigger session review
         run: |
-          STATUS=$(curl -s -o /tmp/result.json -w "%{http_code}" \
+          STATUS=$(curl -s --max-time 290 -o /tmp/result.json -w "%{http_code}" \
             -X POST "${{ secrets.ASSESS_BASE_URL }}/api/cron/session-review" \
             -H "X-Assessment-Key: ${{ secrets.ASSESSMENT_API_KEY }}" \
             -H "Content-Type: application/json")
