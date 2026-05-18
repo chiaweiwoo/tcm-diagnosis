@@ -12,8 +12,8 @@ import { apiError } from "@/lib/apiResponses";
 import { evaluateDoctor, NoConsultationsError } from "@/lib/analytics/evaluation";
 import { buildWindow } from "@/lib/analytics/stats";
 
-// Each doctor = 1 DeepSeek call; allow enough for ~20 doctors in parallel
-export const maxDuration = 120;
+// Each doctor = 1 DeepSeek call (90s timeout + 3s retry pause); allow enough for ~20 doctors in parallel
+export const maxDuration = 300;
 
 export async function POST(req: NextRequest) {
   const assessSecret = process.env.ASSESSMENT_API_KEY;

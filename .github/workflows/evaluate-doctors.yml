@@ -48,11 +48,15 @@ jobs:
             echo ""
 
             if [ "$STATUS" -eq 200 ]; then
-              echo "Evaluation succeeded."
-              exit 0
+              FAILED=$(python3 -c "import json,sys; d=json.load(open('/tmp/result.json')); print(d.get('failed',0))" 2>/dev/null || echo "0")
+              if [ "$FAILED" -eq 0 ]; then
+                echo "Evaluation succeeded."
+                exit 0
+              fi
+              echo "Evaluation reported $FAILED failure(s) — retrying in ${DELAY}s..."
+            else
+              echo "HTTP $STATUS — retrying in ${DELAY}s..."
             fi
-
-            echo "HTTP $STATUS — retrying in ${DELAY}s..."
             sleep $DELAY
             DELAY=$((DELAY * 2))
           done

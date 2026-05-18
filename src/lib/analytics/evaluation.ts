@@ -218,8 +218,10 @@ export async function evaluateDoctor(
       { role: "user", content: userPrompt },
     ],
     model,
-    maxTokens: 2500,
+    maxTokens: 3000,
+    timeoutMs: 90_000, // evaluation prompt is longer than analyze; allow extra time
     repairJson: true,
+    retryOnEmpty: true, // retry once on transient empty-content responses
   });
 
   if (langfuse && trace) {

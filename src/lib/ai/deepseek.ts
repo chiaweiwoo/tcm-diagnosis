@@ -221,20 +221,28 @@ export async function callDeepSeekJson<T>({
   model = getDeepSeekModel(),
   timeoutMs = DEFAULT_TIMEOUT_MS,
   repairJson = false,
+  retryOnEmpty = false,
 }: {
   messages: DeepSeekMessage[];
   maxTokens?: number;
   model?: string;
   timeoutMs?: number;
   repairJson?: boolean;
+  /** Retry once if DeepSeek returns empty content (transient API issue). */
+  retryOnEmpty?: boolean;
 }): Promise<DeepSeekJsonResult<T>> {
-  const first = await requestDeepSeek({
-    messages,
-    maxTokens,
-    model,
-    timeoutMs,
-    temperature: 0.1,
-  });
+  let first: DeepSeekCall;
+  try {
+    first = await requestDeepSeek({ messages, maxTokens, model, timeoutMs, temperature: 0.1 });
+  } catch (err) {
+    if (retryOnEmpty && err instanceof DeepSeekError && err.status === 502) {
+      // Empty or connection-failed response — retry once after a short pause
+      await new Promise((r) => setTimeout(r, 3000));
+      first = await requestDeepSeek({ messages, maxTokens, model, timeoutMs, temperature: 0.1 });
+    } else {
+      throw err;
+    }
+  }
 
   try {
     const data = parseJson<T>(first.content, "first_parse");
