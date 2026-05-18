@@ -3,6 +3,9 @@
 import { useState, useEffect } from "react";
 import type { DoctorProfile } from "@/lib/analytics/evaluation";
 
+// Triggered via GH Actions (Actions → Evaluate Doctors → Run workflow)
+// This panel is read-only. Pass doctor email or UUID as workflow input.
+
 type EvaluationRecord = {
   id: string;
   window_start: string;
@@ -42,56 +45,22 @@ function formatDateSGT(iso: string) {
 export function EvaluationPanel({ doctorId }: { doctorId: string }) {
   const [record, setRecord] = useState<EvaluationRecord>(null);
   const [loading, setLoading] = useState(true);
-  const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
-
-  async function fetchEvaluation() {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/admin/analytics/evaluate/${doctorId}`);
-      if (!res.ok) throw new Error("读取失败");
-      const json = await res.json() as { evaluation: EvaluationRecord };
-      setRecord(json.evaluation);
-    } catch {
-      setError("读取评估记录失败，请稍后重试。");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function runEvaluation() {
-    setRunning(true);
-    setError(null);
-    setSuccessMsg(null);
-    try {
-      const res = await fetch(`/api/admin/analytics/evaluate/${doctorId}`, {
-        method: "POST",
-      });
-      const json = await res.json() as { message?: string; evaluation?: EvaluationRecord };
-      if (!res.ok) {
-        throw new Error(json.message ?? "评估失败");
-      }
-      if (json.evaluation) setRecord(json.evaluation);
-      else await fetchEvaluation();
-      setSuccessMsg("评估完成。");
-      setTimeout(() => setSuccessMsg(null), 4000);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "评估失败，请稍后重试。");
-    } finally {
-      setRunning(false);
-    }
-  }
 
   useEffect(() => {
-    fetchEvaluation();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    setLoading(true);
+    setError(null);
+    fetch(`/api/admin/analytics/evaluate/${doctorId}`)
+      .then((res) => {
+        if (!res.ok) throw new Error("读取失败");
+        return res.json() as Promise<{ evaluation: EvaluationRecord }>;
+      })
+      .then((json) => setRecord(json.evaluation))
+      .catch(() => setError("读取评估记录失败，请稍后重试。"))
+      .finally(() => setLoading(false));
   }, [doctorId]);
 
-  if (loading) {
-    return <div className="eval-loading">加载中…</div>;
-  }
+  if (loading) return <div className="eval-loading">加载中…</div>;
 
   return (
     <div className="eval-panel">
@@ -108,21 +77,18 @@ export function EvaluationPanel({ doctorId }: { doctorId: string }) {
             <span className="eval-meta">暂无评估记录</span>
           )}
         </div>
-        <button
-          className="secondary-button compact-button"
-          onClick={runEvaluation}
-          disabled={running}
-        >
-          {running ? "评估中…" : record ? "重新评估（近 14 天）" : "开始评估（近 14 天）"}
-        </button>
       </div>
 
+      <p style={{ margin: "0.5rem 0 1rem", color: "var(--text-muted)", fontSize: "0.875rem" }}>
+        通过 GitHub Actions → <strong>Evaluate Doctors</strong> → Run workflow 触发，
+        输入医生邮箱或 UUID。历史记录保留，每次运行追加。
+      </p>
+
       {error && <div className="eval-error">{error}</div>}
-      {successMsg && <div className="eval-success">{successMsg}</div>}
 
       {!record && !error && (
         <div className="admin-empty">
-          <p>暂无评估记录。点击"开始评估"对该医生的近 14 天病案进行分析。</p>
+          <p>暂无评估记录。请通过 GitHub Actions 触发首次评估。</p>
         </div>
       )}
 

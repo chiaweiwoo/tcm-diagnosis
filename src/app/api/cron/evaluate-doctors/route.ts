@@ -23,11 +23,15 @@ export async function POST(req: NextRequest) {
     return apiError(401, "UNAUTHORIZED", "无效的密钥。");
   }
 
-  // Optional body: { doctorEmail?: string }
+  // Optional body: { doctorId?: string } or { doctorEmail?: string }
+  // doctorId takes precedence if both are provided.
+  let targetId: string | null = null;
   let targetEmail: string | null = null;
   try {
-    const body = await req.json() as { doctorEmail?: string };
-    if (typeof body.doctorEmail === "string" && body.doctorEmail.trim()) {
+    const body = await req.json() as { doctorId?: string; doctorEmail?: string };
+    if (typeof body.doctorId === "string" && body.doctorId.trim()) {
+      targetId = body.doctorId.trim();
+    } else if (typeof body.doctorEmail === "string" && body.doctorEmail.trim()) {
       targetEmail = body.doctorEmail.trim().toLowerCase();
     }
   } catch { /* no body — run all */ }
@@ -56,7 +60,12 @@ export async function POST(req: NextRequest) {
     }))
     .filter((d): d is { email: string; doctorId: string } => Boolean(d.doctorId));
 
-  if (targetEmail) {
+  if (targetId) {
+    doctors = doctors.filter((d) => d.doctorId === targetId);
+    if (doctors.length === 0) {
+      return apiError(404, "NOT_FOUND", `找不到医生：${targetId}`);
+    }
+  } else if (targetEmail) {
     doctors = doctors.filter((d) => d.email === targetEmail);
     if (doctors.length === 0) {
       return apiError(404, "NOT_FOUND", `找不到医生：${targetEmail}`);

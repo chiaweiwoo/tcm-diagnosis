@@ -7,6 +7,10 @@ on:
         description: "Doctor email — leave blank to evaluate all active doctors"
         required: false
         default: ""
+      doctor_id:
+        description: "Doctor UUID — takes precedence over email if both provided"
+        required: false
+        default: ""
 
 jobs:
   evaluate:
@@ -16,8 +20,11 @@ jobs:
       - name: Trigger evaluation (with retry)
         run: |
           EMAIL="${{ github.event.inputs.email }}"
+          DOCTOR_ID="${{ github.event.inputs.doctor_id }}"
 
-          if [ -n "$EMAIL" ]; then
+          if [ -n "$DOCTOR_ID" ]; then
+            BODY="{\"doctorId\":\"$DOCTOR_ID\"}"
+          elif [ -n "$EMAIL" ]; then
             BODY="{\"doctorEmail\":\"$EMAIL\"}"
           else
             BODY="{}"
