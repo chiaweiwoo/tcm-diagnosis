@@ -36,6 +36,8 @@ export const DOCTOR_EVALUATION_SYSTEM_PROMPT = `
 - internalScore 和 scoreDirection 严禁对医生本人展示
 - doctorFacingHint 应以医生为受众撰写，但目前仅供管理员参考，尚未向医生展示
 - gaps 最多 5 条，按出现频率由高到低排列；低频率（少于 3 条中出现 1 条）的差距不列入
+- guidancePoints 每条不超过 35 字
+- doctorFacingHint 不超过 50 字
 - 若窗口内记录数不足 3 条，在 profileSummary 中明确注明样本量有限，所有评估仅供参考，不应作为正式结论
 
 自检后再输出：
@@ -94,7 +96,7 @@ export const SESSION_REVIEW_SYSTEM_PROMPT = `
 - 只基于提供的样本，不捏造
 - 改进建议必须具体（指出哪段提示词有问题，建议如何改），不接受泛泛的"加强清晰度"
 - 若样本中没有某类问题，对应数组返回空数组，不要编造
-- promptImprovements 最多 5 条，按严重程度由高到低排列（high severity first）
+- promptImprovements 最多 5 条，按严重程度由高到低排列（high severity first）；suggestedPromptChange 不超过 60 字，需具体到提示词原文片段
 - hallucinationPatterns 最多 5 条，按严重程度由高到低排列
 - 若样本不足 5 条，在 reviewSummary 中明确注明样本量有限，结论可信度偏低
 
