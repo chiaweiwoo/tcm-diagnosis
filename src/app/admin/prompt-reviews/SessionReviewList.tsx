@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { SessionReviewRow } from "@/lib/analytics/sessionReview";
 
 const VERDICT_LABEL: Record<string, string> = {
@@ -171,16 +171,39 @@ function ReviewCard({ row }: { row: SessionReviewRow }) {
   );
 }
 
+function RunningCard() {
+  return (
+    <div className="eval-panel" style={{ marginBottom: "1rem", opacity: 0.7 }}>
+      <div className="eval-toolbar">
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+          <span className="eval-verdict eval-verdict--stable" style={{ background: "#F3F4F6", color: "#6B7280", borderColor: "#D1D5DB" }}>
+            运行中
+          </span>
+          <span className="eval-meta">正在审查近 14 天 AI 输出，请稍候（约 1 分钟）…</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function SessionReviewList({ initialReviews }: { initialReviews: SessionReviewRow[] }) {
   const [reviews, setReviews] = useState<SessionReviewRow[]>(initialReviews);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  // On mount: re-fetch list from API so a page refresh always reflects DB state
+  useEffect(() => {
+    fetch("/api/admin/analytics/session-review?limit=20")
+      .then((r) => r.json())
+      .then((json: { reviews?: SessionReviewRow[] }) => {
+        if (json.reviews) setReviews(json.reviews);
+      })
+      .catch(() => { /* non-critical, fall back to SSR data */ });
+  }, []);
 
   async function runReview() {
     setRunning(true);
     setError(null);
-    setSuccessMsg(null);
     try {
       const res = await fetch("/api/admin/analytics/session-review", {
         method: "POST",
@@ -190,8 +213,6 @@ export function SessionReviewList({ initialReviews }: { initialReviews: SessionR
       const json = await res.json() as { message?: string; review?: SessionReviewRow };
       if (!res.ok) throw new Error(json.message ?? "审查失败");
       if (json.review) setReviews((prev) => [json.review!, ...prev]);
-      setSuccessMsg("审查完成。");
-      setTimeout(() => setSuccessMsg(null), 4000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "审查失败，请稍后重试。");
     } finally {
@@ -217,9 +238,10 @@ export function SessionReviewList({ initialReviews }: { initialReviews: SessionR
       </div>
 
       {error && <div className="eval-error" style={{ marginBottom: "1rem" }}>{error}</div>}
-      {successMsg && <div className="eval-success" style={{ marginBottom: "1rem" }}>{successMsg}</div>}
 
-      {reviews.length === 0 ? (
+      {running && <RunningCard />}
+
+      {reviews.length === 0 && !running ? (
         <div className="admin-empty">
           <p>暂无审查记录。点击"运行新审查"开始。</p>
         </div>
