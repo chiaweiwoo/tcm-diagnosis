@@ -1,0 +1,27 @@
+name: Session Review
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Trigger session review
+        run: |
+          STATUS=$(curl -s -o /tmp/result.json -w "%{http_code}" \
+            -X POST "${{ secrets.ASSESS_BASE_URL }}/api/cron/session-review" \
+            -H "X-Assessment-Key: ${{ secrets.ASSESSMENT_API_KEY }}" \
+            -H "Content-Type: application/json")
+
+          cat /tmp/result.json
+          echo ""
+
+          if [ "$STATUS" -eq 200 ]; then
+            echo "Session review completed successfully."
+            exit 0
+          else
+            echo "HTTP $STATUS — session review failed."
+            exit 1
+          fi

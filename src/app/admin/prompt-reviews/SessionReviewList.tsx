@@ -3,6 +3,9 @@
 import { useState, useEffect } from "react";
 import type { SessionReviewRow } from "@/lib/analytics/sessionReview";
 
+// Triggered via GH Actions (Actions → Session Review → Run workflow)
+// This page is read-only.
+
 const VERDICT_LABEL: Record<string, string> = {
   stable: "正常",
   needs_attention: "需关注",
@@ -171,27 +174,10 @@ function ReviewCard({ row }: { row: SessionReviewRow }) {
   );
 }
 
-function RunningCard() {
-  return (
-    <div className="eval-panel" style={{ marginBottom: "1rem", opacity: 0.7 }}>
-      <div className="eval-toolbar">
-        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-          <span className="eval-verdict eval-verdict--stable" style={{ background: "#F3F4F6", color: "#6B7280", borderColor: "#D1D5DB" }}>
-            运行中
-          </span>
-          <span className="eval-meta">正在审查近 14 天 AI 输出，请稍候（约 1 分钟）…</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export function SessionReviewList({ initialReviews }: { initialReviews: SessionReviewRow[] }) {
   const [reviews, setReviews] = useState<SessionReviewRow[]>(initialReviews);
-  const [running, setRunning] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  // On mount: re-fetch list from API so a page refresh always reflects DB state
+  // Re-fetch on mount so a manual page refresh always reflects DB state
   useEffect(() => {
     fetch("/api/admin/analytics/session-review?limit=20")
       .then((r) => r.json())
@@ -201,49 +187,16 @@ export function SessionReviewList({ initialReviews }: { initialReviews: SessionR
       .catch(() => { /* non-critical, fall back to SSR data */ });
   }, []);
 
-  async function runReview() {
-    setRunning(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/admin/analytics/session-review", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ includePrior: true }),
-      });
-      const json = await res.json() as { message?: string; review?: SessionReviewRow };
-      if (!res.ok) throw new Error(json.message ?? "审查失败");
-      if (json.review) setReviews((prev) => [json.review!, ...prev]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "审查失败，请稍后重试。");
-    } finally {
-      setRunning(false);
-    }
-  }
-
   return (
     <div>
-      <div className="eval-toolbar" style={{ marginBottom: "1.5rem" }}>
-        <div>
-          <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.875rem" }}>
-            对近 14 天全体医生的 AI 输出进行系统审查，用于发现提示词问题并追踪改进效果。
-          </p>
-        </div>
-        <button
-          className="primary-button"
-          onClick={runReview}
-          disabled={running}
-        >
-          {running ? "审查中…" : "运行新审查"}
-        </button>
-      </div>
+      <p style={{ margin: "0 0 1.5rem", color: "var(--text-muted)", fontSize: "0.875rem" }}>
+        对近 14 天全体医生的 AI 输出进行系统审查，用于发现提示词问题并追踪改进效果。
+        通过 GitHub Actions → <strong>Session Review</strong> → Run workflow 触发。
+      </p>
 
-      {error && <div className="eval-error" style={{ marginBottom: "1rem" }}>{error}</div>}
-
-      {running && <RunningCard />}
-
-      {reviews.length === 0 && !running ? (
+      {reviews.length === 0 ? (
         <div className="admin-empty">
-          <p>暂无审查记录。点击"运行新审查"开始。</p>
+          <p>暂无审查记录。请通过 GitHub Actions 触发首次审查。</p>
         </div>
       ) : (
         reviews.map((row) => <ReviewCard key={row.id} row={row} />)

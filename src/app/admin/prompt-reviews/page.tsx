@@ -21,7 +21,7 @@ export default async function PromptReviewsPage() {
         <div>
           <h1>提示词评估</h1>
           <p className="admin-meta">
-            按需运行 · 对全体医生近 14 天 AI 输出进行系统审查 · 仅管理员可见
+            通过 GitHub Actions 触发 · 对全体医生近 14 天 AI 输出进行系统审查 · 仅管理员可见
           </p>
         </div>
       </div>
