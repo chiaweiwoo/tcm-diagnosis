@@ -254,7 +254,7 @@ const ResultSection = memo(function ResultSection({ title, items }: { title: str
   );
 });
 
-const ResultColumn = memo(function ResultColumn({ title, icon, colorVariant, children }: { title: string; icon: ReactNode; colorVariant?: "green" | "blue" | "teal" | "amber"; children: ReactNode }) {
+const ResultColumn = memo(function ResultColumn({ title, icon, colorVariant, children }: { title: string; icon: ReactNode; colorVariant?: "green" | "blue" | "red"; children: ReactNode }) {
   return (
     <div className={`result-column${colorVariant ? ` result-column--${colorVariant}` : ""}`}>
       <div className="result-column__header">
@@ -985,7 +985,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
 
                 {/* 风险与提醒 */}
                 {result.cautions.length > 0 && !result.cautions.every((c) => c.includes("请结合面诊")) && (
-                  <ResultColumn title="风险与提醒 Cautions" colorVariant="amber" icon={<AlertTriangle size={15} />}>
+                  <ResultColumn title="风险与提醒 Cautions" colorVariant="red" icon={<AlertTriangle size={15} />}>
                     <ul className="cautions-list">
                       {result.cautions.map((c, i) => (
                         <li key={i}>{c}</li>
@@ -1005,7 +1005,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
                   </ResultColumn>
                 )}
                 {result.groups[2] && (
-                  <ResultColumn title="随访监测 Follow-up" colorVariant="teal" icon={<AlertTriangle size={15} />}>
+                  <ResultColumn title="随访监测 Follow-up" colorVariant="blue" icon={<AlertTriangle size={15} />}>
                     {result.groups[2].sections.map((section) => (
                       <ResultSection key={section.title} title={section.title} items={section.items} />
                     ))}

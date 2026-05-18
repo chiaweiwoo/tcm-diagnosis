@@ -629,16 +629,16 @@
 .result-column--green .result-column__icon { color: #2F5D3A; }
 .result-column--green .result-column__title { color: #2F5D3A; }
 
-/* 风险与提醒 — warm amber (secondary attention) */
-.result-column--amber {
-  border-left: 3px solid #D89B42;
+/* 风险与提醒 — clinical red (cautions/warnings) */
+.result-column--red {
+  border-left: 3px solid #C97B7B;
 }
-.result-column--amber .result-column__header {
-  background: #FFF5E8;
-  border-bottom-color: #F5D2A0;
+.result-column--red .result-column__header {
+  background: #FDF2F2;
+  border-bottom-color: #E8C0C0;
 }
-.result-column--amber .result-column__icon { color: #9A5B00; }
-.result-column--amber .result-column__title { color: #9A5B00; }
+.result-column--red .result-column__icon { color: #8B2E2E; }
+.result-column--red .result-column__title { color: #8B2E2E; }
 
 /* 方案 — cool blue-gray (structured action plan) */
 .result-column--blue {
