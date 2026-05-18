@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import { getDevBypassDoctorEmail, isAllowedDoctorEmail, isAdminDoctorEmail } from "@/lib/auth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import Workbench from "./workbench";
@@ -32,5 +33,9 @@ export default async function Home() {
 
   const isAdmin = await isAdminDoctorEmail(userEmail);
 
-  return <Workbench isAdmin={isAdmin} />;
+  return (
+    <Suspense>
+      <Workbench isAdmin={isAdmin} />
+    </Suspense>
+  );
 }

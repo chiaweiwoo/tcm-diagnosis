@@ -14,6 +14,7 @@ import {
   Settings2,
   Trash2,
 } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ReactNode, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StructuredCaseForm, structuredCaseSchema, PRESCRIPTION_TYPES, SEX_VALUES } from "@/lib/forms/caseSchema";
 import { AnalysisResult, ensureAnalysisResult, normalizePrescriptionType } from "@/lib/ai/analysisResult";
@@ -457,6 +458,9 @@ const HistoryPanel = memo(function HistoryPanel({
 // ---------------------------------------------------------------------------
 
 export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [form, setForm] = useState<StructuredCaseForm>(EMPTY_FORM);
   const [touched, setTouched] = useState<Set<keyof StructuredCaseForm>>(new Set());
 
@@ -500,6 +504,13 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
       .finally(() => setHistoryLoading(false));
   }, [showToast]);
 
+  // Restore consultation from ?id= on page load / refresh
+  const initialId = useRef(searchParams.get("id"));
+  useEffect(() => {
+    if (initialId.current) void handleSelectHistory(initialId.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const setField = useCallback(<K extends keyof StructuredCaseForm>(key: K, value: StructuredCaseForm[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
     setSaveStatus((prev) => prev === "saving" ? prev : "unsaved");
@@ -519,6 +530,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
     setHistoryOpen(false);
     setSaveStatus("new");
     setSavedAt(null);
+    router.replace("/", { scroll: false });
   }
 
   async function handleSelectHistory(id: string) {
@@ -543,6 +555,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
       setSaveStatus("saved");
       setSavedAt(new Date(record.updated_at));
       showToast("已加载病案。", "success");
+      router.replace(`/?id=${id}`, { scroll: false });
     } catch {
       showToast("读取病案记录失败。", "error");
     }

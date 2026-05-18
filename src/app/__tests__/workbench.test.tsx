@@ -8,6 +8,11 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import Workbench from "../workbench";
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: vi.fn() }),
+  useSearchParams: () => ({ get: () => null }),
+}));
+
 // ---------------------------------------------------------------------------
 // Mock fetch globally
 // ---------------------------------------------------------------------------
