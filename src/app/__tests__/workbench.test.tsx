@@ -280,6 +280,7 @@ describe("Analyze flow", () => {
       expect(screen.getByText("判断 Assessment")).toBeInTheDocument();
     });
 
+    expect(screen.getByText("重点结论 Conclusion")).toBeInTheDocument();
     expect(screen.getByText("处方方向基本合理")).toBeInTheDocument();
     expect(screen.getByText("判断 Assessment")).toBeInTheDocument();
     expect(screen.getByText("方案 Plan")).toBeInTheDocument();

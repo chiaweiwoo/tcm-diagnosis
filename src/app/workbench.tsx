@@ -964,19 +964,23 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
           <section className="result-section-wrap" ref={resultRef}>
             <div className="result-layout">
 
-              {/* Top row: 判断 (70%) + 风险与提醒 (30%) */}
+              {/* 重点结论 — full width conclusion card */}
+              {result.keyPoints.length > 0 && (
+                <ResultColumn title="重点结论 Conclusion" colorVariant="green" icon={<CheckCircle2 size={15} />}>
+                  <div className="result-keypoints">
+                    {result.keyPoints.map((kp, i) => (
+                      <p key={i}>{kp}</p>
+                    ))}
+                  </div>
+                </ResultColumn>
+              )}
+
+              {/* Top row: 判断 + 风险与提醒, each full width */}
               <div className="result-top-row">
 
-                {/* 判断 — with 重点结论 folded in as summary */}
+                {/* 判断 */}
                 {result.groups[0] && (
                   <ResultColumn title="判断 Assessment" colorVariant="green" icon={<Brain size={15} />}>
-                    {result.keyPoints.length > 0 && (
-                      <div className="result-keypoints">
-                        {result.keyPoints.map((kp, i) => (
-                          <p key={i}>{kp}</p>
-                        ))}
-                      </div>
-                    )}
                     {result.groups[0].sections.map((section) => (
                       <ResultSection key={section.title} title={section.title} items={section.items} />
                     ))}
