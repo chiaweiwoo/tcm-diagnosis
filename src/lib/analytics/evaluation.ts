@@ -7,7 +7,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { callDeepSeekJson, getDeepSeekSmartModel } from "@/lib/ai/deepseek";
+import { callDeepSeekJson, getDeepSeekFastModel } from "@/lib/ai/deepseek";
 import { DOCTOR_EVALUATION_SYSTEM_PROMPT } from "./prompts";
 import { buildWindow } from "./stats";
 import { getLangfuse } from "@/lib/langfuse";
@@ -392,7 +392,9 @@ export async function evaluateDoctor(
     serialized,
   ].join("\n");
 
-  const model = getDeepSeekSmartModel();
+  // Use the fast (non-reasoning) model. The smart/reasoner model consumes all
+  // tokens on chain-of-thought and leaves nothing for the JSON output.
+  const model = getDeepSeekFastModel();
   const langfuse = getLangfuse();
   const trace = langfuse?.trace({
     name: "evaluate-doctor",
