@@ -75,14 +75,13 @@ describe("structuredCaseSchema", () => {
   });
 
   it("defaults optional fields to empty string when omitted", () => {
-    const { consultationName, pastHistory, doctorQuestion, ...required } = MINIMAL_VALID;
-    void consultationName; void pastHistory; void doctorQuestion;
+    const { consultationName, pastHistory, ...required } = MINIMAL_VALID;
+    void consultationName; void pastHistory;
     const result = parse(required);
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.consultationName).toBe("");
       expect(result.data.pastHistory).toBe("");
-      expect(result.data.doctorQuestion).toBe("");
     }
   });
 

@@ -15,7 +15,6 @@ export const FIELD_LIMITS = {
   diagnosis: 100,
   pattern: 100,
   prescription: 2000,
-  doctorQuestion: 500,
 } as const;
 
 const MSG = {
@@ -97,11 +96,6 @@ export const structuredCaseSchema = z
       .min(1, MSG.REQUIRED)
       .max(FIELD_LIMITS.prescription, `不超过${FIELD_LIMITS.prescription}字`),
 
-    doctorQuestion: z
-      .string()
-      .max(FIELD_LIMITS.doctorQuestion, `不超过${FIELD_LIMITS.doctorQuestion}字`)
-      .optional()
-      .default(""),
   })
   .superRefine((val, ctx) => {
     // Block guaranteed efficacy or patient self-use language across key fields
@@ -110,13 +104,12 @@ export const structuredCaseSchema = z
       val.currentIllness,
       val.diagnosis,
       val.prescription,
-      val.doctorQuestion ?? "",
     ].join(" ");
 
     if (containsBlockedContent(combinedText)) {
       ctx.addIssue({
         code: "custom",
-        path: ["doctorQuestion"],
+        path: ["prescription"],
         message: MSG.BLOCKED,
       });
     }

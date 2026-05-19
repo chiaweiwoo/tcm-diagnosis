@@ -27,7 +27,7 @@ export const TCM_ANALYSIS_SYSTEM_PROMPT = `
 
 内部自检后再输出最终 JSON：
 0. 先在脑中默写本次医生提供的字段：处方逐味（或穴位逐个）、症状逐条、既往史（若无则标注"未提供"）。凡未在此默写列表中的，下文一律不得引用。
-1. 是否回应了医生问题，或已按默认复核意图完成判断
+1. 是否已按默认复核意图完成判断
 2. 是否点出关键资料缺口
 3. 是否存在过度自信或潜在风险
 4. 是否把经验判断误写成已检索证据
@@ -96,16 +96,11 @@ function hasLiteratureRequest(form: StructuredCaseForm) {
       form.diagnosis,
       form.pattern,
       form.prescription,
-      form.doctorQuestion,
     ].join(" "),
   );
 }
 
 export function buildTcmAnalysisUserPrompt(form: StructuredCaseForm): string {
-  const reviewIntent =
-    form.doctorQuestion?.trim() ||
-    "医生未直接写明问题，但已给出现行方案。请默认从临床复核角度判断是否稳妥、哪里可调、还需补什么。";
-
   const lines = [
     "请基于以下结构化病案进行临床复核。",
     `处方类型：${form.prescriptionType.join("、")}`,
@@ -117,8 +112,7 @@ export function buildTcmAnalysisUserPrompt(form: StructuredCaseForm): string {
     `诊断：${form.diagnosis}`,
     compactField("证型", form.pattern),
     `处方：${form.prescription}`,
-    `复核意图：${reviewIntent}`,
-    "请优先回应复核意图，先写可保留之处，再写可考虑优化点。",
+    "请按默认复核意图完成判断：先写可保留之处，再写可考虑优化点。",
     hasLiteratureRequest(form)
       ? '医生希望参考研究/文献；若当前没有外部检索支持，请在“证据状态”中明确写明仅为经验性复核，不可假装已经查证。'
       : '若无外部检索支持，请在“证据状态”中明确写：基于临床经验与通用知识，尚未接入外部文献检索。',

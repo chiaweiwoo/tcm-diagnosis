@@ -12,7 +12,6 @@ describe("Goal 2 deterministic evaluation helpers", () => {
         form_data: {
           pastHistory: "高血压史",
           physicalExam: "舌红，脉弦",
-          doctorQuestion: "请优化方药",
         },
         analysis_result: {},
         analyzed_at: "2026-05-19T00:00:00.000Z",
@@ -21,7 +20,6 @@ describe("Goal 2 deterministic evaluation helpers", () => {
         form_data: {
           pastHistory: "",
           physicalExam: "舌淡，脉细",
-          doctorQuestion: "",
         },
         analysis_result: {},
         analyzed_at: "2026-05-19T00:00:00.000Z",
@@ -31,7 +29,6 @@ describe("Goal 2 deterministic evaluation helpers", () => {
     expect(computeFieldCompleteness(rows)).toEqual([
       { field: "pastHistory", label: "既往史", filled: 1, total: 2, rate: 0.5 },
       { field: "physicalExam", label: "体格检查", filled: 2, total: 2, rate: 1 },
-      { field: "doctorQuestion", label: "医生问题", filled: 1, total: 2, rate: 0.5 },
     ]);
   });
 

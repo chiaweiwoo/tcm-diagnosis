@@ -20,7 +20,6 @@ export const VALID_FIXTURES: StructuredCaseForm[] = [
     pattern: "肾虚血瘀",
     prescription:
       "月经来潮期：杏仁10g 红花10g 熟地黄10g 赤芍10g 补骨脂10g 三棱5g 莪术5g 香附10g 丹参10g 益母草10g 肉苁蓉10g 巴戟天10g\n月经干净后调理5日：六味地黄5g 巴戟天1g 女贞子1g 枸杞子1g 香附1g 熟地黄1g 肉苁蓉1g",
-    doctorQuestion: "请评价该调周期方案是否合理，是否需要调整？",
   },
 
   // 002 — 弹响指 / 针灸
@@ -37,7 +36,6 @@ export const VALID_FIXTURES: StructuredCaseForm[] = [
     diagnosis: "弹响指（屈指肌腱腱鞘炎）",
     pattern: "气血瘀滞",
     prescription: "阿是穴，合谷穴",
-    doctorQuestion: "如何改良针灸方案以提高疗效？",
   },
 
   // 003 — 阳痿 / 肝郁肾虚 / 方药
@@ -53,7 +51,6 @@ export const VALID_FIXTURES: StructuredCaseForm[] = [
     diagnosis: "阳痿",
     pattern: "肝郁肾虚",
     prescription: "六味地黄2.5 逍遥散2.5 菟丝子1 郁金1 枸杞子1 鸡血藤1 巴戟天1，服14日",
-    doctorQuestion: "",
   },
 
   // 004 — 眩晕 / 肝阴虚 / 针灸
@@ -70,7 +67,6 @@ export const VALID_FIXTURES: StructuredCaseForm[] = [
     diagnosis: "眩晕",
     pattern: "肝阴虚",
     prescription: "印堂、四神聪、太阳、太溪、太冲、风池",
-    doctorQuestion: "",
   },
 
   // 005 — 肩痛腰痛 / 肌肉劳损 / 综合调理
@@ -87,7 +83,6 @@ export const VALID_FIXTURES: StructuredCaseForm[] = [
     diagnosis: "肌肉劳损",
     pattern: "气血瘀滞",
     prescription: "推拿：右肩提肩肌松解手法，左腰方肌松解手法",
-    doctorQuestion: "",
   },
 
   // 006 — 腹胀便溏 / 脾虚湿盛 / 方药
@@ -104,7 +99,6 @@ export const VALID_FIXTURES: StructuredCaseForm[] = [
     diagnosis: "痞满",
     pattern: "脾虚湿盛",
     prescription: "二陈汤5 白术1 苍术1 山药1 香附1 艾叶1",
-    doctorQuestion: "",
   },
 
   // 007 — 梨状肌综合征 / 综合调理
@@ -121,7 +115,6 @@ export const VALID_FIXTURES: StructuredCaseForm[] = [
     diagnosis: "梨状肌综合征",
     pattern: "气血瘀滞",
     prescription: "推拿：梨状肌松解手法，左腰臀部深层肌群放松",
-    doctorQuestion: "",
   },
 
   // 008 — 中焦湿热 / GI / 方药
@@ -138,7 +131,6 @@ export const VALID_FIXTURES: StructuredCaseForm[] = [
     diagnosis: "中焦湿热",
     pattern: "湿热蕴结中焦",
     prescription: "防风通圣散5 泽泻1 枳实1 栀子1 厚朴1 萆薢1（每1代表1g颗粒=10g草药）",
-    doctorQuestion: "",
   },
 
   // 009 — 不寐 / 心脾两虚 / 方药
@@ -156,7 +148,6 @@ export const VALID_FIXTURES: StructuredCaseForm[] = [
     pattern: "心脾两虚",
     prescription:
       "归脾汤加减：黄芪15g 白术10g 茯苓10g 当归10g 远志10g 酸枣仁15g 龙眼肉10g 木香6g 炙甘草6g 大枣5枚",
-    doctorQuestion: "此方是否合适？酸枣仁用量是否过重？",
   },
 
   // 010 — 颈椎病 / 气滞血瘀 / 综合调理
@@ -174,7 +165,6 @@ export const VALID_FIXTURES: StructuredCaseForm[] = [
     pattern: "气滞血瘀",
     prescription:
       "针刺：风池、颈夹脊、肩井、曲池、合谷\n推拿：颈肩部松解，手法整脊",
-    doctorQuestion: "针灸与推拿结合，治疗频率建议如何安排？",
   },
 ];
 
@@ -191,5 +181,4 @@ export const MINIMAL_VALID: StructuredCaseForm = {
   diagnosis: "头痛",
   pattern: "肝阳上亢",
   prescription: "天麻钩藤饮加减：天麻10g 钩藤15g 石决明20g 牛膝15g 黄芩10g",
-  doctorQuestion: "",
 };

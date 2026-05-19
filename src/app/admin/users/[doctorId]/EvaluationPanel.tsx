@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ClipboardList, Compass, Lightbulb, MessageSquare, Sparkles } from "lucide-react";
-import type { DoctorProfile } from "@/lib/analytics/evaluation";
+import { Compass, Lightbulb, MessageSquare, Sparkles, Users } from "lucide-react";
+import type { DoctorProfile, PatientDistribution } from "@/lib/analytics/evaluation";
 
 // Triggered via GitHub Actions (Evaluate Doctors -> Run workflow).
 // This panel is read-only. Pass doctor email or UUID as workflow input.
@@ -38,7 +38,7 @@ function formatDateSGT(iso: string) {
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" ? value as Record<string, unknown> : {};
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
 }
 
 function asString(value: unknown): string {
@@ -65,69 +65,107 @@ function parseLegacyRatio(value: string): { filled: number; total: number; rate:
 
 function normalizeProfile(value: unknown): DoctorProfile {
   const raw = asRecord(value);
-  const array = (key: string) => Array.isArray(raw[key]) ? raw[key] as unknown[] : [];
+  const array = (key: string) => (Array.isArray(raw[key]) ? (raw[key] as unknown[]) : []);
 
-  const fieldCompleteness = array("fieldCompleteness").map((item) => {
-    const row = asRecord(item);
-    const ratio = parseLegacyRatio(asString(row.presentIn));
-    return {
-      field: asString(row.field),
-      label: asString(row.label) || asString(row.field),
-      filled: asNumber(row.filled) || ratio.filled,
-      total: asNumber(row.total) || ratio.total,
-      rate: asNumber(row.rate) || ratio.rate,
+  const fieldCompleteness = array("fieldCompleteness")
+    .map((item) => {
+      const row = asRecord(item);
+      const ratio = parseLegacyRatio(asString(row.presentIn));
+      return {
+        field: asString(row.field),
+        label: asString(row.label) || asString(row.field),
+        filled: asNumber(row.filled) || ratio.filled,
+        total: asNumber(row.total) || ratio.total,
+        rate: asNumber(row.rate) || ratio.rate,
+      };
+    })
+    .filter((item) => item.label);
+
+  const aiRecurringThemes = array("aiRecurringThemes")
+    .map((item) => {
+      const row = asRecord(item);
+      return {
+        theme: asString(row.theme),
+        frequency: asString(row.frequency),
+        caseNumbers: asCaseNumbers(row.caseNumbers),
+      };
+    })
+    .filter((item) => item.theme);
+
+  const strengths = array("strengths")
+    .map((item) => {
+      const row = asRecord(item);
+      return { text: asString(row.text) || asString(row.strength) };
+    })
+    .filter((item) => item.text);
+
+  const gaps = array("gaps")
+    .map((item) => {
+      const row = asRecord(item);
+      const ratio = parseLegacyRatio(asString(row.presentIn) || asString(row.frequency));
+      return {
+        field: asString(row.field) || asString(row.gap),
+        inputRate: asNumber(row.inputRate) || ratio.rate,
+        aiAskRate: asNumber(row.aiAskRate),
+        evidence: asString(row.evidence),
+        caseNumbers: asCaseNumbers(row.caseNumbers),
+        guidanceHint: asString(row.guidanceHint),
+      };
+    })
+    .filter((item) => item.field || item.evidence || item.guidanceHint);
+
+  const rawGuidance = array("guidancePoints");
+  const guidancePoints = rawGuidance
+    .map((item) => {
+      if (typeof item === "string") return { text: item };
+      const row = asRecord(item);
+      return { text: asString(row.text) };
+    })
+    .filter((item) => item.text);
+
+  const keyObservations = array("keyObservations").filter(
+    (item): item is string => typeof item === "string" && item.trim().length > 0,
+  );
+
+  // patientDistribution — only present in v1.3+
+  const pdRaw = raw.patientDistribution;
+  let patientDistribution: PatientDistribution | null = null;
+  if (pdRaw && typeof pdRaw === "object") {
+    const pd = pdRaw as Record<string, unknown>;
+    const sexRaw = asRecord(pd.sex);
+    const ageBuckets = Array.isArray(pd.ageBuckets)
+      ? (pd.ageBuckets as unknown[]).map((b) => {
+          const br = asRecord(b);
+          return {
+            label: asString(br.label),
+            range: asString(br.range),
+            count: asNumber(br.count),
+          };
+        })
+      : [];
+    const prescriptionTypes = Array.isArray(pd.prescriptionTypes)
+      ? (pd.prescriptionTypes as unknown[]).map((p) => {
+          const pr = asRecord(p);
+          return { type: asString(pr.type), count: asNumber(pr.count) };
+        })
+      : [];
+    patientDistribution = {
+      sex: { male: asNumber(sexRaw.male), female: asNumber(sexRaw.female) },
+      ageBuckets,
+      prescriptionTypes,
+      total: asNumber(pd.total),
     };
-  }).filter((item) => item.label);
-
-  const aiRecurringThemes = array("aiRecurringThemes").map((item) => {
-    const row = asRecord(item);
-    return {
-      theme: asString(row.theme),
-      frequency: asString(row.frequency),
-      caseNumbers: asCaseNumbers(row.caseNumbers),
-    };
-  }).filter((item) => item.theme);
-
-  const strengths = array("strengths").map((item) => {
-    const row = asRecord(item);
-    return {
-      text: asString(row.text) || asString(row.strength),
-      caseNumbers: asCaseNumbers(row.caseNumbers),
-    };
-  }).filter((item) => item.text);
-
-  const gaps = array("gaps").map((item) => {
-    const row = asRecord(item);
-    const ratio = parseLegacyRatio(asString(row.presentIn) || asString(row.frequency));
-    return {
-      field: asString(row.field) || asString(row.gap),
-      inputRate: asNumber(row.inputRate) || ratio.rate,
-      aiAskRate: asNumber(row.aiAskRate),
-      evidence: asString(row.evidence),
-      caseNumbers: asCaseNumbers(row.caseNumbers),
-      guidanceHint: asString(row.guidanceHint),
-    };
-  }).filter((item) => item.field || item.evidence || item.guidanceHint);
-
-  const oldGuidance = array("guidancePoints")
-    .filter((item): item is string => typeof item === "string")
-    .map((text) => ({ text, caseNumbers: [] }));
-
-  const guidancePoints = array("guidancePoints").map((item) => {
-    const row = asRecord(item);
-    return {
-      text: asString(row.text),
-      caseNumbers: asCaseNumbers(row.caseNumbers),
-    };
-  }).filter((item) => item.text);
+  }
 
   return {
     profileSummary: asString(raw.profileSummary) || "暂无可展示的画像摘要。",
+    keyObservations,
+    patientDistribution,
     fieldCompleteness,
     aiRecurringThemes,
     strengths,
     gaps,
-    guidancePoints: guidancePoints.length ? guidancePoints : oldGuidance,
+    guidancePoints,
   };
 }
 
@@ -135,36 +173,160 @@ function formatRate(rate: number) {
   return `${Math.round(Math.max(0, Math.min(1, rate)) * 100)}%`;
 }
 
-function caseText(caseNumbers: number[]) {
-  return caseNumbers.length > 0 ? `案例 ${caseNumbers.join("、")}` : "未标注案例";
-}
+// ---------------------------------------------------------------------------
+// Help tooltip
+// ---------------------------------------------------------------------------
 
-function barFillClass(rate: number) {
-  if (rate >= 0.7) return "profile-bar-fill--strong";
-  if (rate >= 0.3) return "profile-bar-fill--mid";
-  return "profile-bar-fill--weak";
-}
-
-function FieldCompletenessCard({ profile }: { profile: DoctorProfile }) {
+function HelpTip({ text }: { text: string }) {
   return (
-    <div className="profile-card profile-card--mist">
+    <span className="profile-help-tip" title={text} aria-label={text}>
+      ?
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Patient distribution card (new)
+// ---------------------------------------------------------------------------
+
+function PatientDistributionCard({ distribution }: { distribution: PatientDistribution }) {
+  const { sex, ageBuckets, prescriptionTypes, total } = distribution;
+
+  const sexItems = [
+    { label: "男", count: sex.male, cls: "profile-dist-bar--male" },
+    { label: "女", count: sex.female, cls: "profile-dist-bar--female" },
+  ];
+
+  return (
+    <div className="profile-card profile-card--teal">
       <h3 className="profile-card-title">
-        <ClipboardList size={15} /> 字段完整度
+        <Users size={15} /> 病案分布
+        <HelpTip text="该医生最近窗口内病案的患者画像分布" />
       </h3>
-      {profile.fieldCompleteness.length === 0 ? (
-        <p className="profile-empty">暂无字段完整度数据</p>
-      ) : (
-        <div className="profile-bar-list">
-          {profile.fieldCompleteness.map((field) => (
-            <div key={field.field || field.label} className="profile-bar-row">
-              <span className="profile-bar-label">{field.label}</span>
-              <div className="profile-bar-track">
-                <div
-                  className={`profile-bar-fill ${barFillClass(field.rate)}`}
-                  style={{ width: formatRate(field.rate) }}
-                />
+      <div className="profile-dist-grid">
+        <div className="profile-dist-section">
+          <span className="profile-dist-label">性别</span>
+          <div className="profile-dist-bars">
+            {sexItems.map((item) => (
+              <div key={item.label} className="profile-dist-row">
+                <span className="profile-dist-name">{item.label}</span>
+                <div className="profile-dist-track">
+                  <div
+                    className={`profile-dist-fill ${item.cls}`}
+                    style={{ width: total > 0 ? `${Math.round((item.count / total) * 100)}%` : "0%" }}
+                  />
+                </div>
+                <span className="profile-dist-count">{item.count}</span>
               </div>
-              <span className="profile-bar-fraction">{field.filled}/{field.total}</span>
+            ))}
+          </div>
+        </div>
+
+        <div className="profile-dist-section">
+          <span className="profile-dist-label">年龄</span>
+          <div className="profile-dist-bars">
+            {ageBuckets.filter((b) => b.count > 0).map((b) => (
+              <div key={b.label} className="profile-dist-row">
+                <span className="profile-dist-name">{b.label}</span>
+                <div className="profile-dist-track">
+                  <div
+                    className="profile-dist-fill profile-dist-bar--age"
+                    style={{ width: total > 0 ? `${Math.round((b.count / total) * 100)}%` : "0%" }}
+                  />
+                </div>
+                <span className="profile-dist-count">{b.count}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="profile-dist-section">
+          <span className="profile-dist-label">处方</span>
+          <div className="profile-dist-bars">
+            {prescriptionTypes.map((p) => (
+              <div key={p.type} className="profile-dist-row">
+                <span className="profile-dist-name">{p.type}</span>
+                <div className="profile-dist-track">
+                  <div
+                    className="profile-dist-fill profile-dist-bar--rx"
+                    style={{ width: total > 0 ? `${Math.round((p.count / total) * 100)}%` : "0%" }}
+                  />
+                </div>
+                <span className="profile-dist-count">{p.count}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// AI themes chip cloud
+// ---------------------------------------------------------------------------
+
+function themeChipSize(frequency: string): string {
+  const match = frequency.match(/\((\d+)%\)/);
+  if (!match) return "profile-theme-chip--sm";
+  const pct = parseInt(match[1], 10);
+  if (pct >= 50) return "profile-theme-chip--lg";
+  if (pct >= 30) return "profile-theme-chip--md";
+  return "profile-theme-chip--sm";
+}
+
+function AiThemesCard({ profile }: { profile: DoctorProfile }) {
+  if (profile.aiRecurringThemes.length === 0) {
+    return (
+      <div className="profile-card profile-card--gold">
+        <h3 className="profile-card-title">
+          <Lightbulb size={15} /> AI关注的主题
+          <HelpTip text="AI 在医生病案输出中反复出现的关注点" />
+        </h3>
+        <p className="profile-empty">本期暂无明显重复主题</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="profile-card profile-card--gold">
+      <h3 className="profile-card-title">
+        <Lightbulb size={15} /> AI关注的主题
+        <HelpTip text="AI 在医生病案输出中反复出现的关注点" />
+      </h3>
+      <div className="profile-theme-cloud">
+        {profile.aiRecurringThemes.map((item) => (
+          <span
+            key={item.theme}
+            className={`profile-theme-chip ${themeChipSize(item.frequency)}`}
+            title={item.frequency}
+          >
+            {item.theme}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Strengths
+// ---------------------------------------------------------------------------
+
+function StrengthsCard({ profile }: { profile: DoctorProfile }) {
+  return (
+    <div className="profile-card profile-card--sage">
+      <h3 className="profile-card-title">
+        <Sparkles size={15} /> 可取之处
+        <HelpTip text="通过确定性信号识别的记录习惯亮点" />
+      </h3>
+      {profile.strengths.length === 0 ? (
+        <p className="profile-empty">本期暂未识别到有据可查的突出优势</p>
+      ) : (
+        <div className="profile-list">
+          {profile.strengths.map((item, index) => (
+            <div key={index} className="profile-list-row">
+              <span className="profile-list-main">{item.text}</span>
             </div>
           ))}
         </div>
@@ -173,98 +335,67 @@ function FieldCompletenessCard({ profile }: { profile: DoctorProfile }) {
   );
 }
 
-function AiThemesCard({ profile }: { profile: DoctorProfile }) {
-  return (
-    <div className="profile-card profile-card--gold">
-      <h3 className="profile-card-title">
-        <Lightbulb size={15} /> AI反复提到的主题
-      </h3>
-      <ProfileList
-        emptyText="本期暂无明显重复主题"
-        items={profile.aiRecurringThemes.map((item) => ({
-          main: item.theme,
-          sub: `${item.frequency} · ${caseText(item.caseNumbers)}`,
-        }))}
-      />
-    </div>
-  );
-}
-
-function StrengthsCard({ profile }: { profile: DoctorProfile }) {
-  return (
-    <div className="profile-card profile-card--sage">
-      <h3 className="profile-card-title">
-        <Sparkles size={15} /> 可取之处
-      </h3>
-      <ProfileList
-        emptyText="本期暂未识别到有据可查的突出优势"
-        items={profile.strengths.map((item) => ({
-          main: item.text,
-          sub: caseText(item.caseNumbers),
-        }))}
-      />
-    </div>
-  );
-}
+// ---------------------------------------------------------------------------
+// Gaps
+// ---------------------------------------------------------------------------
 
 function GapsCard({ profile }: { profile: DoctorProfile }) {
   return (
     <div className="profile-card profile-card--tan">
       <h3 className="profile-card-title">
         <Compass size={15} /> 差距识别
+        <HelpTip text="医生填写率 < 70% 且 AI 多次（≥30%）提醒补充的字段" />
       </h3>
-      <ProfileList
-        emptyText="本期暂无符合双证据规则的差距"
-        items={profile.gaps.map((item) => ({
-          main: item.evidence || item.field,
-          sub: `${item.field} · 输入 ${formatRate(item.inputRate)} · AI提醒 ${formatRate(item.aiAskRate)} · ${caseText(item.caseNumbers)}`,
-          hint: item.guidanceHint,
-        }))}
-      />
+      {profile.gaps.length === 0 ? (
+        <p className="profile-empty">本期暂无符合双证据规则的差距</p>
+      ) : (
+        <div className="profile-list">
+          {profile.gaps.map((item, index) => (
+            <div key={index} className="profile-list-row">
+              <span className="profile-list-main">{item.evidence || item.field}</span>
+              <span className="profile-list-sub">
+                输入 {formatRate(item.inputRate)} · AI提醒 {formatRate(item.aiAskRate)}
+              </span>
+              {item.guidanceHint && (
+                <span className="profile-list-hint">💬 {item.guidanceHint}</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Guidance
+// ---------------------------------------------------------------------------
 
 function GuidanceCard({ profile }: { profile: DoctorProfile }) {
   return (
     <div className="profile-card profile-card--ink">
       <h3 className="profile-card-title">
         <MessageSquare size={15} /> 对话参考
+        <HelpTip text="面向管理员的对话建议，可在沟通中使用" />
       </h3>
-      <ProfileList
-        emptyText="本期暂无具体对话建议"
-        items={profile.guidancePoints.map((item) => ({
-          main: item.text,
-          sub: caseText(item.caseNumbers),
-        }))}
-      />
-    </div>
-  );
-}
-
-function ProfileList({
-  items,
-  emptyText,
-}: {
-  items: Array<{ main: string; sub?: string; hint?: string }>;
-  emptyText: string;
-}) {
-  if (items.length === 0) {
-    return <p className="profile-empty">{emptyText}</p>;
-  }
-
-  return (
-    <div className="profile-list">
-      {items.map((item, index) => (
-        <div key={index} className="profile-list-row">
-          <span className="profile-list-main">{item.main}</span>
-          {item.sub && <span className="profile-list-sub">{item.sub}</span>}
-          {item.hint && <span className="profile-list-hint">💬 {item.hint}</span>}
+      {profile.guidancePoints.length === 0 ? (
+        <p className="profile-empty">本期暂无具体对话建议</p>
+      ) : (
+        <div className="profile-list">
+          {profile.guidancePoints.map((item, index) => (
+            <div key={index} className="profile-list-row">
+              <span className="profile-list-main">{item.text}</span>
+            </div>
+          ))}
         </div>
-      ))}
+      )}
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Main panel
+// ---------------------------------------------------------------------------
 
 export function EvaluationPanel({ doctorId }: { doctorId: string }) {
   const [record, setRecord] = useState<EvaluationRecord>(null);
@@ -310,12 +441,21 @@ export function EvaluationPanel({ doctorId }: { doctorId: string }) {
             </div>
             <h2 className="profile-headline">画像摘要</h2>
             <p className="profile-summary">{profile.profileSummary}</p>
+            {profile.keyObservations.length > 0 && (
+              <ul className="profile-observations">
+                {profile.keyObservations.map((obs, i) => (
+                  <li key={i}>{obs}</li>
+                ))}
+              </ul>
+            )}
             <p className="profile-trigger-note">
               通过 GitHub Actions → <strong>Evaluate Doctors</strong> → Run workflow 触发，输入医生邮箱或 UUID。历史记录保留，每次运行追加。
             </p>
           </div>
 
-          <FieldCompletenessCard profile={profile} />
+          {profile.patientDistribution && profile.patientDistribution.total > 0 && (
+            <PatientDistributionCard distribution={profile.patientDistribution} />
+          )}
           <AiThemesCard profile={profile} />
           <StrengthsCard profile={profile} />
           <GapsCard profile={profile} />

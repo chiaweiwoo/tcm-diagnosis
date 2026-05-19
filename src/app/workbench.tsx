@@ -76,7 +76,6 @@ const EMPTY_FORM: StructuredCaseForm = {
   diagnosis: "",
   pattern: "",
   prescription: "",
-  doctorQuestion: "",
 };
 
 // ---------------------------------------------------------------------------

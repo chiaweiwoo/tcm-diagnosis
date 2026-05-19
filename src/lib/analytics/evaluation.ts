@@ -41,11 +41,18 @@ export class NoConsultationsError extends Error {
 // ---------------------------------------------------------------------------
 
 export type FieldCompletenessStat = {
-  field: "pastHistory" | "physicalExam" | "doctorQuestion";
+  field: "pastHistory" | "physicalExam";
   label: string;
   filled: number;
   total: number;
   rate: number;
+};
+
+export type PatientDistribution = {
+  sex: { male: number; female: number };
+  ageBuckets: Array<{ label: string; range: string; count: number }>;
+  prescriptionTypes: Array<{ type: string; count: number }>;
+  total: number;
 };
 
 export type ThemeCandidate = {
@@ -67,18 +74,19 @@ export type GapCandidate = {
   caseNumbers: number[];
 };
 
-/** Strength signal detected deterministically (e.g. high field completeness). */
+/** Strength signal detected deterministically. */
 export type StrengthSignal = {
-  kind: "high_completeness";
-  field: FieldCompletenessStat["field"];
-  label: string;
-  rate: number;
+  kind: string;
+  description: string;
+  rate?: number;
+  count?: number;
   caseNumbers: number[];
 };
 
 /** Output of Stage 1 — all structural findings, no prose. */
 export type EvaluationFindings = {
   fieldCompleteness: FieldCompletenessStat[];
+  patientDistribution: PatientDistribution;
   aiRecurringThemes: ResolvedTheme[];
   gapCandidates: GapCandidate[];
   strengthSignals: StrengthSignal[];
@@ -89,18 +97,21 @@ export type EvaluationFindings = {
 /** Narrative output of Stage 2 — prose only, no structural decisions. */
 type EvalNarrative = {
   profileSummary: string;
-  strengths: Array<{ text: string; caseNumbers: number[] }>;
+  keyObservations: string[];
+  strengths: Array<{ text: string }>;
   gapsNarrative: Array<{
     field: string;
     evidence: string;
     guidanceHint: string;
-    caseNumbers: number[];
   }>;
-  guidancePoints: Array<{ text: string; caseNumbers: number[] }>;
+  guidancePoints: Array<{ text: string }>;
 };
 
 export type DoctorProfile = {
   profileSummary: string;
+  keyObservations: string[];
+  patientDistribution: PatientDistribution | null;
+  /** Kept in DB for gap detection and backward compat; not rendered in UI. */
   fieldCompleteness: Array<{
     field: string;
     label: string;
@@ -113,10 +124,7 @@ export type DoctorProfile = {
     frequency: string;
     caseNumbers: number[];
   }>;
-  strengths: Array<{
-    text: string;
-    caseNumbers: number[];
-  }>;
+  strengths: Array<{ text: string }>;
   gaps: Array<{
     field: string;
     inputRate: number;
@@ -125,10 +133,7 @@ export type DoctorProfile = {
     caseNumbers: number[];
     guidanceHint: string;
   }>;
-  guidancePoints: Array<{
-    text: string;
-    caseNumbers: number[];
-  }>;
+  guidancePoints: Array<{ text: string }>;
 };
 
 export type DoctorEvaluation = {
@@ -145,16 +150,19 @@ type EvalRow = {
 // Constants
 // ---------------------------------------------------------------------------
 
-const MAX_EVAL_CASES = 8;
+const MAX_EVAL_CASES = 20;
 const MAX_THEMES = 5;
 const GAP_INPUT_THRESHOLD = 0.7;
 const GAP_AI_ASK_THRESHOLD = 0.3;
 const STRENGTH_COMPLETENESS_THRESHOLD = 0.9;
+const STRENGTH_TONGUE_PULSE_THRESHOLD = 0.8;
+const STRENGTH_PRESCRIPTION_DETAIL_THRESHOLD = 0.5;
+const STRENGTH_COMPLAINT_LENGTH_THRESHOLD = 15;
+const STRENGTH_PATTERN_DIVERSITY_MIN = 5;
 
 const FIELD_LABELS: Record<FieldCompletenessStat["field"], string> = {
   pastHistory: "既往史",
   physicalExam: "体格检查",
-  doctorQuestion: "医生问题",
 };
 
 /**
@@ -165,6 +173,13 @@ const FIELD_TO_THEME: Partial<Record<FieldCompletenessStat["field"], string>> = 
   pastHistory: "既往史补充",
   physicalExam: "体格检查补充",
 };
+
+const AGE_BUCKETS = [
+  { label: "儿童", range: "≤14", min: 0, max: 14 },
+  { label: "青年", range: "15–39", min: 15, max: 39 },
+  { label: "中年", range: "40–64", min: 40, max: 64 },
+  { label: "老年", range: "≥65", min: 65, max: 999 },
+] as const;
 
 const THEME_PATTERNS: Array<{ theme: string; patterns: RegExp[] }> = [
   { theme: "既往史补充", patterns: [/既往史|病史|用药史|过敏史/] },
@@ -380,29 +395,123 @@ function detectGaps(
   });
 }
 
+export function computePatientDistribution(rows: EvalRow[]): PatientDistribution {
+  const total = rows.length;
+  const male = rows.filter((r) => r.form_data?.patientSex === "男").length;
+  const female = rows.filter((r) => r.form_data?.patientSex === "女").length;
+
+  const ageBuckets = AGE_BUCKETS.map((b) => ({
+    label: b.label,
+    range: b.range,
+    count: rows.filter((r) => {
+      const age = parseInt(String(r.form_data?.patientAge ?? ""), 10);
+      return !isNaN(age) && age >= b.min && age <= b.max;
+    }).length,
+  }));
+
+  const typeCount = new Map<string, number>();
+  for (const row of rows) {
+    const types = Array.isArray(row.form_data?.prescriptionType)
+      ? (row.form_data!.prescriptionType as string[])
+      : [String(row.form_data?.prescriptionType ?? "其他")];
+    for (const t of types) {
+      typeCount.set(t, (typeCount.get(t) ?? 0) + 1);
+    }
+  }
+  const prescriptionTypes = [...typeCount.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([type, count]) => ({ type, count }));
+
+  return { sex: { male, female }, ageBuckets, prescriptionTypes, total };
+}
+
 function detectStrengthSignals(
   fieldCompleteness: FieldCompletenessStat[],
   sampleCases: EvalRow[],
 ): StrengthSignal[] {
-  return fieldCompleteness
-    .filter((stat) => stat.rate >= STRENGTH_COMPLETENESS_THRESHOLD && stat.filled >= 2)
-    .map((stat) => ({
-      kind: "high_completeness" as const,
-      field: stat.field,
-      label: stat.label,
-      rate: stat.rate,
-      caseNumbers: sampleCases
-        .map((row, i) => ({ filled: isFilled(row.form_data?.[stat.field]), num: i + 1 }))
-        .filter((c) => c.filled)
-        .map((c) => c.num)
-        .slice(0, 5),
-    }));
+  const signals: StrengthSignal[] = [];
+  const n = sampleCases.length;
+
+  // High field completeness (≥90%)
+  for (const stat of fieldCompleteness) {
+    if (stat.rate >= STRENGTH_COMPLETENESS_THRESHOLD && stat.filled >= 2) {
+      signals.push({
+        kind: "high_completeness",
+        description: `${stat.label}填写率${Math.round(stat.rate * 100)}%`,
+        rate: stat.rate,
+        caseNumbers: sampleCases
+          .map((row, i) => ({ filled: isFilled(row.form_data?.[stat.field]), num: i + 1 }))
+          .filter((c) => c.filled)
+          .map((c) => c.num)
+          .slice(0, 5),
+      });
+    }
+  }
+
+  // Tongue/pulse consistency — 舌脉 mentioned in physicalExam
+  const tonguePulseCases = sampleCases
+    .map((r, i) => ({ has: /[舌脉]/.test(String(r.form_data?.physicalExam ?? "")), num: i + 1 }))
+    .filter((c) => c.has);
+  const tpRate = n > 0 ? tonguePulseCases.length / n : 0;
+  if (tpRate >= STRENGTH_TONGUE_PULSE_THRESHOLD) {
+    signals.push({
+      kind: "tongue_pulse_consistency",
+      description: `舌脉记录一致性${Math.round(tpRate * 100)}%`,
+      rate: tpRate,
+      caseNumbers: tonguePulseCases.map((c) => c.num).slice(0, 5),
+    });
+  }
+
+  // Pattern diversity — distinct 证型 count
+  const distinctPatterns = new Set(
+    sampleCases.map((r) => String(r.form_data?.pattern ?? "").trim()).filter(Boolean),
+  );
+  if (distinctPatterns.size >= STRENGTH_PATTERN_DIVERSITY_MIN) {
+    signals.push({
+      kind: "pattern_diversity",
+      description: `证型多样性：${distinctPatterns.size}种不同证型`,
+      count: distinctPatterns.size,
+      caseNumbers: [],
+    });
+  }
+
+  // Detailed prescription — dosage markers present
+  const DOSAGE_PATTERN = /\d+\s*[克gG两钱]/;
+  const detailedCases = sampleCases
+    .map((r, i) => ({ has: DOSAGE_PATTERN.test(String(r.form_data?.prescription ?? "")), num: i + 1 }))
+    .filter((c) => c.has);
+  const detailRate = n > 0 ? detailedCases.length / n : 0;
+  if (detailRate >= STRENGTH_PRESCRIPTION_DETAIL_THRESHOLD) {
+    signals.push({
+      kind: "detailed_prescription",
+      description: `${Math.round(detailRate * 100)}%的处方含明确剂量标注`,
+      rate: detailRate,
+      caseNumbers: detailedCases.map((c) => c.num).slice(0, 5),
+    });
+  }
+
+  // Chief complaint specificity — average length
+  if (n > 0) {
+    const lengths = sampleCases.map((r) => String(r.form_data?.chiefComplaint ?? "").length);
+    const avg = lengths.reduce((a, b) => a + b, 0) / n;
+    if (avg >= STRENGTH_COMPLAINT_LENGTH_THRESHOLD) {
+      signals.push({
+        kind: "chief_complaint_specificity",
+        description: `主诉平均长度${Math.round(avg)}字，描述具体`,
+        count: Math.round(avg),
+        caseNumbers: [],
+      });
+    }
+  }
+
+  return signals;
 }
 
 /** Stage 1 entry point — deterministic, no LLM. */
 export function analyzeConsultations(rows: EvalRow[]): EvaluationFindings {
   const sampleCases = sampleRecentCases(rows);
   const fieldCompleteness = computeFieldCompleteness(rows);
+  const patientDistribution = computePatientDistribution(rows);
   const themeCandidates = extractThemeCandidates(sampleCases);
   const aiRecurringThemes = themeCandidates.slice(0, MAX_THEMES);
   const gapCandidates = detectGaps(fieldCompleteness, sampleCases);
@@ -410,6 +519,7 @@ export function analyzeConsultations(rows: EvalRow[]): EvaluationFindings {
 
   return {
     fieldCompleteness,
+    patientDistribution,
     aiRecurringThemes,
     gapCandidates,
     strengthSignals,
@@ -424,11 +534,17 @@ export function analyzeConsultations(rows: EvalRow[]): EvaluationFindings {
 
 /** Compact serialization of Stage 1 findings sent to the LLM. */
 function serializeFindings(findings: EvaluationFindings, windowDays: number): string {
-  const { fieldCompleteness, aiRecurringThemes, gapCandidates, strengthSignals, sampleCases, totalCount } = findings;
+  const { fieldCompleteness, patientDistribution, aiRecurringThemes, gapCandidates, strengthSignals, sampleCases, totalCount } = findings;
   const n = sampleCases.length;
+  const pd = patientDistribution;
 
   const lines: string[] = [
     `窗口：过去 ${windowDays} 天（共 ${totalCount} 条，分层取样 ${n} 条）`,
+    "",
+    "PATIENT_DISTRIBUTION",
+    `性别: 男${pd.sex.male} / 女${pd.sex.female}`,
+    `年龄: ${pd.ageBuckets.map((b) => `${b.label}${b.count}`).join(" / ")}`,
+    `处方类型: ${pd.prescriptionTypes.map((p) => `${p.type}${p.count}`).join(" / ")}`,
     "",
     "DETERMINISTIC_FIELD_COMPLETENESS",
     ...fieldCompleteness.map(
@@ -450,11 +566,12 @@ function serializeFindings(findings: EvaluationFindings, windowDays: number): st
         )
       : ["none"]),
     "",
-    "DETERMINISTIC_STRENGTH_SIGNALS (字段填写率>=90%)",
+    "DETERMINISTIC_STRENGTH_SIGNALS",
     ...(strengthSignals.length > 0
-      ? strengthSignals.map(
-          (s) =>
-            `${s.field}/${s.label}: ${Math.round(s.rate * 100)}%, cases=${s.caseNumbers.join(",")}`,
+      ? strengthSignals.map((s) =>
+          s.caseNumbers.length > 0
+            ? `${s.kind}: ${s.description}, cases=${s.caseNumbers.join(",")}`
+            : `${s.kind}: ${s.description}`,
         )
       : ["none"]),
     "",
@@ -476,7 +593,7 @@ function serializeFindings(findings: EvaluationFindings, windowDays: number): st
 
 /** Merges Stage 1 structural findings with Stage 2 prose into a DoctorProfile. */
 function mergeProfile(findings: EvaluationFindings, narrative: EvalNarrative): DoctorProfile {
-  const { fieldCompleteness, aiRecurringThemes, gapCandidates, sampleCases } = findings;
+  const { fieldCompleteness, patientDistribution, aiRecurringThemes, gapCandidates, sampleCases } = findings;
   const n = sampleCases.length;
 
   const resolvedThemes = aiRecurringThemes.map((t) => ({
@@ -505,11 +622,13 @@ function mergeProfile(findings: EvaluationFindings, narrative: EvalNarrative): D
 
   return {
     profileSummary: narrative.profileSummary || "暂无可展示的画像摘要。",
+    keyObservations: narrative.keyObservations ?? [],
+    patientDistribution,
     fieldCompleteness,
     aiRecurringThemes: resolvedThemes,
-    strengths: narrative.strengths ?? [],
+    strengths: (narrative.strengths ?? []).map((s) => ({ text: s.text })),
     gaps,
-    guidancePoints: narrative.guidancePoints ?? [],
+    guidancePoints: (narrative.guidancePoints ?? []).map((g) => ({ text: g.text })),
   };
 }
 
@@ -530,8 +649,8 @@ async function narrateFindings(
       { role: "user", content: userPrompt },
     ],
     model,
-    maxTokens: 1500,
-    timeoutMs: 60_000,
+    maxTokens: 2500,
+    timeoutMs: 90_000,
     repairJson: true,
     retryOnEmpty: true,
     jsonMode: false,
@@ -609,8 +728,14 @@ export function normalizeDoctorProfile(value: unknown): DoctorProfile {
       guidanceHint: stringValue(gap.guidanceHint),
     }));
 
+  const keyObservations = Array.isArray(raw.keyObservations)
+    ? (raw.keyObservations as unknown[]).filter((item): item is string => typeof item === "string")
+    : [];
+
   return {
     profileSummary: stringValue(raw.profileSummary) || "暂无可展示的画像摘要。",
+    keyObservations,
+    patientDistribution: (raw.patientDistribution as PatientDistribution | null) ?? null,
     fieldCompleteness: listObjects<DoctorProfile["fieldCompleteness"][number]>("fieldCompleteness"),
     aiRecurringThemes: listObjects<DoctorProfile["aiRecurringThemes"][number]>("aiRecurringThemes"),
     strengths: listObjects<DoctorProfile["strengths"][number]>("strengths"),

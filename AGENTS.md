@@ -197,7 +197,9 @@ Required fields (hard-block if missing/invalid):
 - `pattern`: 2-100 chars (证型)
 - `prescription`: 3-2000 chars
 
-Optional fields (in schema but not shown in form UI): `consultationName`, `pastHistory`, `doctorQuestion`
+Optional fields (in schema but not shown in form UI): `consultationName`, `pastHistory`
+
+> `doctorQuestion` has been removed from the schema, prompt, and all fixtures. Historical `form_data` rows may still contain the key — it is silently ignored.
 
 History item display name: auto-built from `patientSex + patientAge岁 + chiefComplaint` (no stored name field).
 
@@ -274,10 +276,44 @@ Bulk route: `POST /api/cron/evaluate-doctors`
 - Doctors with 0 consultations in window → skipped silently (not failed)
 - 3-attempt retry with exponential backoff in the GH Actions workflow
 
-Output: `doctorProfile` only — `internalScore` and `scoreDirection` stored but never shown to doctor.
-`doctorFacingHint` field stored for future Phase 2 doctor-facing surface; not rendered yet.
+### Two-stage pipeline (v1.3)
 
-Prompts: `DOCTOR_EVALUATION_SYSTEM_PROMPT` in `src/lib/analytics/prompts.ts`
+**Stage 1 — Observer** (`analyzeConsultations()`, pure TypeScript, no LLM):
+- `computeFieldCompleteness()` — pastHistory + physicalExam fill rates across ALL rows
+- `computePatientDistribution()` — sex, age buckets (儿童/青年/中年/老年), prescription types
+- `extractThemeCandidates()` → top 5 AI themes by frequency (from sampled cases)
+- `detectGaps()` — dual-evidence rule in code: inputRate < 70% AND aiAskRate ≥ 30%
+- `detectStrengthSignals()` — 4 heuristics: high_completeness, tongue_pulse_consistency, pattern_diversity, detailed_prescription, chief_complaint_specificity
+- Samples up to `MAX_EVAL_CASES=20` cases (stratified by prescription type, most recent first)
+
+**Stage 2 — Narrator** (`narrateFindings()`, LLM — flash model only):
+- Receives compact findings (~30 lines) + case excerpts (one line each)
+- Outputs prose only: profileSummary (3-4 sentences), keyObservations (≤4 bullets), strengths (≤6), gapsNarrative (evidence + guidance per gap), guidancePoints (≤4)
+- Cannot invent field names, rates, gap candidates, or case numbers
+
+**Merge** (`mergeProfile()`): joins Stage 1 structural fields + Stage 2 prose into stored `DoctorProfile`.
+
+`DoctorProfile` schema (v1.3):
+- `profileSummary` (string) — Stage 2
+- `keyObservations` (string[]) — Stage 2, free-form observations
+- `patientDistribution` (object | null) — Stage 1: sex/ageBuckets/prescriptionTypes
+- `fieldCompleteness` (array) — Stage 1, stored but not rendered in UI
+- `aiRecurringThemes` (array) — Stage 1 structure, Stage 2 prose
+- `strengths` (array of `{text}`) — Stage 2
+- `gaps` (array) — Stage 1 rates + Stage 2 evidence/guidanceHint
+- `guidancePoints` (array of `{text}`) — Stage 2
+
+Admin UI panel (`/admin/users/[doctorId]?tab=profile`) card order:
+1. 画像摘要 + keyObservations bullets
+2. 病案分布 (patient distribution — teal card, CSS-only bars)
+3. AI关注的主题 (chip cloud, size = frequency tier)
+4. 可取之处 (strengths, no case refs)
+5. 差距识别 (gaps with dual-evidence stats + help tooltip)
+6. 对话参考 (guidance, no case refs)
+
+All section titles have a `(?)` help tooltip.
+
+Prompts: `DOCTOR_EVALUATION_SYSTEM_PROMPT` (`doctor-eval-v1.3`) in `src/lib/analytics/prompts.ts`
 Window helper: `buildWindow(days)` in `src/lib/analytics/stats.ts`
 
 ## Session Review (Goal 1 — prompt refinement)

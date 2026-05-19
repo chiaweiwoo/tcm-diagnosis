@@ -1840,7 +1840,7 @@ details[open] .sample-details__toggle::before {
   }
 }
 
-/* ── Doctor profile v1.1 — warm clinical letter layout ── */
+/* ── Doctor profile — warm clinical letter layout ── */
 :root {
   --profile-sage:      #5C7B5C;
   --profile-sage-bg:   #EFF4EE;
@@ -1850,6 +1850,8 @@ details[open] .sample-details__toggle::before {
   --profile-gold-bg:   #FBF6EC;
   --profile-ink:       #4A4A48;
   --profile-ink-bg:    #F5F5F4;
+  --profile-teal:      #3B7A7A;
+  --profile-teal-bg:   #EEF6F6;
 }
 
 .profile-panel {
@@ -1930,6 +1932,7 @@ details[open] .sample-details__toggle::before {
 .profile-card--gold { border-left-color: var(--profile-gold);  background: var(--profile-gold-bg); }
 .profile-card--ink  { border-left-color: var(--profile-ink);   background: var(--profile-ink-bg); }
 .profile-card--mist { border-left-color: #A0A09A;              background: #F7F7F5; }
+.profile-card--teal { border-left-color: var(--profile-teal);  background: var(--profile-teal-bg); }
 
 .profile-card-title {
   margin: 0;
@@ -1945,6 +1948,7 @@ details[open] .sample-details__toggle::before {
 .profile-card--tan  .profile-card-title { color: var(--profile-tan); }
 .profile-card--gold .profile-card-title { color: var(--profile-gold); }
 .profile-card--ink  .profile-card-title { color: var(--profile-ink); }
+.profile-card--teal .profile-card-title { color: var(--profile-teal); }
 
 .profile-empty {
   margin: 0;
@@ -2159,6 +2163,145 @@ details[open] .sample-details__toggle::before {
   font-size: 13px;
   color: var(--text, #1A1A1A);
   line-height: 1.55;
+}
+
+/* ── Key observations list (hero section) ── */
+.profile-observations {
+  margin: 0;
+  padding: 0 0 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.profile-observations li {
+  font-size: 13px;
+  color: var(--text-muted, #6B6B6B);
+  line-height: 1.5;
+  list-style-type: disc;
+}
+
+/* ── Help tooltip ── */
+.profile-help-tip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  margin-left: 5px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.12);
+  color: var(--text-muted, #6B6B6B);
+  font-size: 9px;
+  font-weight: 700;
+  cursor: help;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+/* ── AI themes chip cloud ── */
+.profile-theme-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.profile-theme-chip {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: rgba(155, 123, 48, 0.1);
+  color: var(--profile-gold);
+  border: 1px solid rgba(155, 123, 48, 0.25);
+  cursor: default;
+  white-space: nowrap;
+}
+
+.profile-theme-chip--lg {
+  font-size: 14px;
+  font-weight: 700;
+  padding: 5px 13px;
+}
+
+.profile-theme-chip--md {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.profile-theme-chip--sm {
+  font-size: 11px;
+  font-weight: 400;
+  opacity: 0.8;
+}
+
+/* ── Patient distribution card ── */
+.profile-dist-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 4px;
+}
+
+.profile-dist-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.profile-dist-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--profile-teal);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.profile-dist-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.profile-dist-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.profile-dist-name {
+  font-size: 12px;
+  color: var(--text, #1A1A1A);
+  width: 36px;
+  flex-shrink: 0;
+}
+
+.profile-dist-track {
+  flex: 1;
+  height: 8px;
+  background: rgba(59, 122, 122, 0.12);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.profile-dist-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+  min-width: 2px;
+}
+
+.profile-dist-bar--male   { background: #5B8DB8; }
+.profile-dist-bar--female { background: #C27B8E; }
+.profile-dist-bar--age    { background: var(--profile-teal); }
+.profile-dist-bar--rx     { background: #7B6FA0; }
+
+.profile-dist-count {
+  font-size: 12px;
+  color: var(--text-muted, #6B6B6B);
+  width: 20px;
+  text-align: right;
+  flex-shrink: 0;
 }
 
 /* ══════════════════════════════════════════════════════════════
