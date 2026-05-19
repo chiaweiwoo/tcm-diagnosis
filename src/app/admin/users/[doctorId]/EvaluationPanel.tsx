@@ -243,55 +243,47 @@ function DonutChart({ segments, title, displayTotal }: {
 }
 
 // ---------------------------------------------------------------------------
-// Time-series bar chart — consultation count by week
+// Time-series bar chart — daily consultation count, past 30 days
 // ---------------------------------------------------------------------------
 
-const BAR_W = 16;
-const BAR_GAP = 5;
-const CHART_H = 72;
-const N_WEEKS = 16;
+const TS_BAR_W   = 11;   // bar width px
+const TS_GAP     = 3;    // gap between bars
+const TS_STEP    = TS_BAR_W + TS_GAP;   // 14 px per day
+const TS_N       = 30;   // days shown
+const TS_H       = 72;   // chart area height
+const TS_XLBL_H  = 20;   // x-axis label area
+const TS_W       = TS_N * TS_STEP - TS_GAP;  // total chart width
 
-/** Return the Monday (SGT) of the ISO week containing a UTC timestamp string. */
-function weekKey(iso: string): string {
-  const d = new Date(iso);
-  // Shift to SGT (+8h) before computing Monday
-  d.setTime(d.getTime() + 8 * 60 * 60 * 1000);
-  const day = d.getUTCDay(); // 0=Sun
-  const diffToMon = day === 0 ? -6 : 1 - day;
-  d.setUTCDate(d.getUTCDate() + diffToMon);
-  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const dd = String(d.getUTCDate()).padStart(2, "0");
-  return `${d.getUTCFullYear()}-${mm}-${dd}`; // sortable key = Monday date
+type DayBucket = { key: string; label: string; count: number; isToday: boolean; isMonday: boolean };
+
+function tsDayKey(iso: string): string {
+  const d = new Date(new Date(iso).getTime() + 8 * 3600_000);
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
 }
 
-/** Format "2025-05-19" → "5/19" */
-function shortDate(key: string): string {
-  const [, m, d] = key.split("-");
-  return `${parseInt(m)}/${parseInt(d)}`;
-}
-
-function buildWeekBuckets(dates: string[]): Array<{ key: string; label: string; count: number }> {
+function buildDayBuckets(dates: string[]): DayBucket[] {
   const counts = new Map<string, number>();
   for (const d of dates) {
-    const k = weekKey(d);
+    const k = tsDayKey(d);
     counts.set(k, (counts.get(k) ?? 0) + 1);
   }
+  const nowMs = Date.now() + 8 * 3600_000;
+  const todayD = new Date(nowMs);
+  const todayKey = `${todayD.getUTCFullYear()}-${String(todayD.getUTCMonth() + 1).padStart(2, "0")}-${String(todayD.getUTCDate()).padStart(2, "0")}`;
 
-  // Last N_WEEKS mondays ending this week
-  const now = new Date();
-  now.setTime(now.getTime() + 8 * 60 * 60 * 1000);
-  const thisDay = now.getUTCDay();
-  const diffToMon = thisDay === 0 ? -6 : 1 - thisDay;
-  now.setUTCDate(now.getUTCDate() + diffToMon);
-
-  const buckets = [];
-  for (let i = N_WEEKS - 1; i >= 0; i--) {
-    const d = new Date(now);
-    d.setUTCDate(d.getUTCDate() - i * 7);
+  const buckets: DayBucket[] = [];
+  for (let i = TS_N - 1; i >= 0; i--) {
+    const d = new Date(nowMs - i * 86_400_000);
     const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
     const dd = String(d.getUTCDate()).padStart(2, "0");
     const key = `${d.getUTCFullYear()}-${mm}-${dd}`;
-    buckets.push({ key, label: shortDate(key), count: counts.get(key) ?? 0 });
+    buckets.push({
+      key,
+      label: `${d.getUTCMonth() + 1}/${d.getUTCDate()}`,
+      count: counts.get(key) ?? 0,
+      isToday: key === todayKey,
+      isMonday: d.getUTCDay() === 1,
+    });
   }
   return buckets;
 }
@@ -304,22 +296,20 @@ function TimeSeriesCard({ doctorId }: { doctorId: string }) {
     fetch(`/api/admin/analytics/evaluate/${doctorId}/timeseries`)
       .then((r) => r.ok ? r.json() as Promise<{ dates: string[] }> : Promise.reject())
       .then((j) => setDates(j.dates))
-      .catch(() => {/* silently skip — chart is non-critical */})
+      .catch(() => { /* non-critical */ })
       .finally(() => setLoading(false));
   }, [doctorId]);
 
-  const buckets = useMemo(() => buildWeekBuckets(dates), [dates]);
+  const buckets = useMemo(() => buildDayBuckets(dates), [dates]);
   const maxCount = Math.max(1, ...buckets.map((b) => b.count));
   const totalInRange = buckets.reduce((s, b) => s + b.count, 0);
-
-  const chartW = N_WEEKS * (BAR_W + BAR_GAP) - BAR_GAP;
 
   return (
     <div className="profile-card profile-card--brand">
       <h3 className="profile-card-title">
         <BarChart2 size={15} /> 病案趋势
-        <HelpTip text="近16周每周分析病案数（新加坡时区）" />
-        <span className="profile-ts-total">共 {totalInRange} 例</span>
+        <HelpTip text="近30天每日分析病案数（新加坡时区，蓝线为周一起始）" />
+        <span className="profile-ts-total">近30天共 {totalInRange} 例</span>
       </h3>
       {loading ? (
         <p className="profile-empty">加载中…</p>
@@ -327,51 +317,81 @@ function TimeSeriesCard({ doctorId }: { doctorId: string }) {
         <div className="profile-ts-wrap">
           <svg
             className="profile-ts-svg"
-            viewBox={`0 0 ${chartW} ${CHART_H + 24}`}
-            aria-label="每周病案数柱状图"
+            viewBox={`0 0 ${TS_W} ${TS_H + TS_XLBL_H}`}
+            aria-label="近30天每日病案数柱状图"
           >
+            {/* Baseline */}
+            <line x1={0} y1={TS_H} x2={TS_W} y2={TS_H} className="profile-ts-baseline" />
+
             {buckets.map((b, i) => {
-              const x = i * (BAR_W + BAR_GAP);
-              const barH = b.count === 0 ? 2 : Math.max(4, (b.count / maxCount) * CHART_H);
-              const y = CHART_H - barH;
-              const isCurrentWeek = i === N_WEEKS - 1;
+              const x   = i * TS_STEP;
+              const barH = b.count === 0 ? 2 : Math.max(3, Math.round((b.count / maxCount) * TS_H));
+              const y   = TS_H - barH;
+              const sepX = x - TS_GAP / 2;   // separator sits in the gap before this bar
+
               return (
                 <g key={b.key}>
+                  {/* Week boundary: dotted vertical line before Monday */}
+                  {b.isMonday && i > 0 && (
+                    <>
+                      <line
+                        x1={sepX} y1={0}
+                        x2={sepX} y2={TS_H}
+                        className="profile-ts-sep"
+                      />
+                      {/* Monday date label below the separator */}
+                      <text
+                        x={x + TS_BAR_W / 2}
+                        y={TS_H + 14}
+                        textAnchor="middle"
+                        className="profile-ts-xlabel"
+                      >
+                        {b.label}
+                      </text>
+                    </>
+                  )}
+
+                  {/* Bar */}
                   <rect
                     x={x}
                     y={y}
-                    width={BAR_W}
+                    width={TS_BAR_W}
                     height={barH}
-                    rx={3}
-                    className={`profile-ts-bar ${b.count === 0 ? "profile-ts-bar--empty" : ""} ${isCurrentWeek ? "profile-ts-bar--current" : ""}`}
+                    rx={b.count === 0 ? 1 : 2}
+                    className={[
+                      "profile-ts-bar",
+                      b.count === 0  ? "profile-ts-bar--empty"   : "",
+                      b.isToday      ? "profile-ts-bar--today"   : "",
+                    ].join(" ")}
                   >
                     <title>{`${b.label}：${b.count} 例`}</title>
                   </rect>
-                  {/* count label on bar if > 0 */}
-                  {b.count > 0 && barH > 18 && (
+
+                  {/* Count label inside tall bars */}
+                  {b.count > 0 && barH >= 16 && (
                     <text
-                      x={x + BAR_W / 2}
-                      y={y + 12}
+                      x={x + TS_BAR_W / 2}
+                      y={y + 10}
                       textAnchor="middle"
                       className="profile-ts-count-label"
                     >
                       {b.count}
                     </text>
                   )}
-                  {/* x-axis label — every 4th week + last */}
-                  {(i % 4 === 0 || i === N_WEEKS - 1) && (
-                    <text
-                      x={x + BAR_W / 2}
-                      y={CHART_H + 16}
-                      textAnchor="middle"
-                      className="profile-ts-xlabel"
-                    >
-                      {b.label}
-                    </text>
-                  )}
                 </g>
               );
             })}
+
+            {/* "今" label under today */}
+            {(() => {
+              const todayIdx = buckets.length - 1;
+              const x = todayIdx * TS_STEP + TS_BAR_W / 2;
+              return (
+                <text x={x} y={TS_H + 14} textAnchor="middle" className="profile-ts-xlabel profile-ts-xlabel--today">
+                  今
+                </text>
+              );
+            })()}
           </svg>
         </div>
       )}
