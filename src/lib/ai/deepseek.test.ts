@@ -1,17 +1,17 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { callDeepSeekJson, DeepSeekError, extractJsonObject } from "./deepseek";
 
-describe("DeepSeek JSON解析", () => {
-  it("可解析被代码块包住的JSON", () => {
-    expect(extractJsonObject('```json\n{"状态":"成功"}\n```')).toBe('{"状态":"成功"}');
+describe("DeepSeek JSON parsing", () => {
+  it("extracts JSON from fenced code", () => {
+    expect(extractJsonObject('```json\n{"status":"ok"}\n```')).toBe('{"status":"ok"}');
   });
 
-  it("可从前后说明文字中提取JSON", () => {
-    expect(extractJsonObject('好的：\n{"状态":"成功"}\n请查收')).toBe('{"状态":"成功"}');
+  it("extracts JSON from surrounding prose", () => {
+    expect(extractJsonObject('Here:\n{"status":"ok"}\nDone')).toBe('{"status":"ok"}');
   });
 });
 
-describe("DeepSeek JSON修复回退", () => {
+describe("DeepSeek JSON repair fallback", () => {
   const originalEnv = process.env.DEEPSEEK_API_KEY;
 
   afterEach(() => {
@@ -23,53 +23,101 @@ describe("DeepSeek JSON修复回退", () => {
     }
   });
 
-  it("malformed JSON可通过repairJson回退修复", async () => {
+  it("repairs malformed JSON when repairJson is enabled", async () => {
     process.env.DEEPSEEK_API_KEY = "test-key";
     const fetchMock = vi.fn()
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          choices: [{ message: { content: '{"重点结论":["A"]' } }],
+          choices: [{ message: { content: '{"keyPoints":["A"]' }, finish_reason: "length" }],
           usage: { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 },
         }),
       } as Response)
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          choices: [{ message: { content: '{"重点结论":["A"]}' } }],
+          choices: [{ message: { content: '{"keyPoints":["A"]}' }, finish_reason: "stop" }],
           usage: { prompt_tokens: 5, completion_tokens: 5, total_tokens: 10 },
         }),
       } as Response);
 
     vi.stubGlobal("fetch", fetchMock);
 
-    const result = await callDeepSeekJson<{ 重点结论: string[] }>({
+    const result = await callDeepSeekJson<{ keyPoints: string[] }>({
       messages: [{ role: "user", content: "test" }],
       repairJson: true,
     });
 
     expect(result.repairedJson).toBe(true);
-    expect(result.data.重点结论).toEqual(["A"]);
+    expect(result.data.keyPoints).toEqual(["A"]);
     expect(result.usage?.total_tokens).toBe(40);
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it("repairJson关闭时，malformed JSON直接报错", async () => {
+  it("throws directly on malformed JSON when repairJson is disabled", async () => {
     process.env.DEEPSEEK_API_KEY = "test-key";
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
-        choices: [{ message: { content: '{"重点结论":["A"]' } }],
+        choices: [{ message: { content: '{"keyPoints":["A"]' }, finish_reason: "length" }],
       }),
     } as Response);
 
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(
-      callDeepSeekJson<{ 重点结论: string[] }>({
+      callDeepSeekJson<{ keyPoints: string[] }>({
         messages: [{ role: "user", content: "test" }],
         repairJson: false,
       }),
     ).rejects.toBeInstanceOf(DeepSeekError);
+  });
+
+  it("omits response_format when jsonMode is false", async () => {
+    process.env.DEEPSEEK_API_KEY = "test-key";
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: '{"ok":true}' }, finish_reason: "stop" }],
+        usage: { total_tokens: 3 },
+      }),
+    } as Response);
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await callDeepSeekJson<{ ok: boolean }>({
+      messages: [{ role: "user", content: "test" }],
+      jsonMode: false,
+    });
+
+    const body = JSON.parse(fetchMock.mock.calls[0]?.[1]?.body as string);
+    expect(body.response_format).toBeUndefined();
+  });
+
+  it("includes finish reason and token diagnostics when content is empty", async () => {
+    process.env.DEEPSEEK_API_KEY = "test-key";
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: null }, finish_reason: "length" }],
+        usage: { prompt_tokens: 2913, completion_tokens: 3000, total_tokens: 5913 },
+      }),
+    } as Response);
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      callDeepSeekJson<{ ok: boolean }>({
+        messages: [{ role: "user", content: "test" }],
+        maxTokens: 3000,
+      }),
+    ).rejects.toMatchObject({
+      details: {
+        finishReason: "length",
+        maxTokens: 3000,
+        jsonMode: true,
+        usage: { total_tokens: 5913 },
+      },
+    });
   });
 });

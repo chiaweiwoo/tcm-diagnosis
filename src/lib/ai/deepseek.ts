@@ -11,11 +11,15 @@ type DeepSeekUsage = {
   prompt_cache_miss_tokens?: number;
 };
 
+type DeepSeekChoice = {
+  message?: {
+    content?: string | null;
+  };
+  finish_reason?: string | null;
+};
+
 type DeepSeekResponse = {
-  choices?: Array<{
-    message?: { content?: string | null };
-    finish_reason?: string | null;
-  }>;
+  choices?: DeepSeekChoice[];
   usage?: DeepSeekUsage;
 };
 
@@ -23,6 +27,9 @@ type DeepSeekCall = {
   content: string;
   usage?: DeepSeekUsage;
   model: string;
+  finishReason?: string | null;
+  maxTokens: number;
+  jsonMode: boolean;
 };
 
 type DeepSeekJsonResult<T> = {
@@ -92,7 +99,7 @@ export function extractJsonObject(content: string) {
   const end = candidate.lastIndexOf("}");
 
   if (start === -1 || end === -1 || end <= start) {
-    throw new DeepSeekError("DeepSeek返回的JSON无法解析。", 502, {
+    throw new DeepSeekError("DeepSeek returned JSON that could not be parsed.", 502, {
       parserStage: "extract",
       rawSnippet: snippet(content),
     });
@@ -120,7 +127,7 @@ async function requestDeepSeek({
   const apiKey = process.env.DEEPSEEK_API_KEY;
 
   if (!apiKey) {
-    throw new DeepSeekError("服务器尚未配置DEEPSEEK_API_KEY。", 503);
+    throw new DeepSeekError("Server is missing DEEPSEEK_API_KEY.", 503);
   }
 
   const controller = new AbortController();
@@ -145,17 +152,17 @@ async function requestDeepSeek({
     });
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
-      throw new DeepSeekError("DeepSeek请求超时，请稍后重试。", 504);
+      throw new DeepSeekError("DeepSeek request timed out.", 504);
     }
 
-    throw new DeepSeekError("DeepSeek连接失败，请稍后重试。", 502);
+    throw new DeepSeekError("DeepSeek connection failed.", 502);
   } finally {
     clearTimeout(timeout);
   }
 
   if (!response.ok) {
     const detail = await response.text();
-    throw new DeepSeekError(`DeepSeek请求失败：${response.status} ${detail.slice(0, 300)}`, response.status);
+    throw new DeepSeekError(`DeepSeek request failed: ${response.status} ${detail.slice(0, 300)}`, response.status);
   }
 
   const payload = (await response.json()) as DeepSeekResponse;
@@ -163,17 +170,23 @@ async function requestDeepSeek({
   const content = choice?.message?.content;
 
   if (!content) {
-    const finishReason = choice?.finish_reason ?? "none";
-    const inputTokens = payload.usage?.prompt_tokens ?? "?";
-    const outputTokens = payload.usage?.completion_tokens ?? "?";
-    throw new DeepSeekError(
-      `DeepSeek返回为空 [model=${model}, finish_reason=${finishReason}, tokens=${inputTokens}→${outputTokens}]`,
-      502,
-      { model, finishReason, inputTokens, outputTokens },
-    );
+    throw new DeepSeekError("DeepSeek returned empty content.", 502, {
+      finishReason: choice?.finish_reason ?? null,
+      usage: payload.usage,
+      model,
+      maxTokens,
+      jsonMode,
+    });
   }
 
-  return { content, usage: payload.usage, model };
+  return {
+    content,
+    usage: payload.usage,
+    model,
+    finishReason: choice?.finish_reason ?? null,
+    maxTokens,
+    jsonMode,
+  };
 }
 
 async function repairJsonContent({
@@ -192,15 +205,16 @@ async function repairJsonContent({
     timeoutMs,
     maxTokens,
     temperature: 0,
+    jsonMode: false,
     messages: [
       {
         role: "system",
         content:
-          "你是JSON格式修复器。只修复JSON语法，不新增医学内容，不补充不存在的信息。若数组或字符串被截断，只保留已经完整可读的项目。只返回合法JSON。",
+          "You repair JSON syntax only. Do not add medical content. Do not invent missing information. If an array or string is truncated, keep only complete readable items. Return valid JSON only.",
       },
       {
         role: "user",
-        content: `请修复以下JSON，使其可被JSON.parse解析：\n${content}`,
+        content: `Repair this JSON so JSON.parse can parse it:\n${content}`,
       },
     ],
   });
@@ -218,7 +232,7 @@ function parseJson<T>(content: string, parserStage: string) {
       });
     }
 
-    throw new DeepSeekError("DeepSeek返回的JSON无法解析。", 502, {
+    throw new DeepSeekError("DeepSeek returned JSON that could not be parsed.", 502, {
       parserStage,
       rawSnippet: snippet(content),
     });
@@ -296,15 +310,23 @@ export async function callDeepSeekJson<T>({
     return { data, usage, model, repairedJson: true };
   } catch (error) {
     if (error instanceof DeepSeekError) {
-      throw new DeepSeekError("DeepSeek返回的JSON无法解析。", 502, {
+      throw new DeepSeekError("DeepSeek returned JSON that could not be parsed.", 502, {
         ...error.details,
+        firstFinishReason: first.finishReason,
+        firstUsage: first.usage,
+        firstMaxTokens: first.maxTokens,
+        firstJsonMode: first.jsonMode,
         firstSnippet: snippet(first.content),
         fastRepairSnippet: fastRepair ? snippet(fastRepair.content) : null,
       });
     }
 
-    throw new DeepSeekError("DeepSeek返回的JSON无法解析。", 502, {
+    throw new DeepSeekError("DeepSeek returned JSON that could not be parsed.", 502, {
       parserStage: "deep_repair_parse",
+      firstFinishReason: first.finishReason,
+      firstUsage: first.usage,
+      firstMaxTokens: first.maxTokens,
+      firstJsonMode: first.jsonMode,
       firstSnippet: snippet(first.content),
       fastRepairSnippet: fastRepair ? snippet(fastRepair.content) : null,
     });
