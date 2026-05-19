@@ -107,12 +107,15 @@ async function requestDeepSeek({
   model,
   timeoutMs,
   temperature,
+  jsonMode = true,
 }: {
   messages: DeepSeekMessage[];
   maxTokens: number;
   model: string;
   timeoutMs: number;
   temperature: number;
+  /** Set false to omit response_format:json_object — allows partial output on truncation. */
+  jsonMode?: boolean;
 }): Promise<DeepSeekCall> {
   const apiKey = process.env.DEEPSEEK_API_KEY;
 
@@ -134,7 +137,7 @@ async function requestDeepSeek({
       body: JSON.stringify({
         model,
         messages,
-        response_format: { type: "json_object" },
+        ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
         temperature,
         max_tokens: maxTokens,
       }),
@@ -229,6 +232,7 @@ export async function callDeepSeekJson<T>({
   timeoutMs = DEFAULT_TIMEOUT_MS,
   repairJson = false,
   retryOnEmpty = false,
+  jsonMode = true,
 }: {
   messages: DeepSeekMessage[];
   maxTokens?: number;
@@ -237,15 +241,17 @@ export async function callDeepSeekJson<T>({
   repairJson?: boolean;
   /** Retry once if DeepSeek returns empty content (transient API issue). */
   retryOnEmpty?: boolean;
+  /** Set false to omit response_format:json_object — allows partial output on truncation. */
+  jsonMode?: boolean;
 }): Promise<DeepSeekJsonResult<T>> {
   let first: DeepSeekCall;
   try {
-    first = await requestDeepSeek({ messages, maxTokens, model, timeoutMs, temperature: 0.1 });
+    first = await requestDeepSeek({ messages, maxTokens, model, timeoutMs, temperature: 0.1, jsonMode });
   } catch (err) {
     if (retryOnEmpty && err instanceof DeepSeekError && err.status === 502) {
       // Empty or connection-failed response — retry once after a short pause
       await new Promise((r) => setTimeout(r, 3000));
-      first = await requestDeepSeek({ messages, maxTokens, model, timeoutMs, temperature: 0.1 });
+      first = await requestDeepSeek({ messages, maxTokens, model, timeoutMs, temperature: 0.1, jsonMode });
     } else {
       throw err;
     }

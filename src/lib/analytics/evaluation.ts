@@ -271,10 +271,12 @@ export async function evaluateDoctor(
       { role: "user", content: userPrompt },
     ],
     model,
-    maxTokens: 3000,
-    timeoutMs: 90_000, // evaluation prompt is longer than analyze; allow extra time
+    maxTokens: 2000,    // schema output ~1000-1400 tokens; cap forces conciseness
+    timeoutMs: 90_000,
     repairJson: true,
-    retryOnEmpty: true, // retry once on transient empty-content responses
+    retryOnEmpty: true,
+    jsonMode: false,    // plain text mode: truncated output returns partial JSON
+                        // rather than null; repairJson handles the rest
   });
 
   if (langfuse && trace) {
