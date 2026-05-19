@@ -377,6 +377,12 @@ Logging must not block doctor-facing responses (use `after()` from Next.js).
 
 ## Common Pitfalls
 
+**Chinese text becomes mojibake / garbled (`???`, `â€¦`, `æ²¡`)**
+- Treat this as an implementation bug, not cosmetic noise. Stop and fix encoding before continuing.
+- Prefer UTF-8-safe edits (`apply_patch`) and avoid rewriting Chinese files through shell commands that may use the wrong Windows code page.
+- After editing Chinese prompts/docs/UI strings, inspect the file with UTF-8 output and search for mojibake markers such as `???`, `â€`, `æ`, `ç`, `ä¸`, or `�`.
+- Do not commit garbled Chinese text. If a file already contains mojibake, repair it in the same commit that touches that area.
+
 **Push rejected (non-fast-forward)**
 ```
 git fetch origin main && git rebase origin/main && git push origin HEAD:main
