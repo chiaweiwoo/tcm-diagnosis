@@ -174,28 +174,98 @@ function formatRate(rate: number) {
 }
 
 // ---------------------------------------------------------------------------
-// Help tooltip
+// Help tooltip — uses data-tooltip for CSS-driven tooltip
 // ---------------------------------------------------------------------------
 
 function HelpTip({ text }: { text: string }) {
   return (
-    <span className="profile-help-tip" title={text} aria-label={text}>
+    <span className="profile-help-tip" data-tooltip={text} aria-label={text}>
       ?
     </span>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Patient distribution card (new)
+// SVG donut chart
 // ---------------------------------------------------------------------------
+
+const DONUT_R = 38;
+const DONUT_C = 2 * Math.PI * DONUT_R;
+
+type DonutSegment = { label: string; count: number; color: string };
+
+function DonutChart({ segments, title, displayTotal }: {
+  segments: DonutSegment[];
+  title: string;
+  displayTotal: number;
+}) {
+  const segTotal = segments.reduce((s, seg) => s + seg.count, 0);
+  let deg = -90;
+
+  return (
+    <div className="profile-donut">
+      <p className="profile-donut-title">{title}</p>
+      <svg className="profile-donut-svg" viewBox="0 0 100 100" aria-hidden="true">
+        {/* Track */}
+        <circle cx={50} cy={50} r={DONUT_R} fill="none" stroke="rgba(0,0,0,0.07)" strokeWidth={11} />
+        {segTotal > 0 && segments.map((seg, i) => {
+          if (seg.count === 0) return null;
+          const fraction = seg.count / segTotal;
+          const segLen = Math.max(0, fraction * DONUT_C - 1.5);
+          const rotation = deg;
+          deg += fraction * 360;
+          return (
+            <circle
+              key={i}
+              cx={50} cy={50} r={DONUT_R}
+              fill="none"
+              stroke={seg.color}
+              strokeWidth={11}
+              strokeDasharray={`${segLen} ${DONUT_C}`}
+              style={{ transform: `rotate(${rotation}deg)`, transformOrigin: "50px 50px" }}
+            />
+          );
+        })}
+        <text x={50} y={46} textAnchor="middle" fontSize={17} fontWeight={700} fill="#1A1A1A">{displayTotal}</text>
+        <text x={50} y={60} textAnchor="middle" fontSize={9} fill="#6B6B6B">例</text>
+      </svg>
+      <div className="profile-donut-legend">
+        {segments.filter((s) => s.count > 0).map((seg, i) => (
+          <div key={i} className="profile-donut-legend-item">
+            <span className="profile-donut-dot" style={{ background: seg.color }} />
+            <span className="profile-donut-name">{seg.label}</span>
+            <span className="profile-donut-count">{seg.count}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Patient distribution card — 3 donut charts
+// ---------------------------------------------------------------------------
+
+const AGE_COLORS = ["#3B7A7A", "#5BA0A0", "#8CC8C8", "#B3DADA"];
+const RX_COLORS  = ["#7B6FA0", "#9B2226", "#B07555", "#5C7B5C"];
 
 function PatientDistributionCard({ distribution }: { distribution: PatientDistribution }) {
   const { sex, ageBuckets, prescriptionTypes, total } = distribution;
 
-  const sexItems = [
-    { label: "男", count: sex.male, cls: "profile-dist-bar--male" },
-    { label: "女", count: sex.female, cls: "profile-dist-bar--female" },
+  const sexSegments: DonutSegment[] = [
+    { label: "男", count: sex.male,   color: "#5B8DB8" },
+    { label: "女", count: sex.female, color: "#C27B8E" },
   ];
+
+  const ageSegments: DonutSegment[] = ageBuckets
+    .filter((b) => b.count > 0)
+    .map((b, i) => ({ label: b.label, count: b.count, color: AGE_COLORS[i % AGE_COLORS.length] }));
+
+  const rxSegments: DonutSegment[] = prescriptionTypes.map((p, i) => ({
+    label: p.type,
+    count: p.count,
+    color: RX_COLORS[i % RX_COLORS.length],
+  }));
 
   return (
     <div className="profile-card profile-card--teal">
@@ -203,60 +273,10 @@ function PatientDistributionCard({ distribution }: { distribution: PatientDistri
         <Users size={15} /> 病案分布
         <HelpTip text="该医生最近窗口内病案的患者画像分布" />
       </h3>
-      <div className="profile-dist-grid">
-        <div className="profile-dist-section">
-          <span className="profile-dist-label">性别</span>
-          <div className="profile-dist-bars">
-            {sexItems.map((item) => (
-              <div key={item.label} className="profile-dist-row">
-                <span className="profile-dist-name">{item.label}</span>
-                <div className="profile-dist-track">
-                  <div
-                    className={`profile-dist-fill ${item.cls}`}
-                    style={{ width: total > 0 ? `${Math.round((item.count / total) * 100)}%` : "0%" }}
-                  />
-                </div>
-                <span className="profile-dist-count">{item.count}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="profile-dist-section">
-          <span className="profile-dist-label">年龄</span>
-          <div className="profile-dist-bars">
-            {ageBuckets.filter((b) => b.count > 0).map((b) => (
-              <div key={b.label} className="profile-dist-row">
-                <span className="profile-dist-name">{b.label}</span>
-                <div className="profile-dist-track">
-                  <div
-                    className="profile-dist-fill profile-dist-bar--age"
-                    style={{ width: total > 0 ? `${Math.round((b.count / total) * 100)}%` : "0%" }}
-                  />
-                </div>
-                <span className="profile-dist-count">{b.count}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="profile-dist-section">
-          <span className="profile-dist-label">处方</span>
-          <div className="profile-dist-bars">
-            {prescriptionTypes.map((p) => (
-              <div key={p.type} className="profile-dist-row">
-                <span className="profile-dist-name">{p.type}</span>
-                <div className="profile-dist-track">
-                  <div
-                    className="profile-dist-fill profile-dist-bar--rx"
-                    style={{ width: total > 0 ? `${Math.round((p.count / total) * 100)}%` : "0%" }}
-                  />
-                </div>
-                <span className="profile-dist-count">{p.count}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+      <div className="profile-donuts">
+        <DonutChart segments={sexSegments} title="性别" displayTotal={total} />
+        <DonutChart segments={ageSegments} title="年龄" displayTotal={total} />
+        <DonutChart segments={rxSegments}  title="处方" displayTotal={total} />
       </div>
     </div>
   );
@@ -448,18 +468,18 @@ export function EvaluationPanel({ doctorId }: { doctorId: string }) {
                 ))}
               </ul>
             )}
-            <p className="profile-trigger-note">
-              通过 GitHub Actions → <strong>Evaluate Doctors</strong> → Run workflow 触发，输入医生邮箱或 UUID。历史记录保留，每次运行追加。
-            </p>
           </div>
 
           {profile.patientDistribution && profile.patientDistribution.total > 0 && (
             <PatientDistributionCard distribution={profile.patientDistribution} />
           )}
-          <AiThemesCard profile={profile} />
-          <StrengthsCard profile={profile} />
-          <GapsCard profile={profile} />
-          <GuidanceCard profile={profile} />
+
+          <div className="profile-cards-grid">
+            <AiThemesCard profile={profile} />
+            <StrengthsCard profile={profile} />
+            <GapsCard profile={profile} />
+            <GuidanceCard profile={profile} />
+          </div>
         </>
       )}
     </div>
