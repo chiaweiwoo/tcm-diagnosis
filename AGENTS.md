@@ -323,7 +323,7 @@ The doctor can then sign in via Google OAuth — Supabase matches the existing `
 
 ## Database Schema
 
-Migrations: `supabase/migrations/` (numbered SQL). Applied manually in Supabase SQL editor.
+Migrations: `supabase/migrations/` (numbered SQL). **Committing a migration file does NOT apply it — every file must be manually run in the Supabase SQL Editor.** The production DB only reflects migrations that have been explicitly executed there.
 
 | Table | Purpose |
 |---|---|
@@ -331,10 +331,13 @@ Migrations: `supabase/migrations/` (numbered SQL). Applied manually in Supabase 
 | `error_logs` | Pipeline errors (no form field values) |
 | `doctor_allowlist` | `email`, `is_active`, `is_admin` — access control source of truth |
 | `activity_logs` | Doctor activity events (login, analyze) — no UI for now |
-| `analytics_doctor_evaluations` | Per-doctor profile evaluations. No RLS (admin service_role only). Append-only (no unique constraint). (migration 021, cleaned up in 023) |
+| `analytics_doctor_evaluations` | Per-doctor profile evaluations. No RLS (admin service_role only). Append-only — no unique constraint once migration 022_doctor_evaluations_append_only is applied. |
 | `analytics_session_reviews` | Fleet-wide AI output reviews for prompt refinement. No RLS. Append-only with optional `prior_review_id` chain. (migration 023) |
 
-> Migration 022 drops legacy tables: `analytics_prompt_quality_runs`, `analytics_usage_runs`, `analytics_performance_runs`, `analytics_admin_alerts`, `analytics_doctor_dashboard` view, `assessment_jobs`, `assessment_job_results`. Apply when ready.
+> **Unapplied migrations (must be run in Supabase SQL Editor):**
+> - `022_drop_analytics_and_assessments.sql` — drops legacy tables (`analytics_prompt_quality_runs`, etc.)
+> - `022_doctor_evaluations_append_only.sql` — drops unique constraint on `analytics_doctor_evaluations(doctor_id, window_start, window_end)`; adds index. **Required before evaluation re-runs succeed.**
+> - `023_session_reviews_and_eval_cleanup.sql` — drops `output_review` column, creates `analytics_session_reviews`
 
 `consultations`: doctor reads use user-scoped Supabase client (anon key + session JWT); RLS enforces isolation. Admin routes use service_role (bypasses RLS). Never expose service_role key to browser.
 
@@ -400,6 +403,9 @@ Add it to `.env.local` and Vercel env vars. Still required for the `/api/analyze
 Registered secrets: `ASSESS_BASE_URL` (e.g. `https://your-app.vercel.app`) and `ASSESSMENT_API_KEY`.
 There is no `CRON_SECRET` or `VERCEL_PRODUCTION_URL` — do not reference these.
 
+**Migration file committed but not applied to production**
+Committing a `.sql` file to `supabase/migrations/` has no effect on the live DB. The error will typically be a Postgres constraint or missing-column error surfaced through the API (e.g. `duplicate key value violates unique constraint`). Fix: open Supabase SQL Editor, run the pending migration manually, then retrigger. Always check the unapplied migrations list in the Database Schema section above before assuming a schema change is live.
+
 **evaluate-doctors returns `skipped:1` with empty doctor**
 `NoConsultationsError` now counts as a skip (not failure). Check that the doctor has analyzed consultations in the last 14 days. `buildWindow` sets `windowEnd` to midnight tomorrow — intentional, includes today's records.
 
@@ -438,7 +444,8 @@ Do not say done until the changed path is verified, not merely coded.
 
 1. Doctor feedback capture — accepted/rejected suggestion tracking
 2. External citation retrieval layer
-3. Migration 022 applied in production (drops legacy analytics/assessment tables)
-4. Migration 023 applied in production (drops `output_review` column, creates `analytics_session_reviews`)
-5. Phase 2: doctor-facing surface using `doctorFacingHint` field (already generated, not yet rendered)
-6. SGT timezone alignment in `buildWindow` — 14-day on-demand window makes boundary precision a non-issue; reopen if needed
+3. **`022_drop_analytics_and_assessments.sql`** — apply in production (drops legacy analytics/assessment tables)
+4. **`022_doctor_evaluations_append_only.sql`** — apply in production (drops unique constraint, adds index; blocks evaluate-doctors until applied)
+5. **`023_session_reviews_and_eval_cleanup.sql`** — apply in production (drops `output_review` column, creates `analytics_session_reviews`)
+6. Phase 2: doctor-facing surface (doctorFacingHint removed from v1.1 schema; revisit if needed)
+7. SGT timezone alignment in `buildWindow` — 14-day on-demand window makes boundary precision a non-issue; reopen if needed
