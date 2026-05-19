@@ -162,7 +162,7 @@ describe("Form field interactions", () => {
     expect(input).toHaveValue("头痛眩晕");
   });
 
-  it("toggles prescription type chips on click", async () => {
+  it("switches prescription type chip on click (single-select)", async () => {
     const user = userEvent.setup();
     render(<Workbench />);
     await waitFor(() => screen.getByText("针灸"));
@@ -170,11 +170,11 @@ describe("Form field interactions", () => {
     // 方药 is active by default
     expect(screen.getByText("方药").closest("button")).toHaveClass("segmented-btn--active");
 
-    // Click 针灸 to add it
+    // Click 针灸 — it becomes the sole selection
     await user.click(screen.getByText("针灸"));
     expect(screen.getByText("针灸").closest("button")).toHaveClass("segmented-btn--active");
-    // 方药 still active (multi-select)
-    expect(screen.getByText("方药").closest("button")).toHaveClass("segmented-btn--active");
+    // 方药 is now inactive (single-select)
+    expect(screen.getByText("方药").closest("button")).not.toHaveClass("segmented-btn--active");
   });
 
   it("switches sex on click", async () => {
@@ -186,14 +186,13 @@ describe("Form field interactions", () => {
     expect(screen.getByText("男").closest("button")).toHaveClass("segmented-btn--active");
   });
 
-  it("placeholder changes when only 针灸 is selected", async () => {
+  it("placeholder changes when 针灸 is selected", async () => {
     const user = userEvent.setup();
     render(<Workbench />);
     await waitFor(() => screen.getByText("针灸"));
 
-    // Add 针灸, then remove 方药 → only 针灸 selected
+    // Click 针灸 — single-select immediately switches placeholder
     await user.click(screen.getByText("针灸"));
-    await user.click(screen.getByText("方药"));
     await waitFor(() =>
       expect(screen.getByPlaceholderText(/百会、太冲、风池/)).toBeInTheDocument(),
     );
