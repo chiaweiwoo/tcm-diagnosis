@@ -1929,12 +1929,13 @@ details[open] .sample-details__toggle::before {
   gap: 12px;
 }
 
-.profile-card--sage { border-top-color: var(--profile-sage); }
-.profile-card--tan  { border-top-color: var(--profile-tan); }
-.profile-card--gold { border-top-color: var(--profile-gold); }
-.profile-card--ink  { border-top-color: var(--profile-ink); }
-.profile-card--mist { border-top-color: #A0A09A; }
-.profile-card--teal { border-top-color: var(--profile-teal); }
+.profile-card--sage  { border-top-color: var(--profile-sage); }
+.profile-card--tan   { border-top-color: var(--profile-tan); }
+.profile-card--gold  { border-top-color: var(--profile-gold); }
+.profile-card--ink   { border-top-color: var(--profile-ink); }
+.profile-card--mist  { border-top-color: #A0A09A; }
+.profile-card--teal  { border-top-color: var(--profile-teal); }
+.profile-card--brand { border-top-color: var(--brand, #9B2226); }
 
 .profile-card-title {
   margin: 0;
@@ -2341,6 +2342,60 @@ details[open] .sample-details__toggle::before {
   font-size: 11px;
   color: var(--text-muted, #6B6B6B);
   font-weight: 600;
+}
+
+/* ── Time series bar chart ── */
+.profile-card--brand .profile-card-title { color: var(--brand, #9B2226); }
+
+.profile-ts-total {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.profile-ts-wrap {
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.profile-ts-svg {
+  display: block;
+  width: 100%;
+  min-width: 260px;
+  height: auto;
+}
+
+.profile-ts-bar {
+  fill: rgba(155, 34, 38, 0.65);
+  transition: fill 0.12s;
+}
+
+.profile-ts-bar:hover {
+  fill: var(--brand, #9B2226);
+}
+
+.profile-ts-bar--empty {
+  fill: rgba(0, 0, 0, 0.07);
+}
+
+.profile-ts-bar--current {
+  fill: var(--brand, #9B2226);
+}
+
+.profile-ts-count-label {
+  font-size: 9px;
+  fill: #fff;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.profile-ts-xlabel {
+  font-size: 8px;
+  fill: var(--text-muted, #6B6B6B);
+  pointer-events: none;
 }
 
 /* ── 4-column grid for bottom profile cards ── */

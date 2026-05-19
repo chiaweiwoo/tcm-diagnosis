@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Compass, Lightbulb, MessageSquare, Sparkles, Users } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { BarChart2, Compass, Lightbulb, MessageSquare, Sparkles, Users } from "lucide-react";
 import type { DoctorProfile, PatientDistribution } from "@/lib/analytics/evaluation";
 
 // Triggered via GitHub Actions (Evaluate Doctors -> Run workflow).
@@ -243,6 +243,143 @@ function DonutChart({ segments, title, displayTotal }: {
 }
 
 // ---------------------------------------------------------------------------
+// Time-series bar chart — consultation count by week
+// ---------------------------------------------------------------------------
+
+const BAR_W = 16;
+const BAR_GAP = 5;
+const CHART_H = 72;
+const N_WEEKS = 16;
+
+/** Return the Monday (SGT) of the ISO week containing a UTC timestamp string. */
+function weekKey(iso: string): string {
+  const d = new Date(iso);
+  // Shift to SGT (+8h) before computing Monday
+  d.setTime(d.getTime() + 8 * 60 * 60 * 1000);
+  const day = d.getUTCDay(); // 0=Sun
+  const diffToMon = day === 0 ? -6 : 1 - day;
+  d.setUTCDate(d.getUTCDate() + diffToMon);
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  return `${d.getUTCFullYear()}-${mm}-${dd}`; // sortable key = Monday date
+}
+
+/** Format "2025-05-19" → "5/19" */
+function shortDate(key: string): string {
+  const [, m, d] = key.split("-");
+  return `${parseInt(m)}/${parseInt(d)}`;
+}
+
+function buildWeekBuckets(dates: string[]): Array<{ key: string; label: string; count: number }> {
+  const counts = new Map<string, number>();
+  for (const d of dates) {
+    const k = weekKey(d);
+    counts.set(k, (counts.get(k) ?? 0) + 1);
+  }
+
+  // Last N_WEEKS mondays ending this week
+  const now = new Date();
+  now.setTime(now.getTime() + 8 * 60 * 60 * 1000);
+  const thisDay = now.getUTCDay();
+  const diffToMon = thisDay === 0 ? -6 : 1 - thisDay;
+  now.setUTCDate(now.getUTCDate() + diffToMon);
+
+  const buckets = [];
+  for (let i = N_WEEKS - 1; i >= 0; i--) {
+    const d = new Date(now);
+    d.setUTCDate(d.getUTCDate() - i * 7);
+    const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+    const dd = String(d.getUTCDate()).padStart(2, "0");
+    const key = `${d.getUTCFullYear()}-${mm}-${dd}`;
+    buckets.push({ key, label: shortDate(key), count: counts.get(key) ?? 0 });
+  }
+  return buckets;
+}
+
+function TimeSeriesCard({ doctorId }: { doctorId: string }) {
+  const [dates, setDates] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch(`/api/admin/analytics/evaluate/${doctorId}/timeseries`)
+      .then((r) => r.ok ? r.json() as Promise<{ dates: string[] }> : Promise.reject())
+      .then((j) => setDates(j.dates))
+      .catch(() => {/* silently skip — chart is non-critical */})
+      .finally(() => setLoading(false));
+  }, [doctorId]);
+
+  const buckets = useMemo(() => buildWeekBuckets(dates), [dates]);
+  const maxCount = Math.max(1, ...buckets.map((b) => b.count));
+  const totalInRange = buckets.reduce((s, b) => s + b.count, 0);
+
+  const chartW = N_WEEKS * (BAR_W + BAR_GAP) - BAR_GAP;
+
+  return (
+    <div className="profile-card profile-card--brand">
+      <h3 className="profile-card-title">
+        <BarChart2 size={15} /> 病案趋势
+        <HelpTip text="近16周每周分析病案数（新加坡时区）" />
+        <span className="profile-ts-total">共 {totalInRange} 例</span>
+      </h3>
+      {loading ? (
+        <p className="profile-empty">加载中…</p>
+      ) : (
+        <div className="profile-ts-wrap">
+          <svg
+            className="profile-ts-svg"
+            viewBox={`0 0 ${chartW} ${CHART_H + 24}`}
+            aria-label="每周病案数柱状图"
+          >
+            {buckets.map((b, i) => {
+              const x = i * (BAR_W + BAR_GAP);
+              const barH = b.count === 0 ? 2 : Math.max(4, (b.count / maxCount) * CHART_H);
+              const y = CHART_H - barH;
+              const isCurrentWeek = i === N_WEEKS - 1;
+              return (
+                <g key={b.key}>
+                  <rect
+                    x={x}
+                    y={y}
+                    width={BAR_W}
+                    height={barH}
+                    rx={3}
+                    className={`profile-ts-bar ${b.count === 0 ? "profile-ts-bar--empty" : ""} ${isCurrentWeek ? "profile-ts-bar--current" : ""}`}
+                  >
+                    <title>{`${b.label}：${b.count} 例`}</title>
+                  </rect>
+                  {/* count label on bar if > 0 */}
+                  {b.count > 0 && barH > 18 && (
+                    <text
+                      x={x + BAR_W / 2}
+                      y={y + 12}
+                      textAnchor="middle"
+                      className="profile-ts-count-label"
+                    >
+                      {b.count}
+                    </text>
+                  )}
+                  {/* x-axis label — every 4th week + last */}
+                  {(i % 4 === 0 || i === N_WEEKS - 1) && (
+                    <text
+                      x={x + BAR_W / 2}
+                      y={CHART_H + 16}
+                      textAnchor="middle"
+                      className="profile-ts-xlabel"
+                    >
+                      {b.label}
+                    </text>
+                  )}
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Patient distribution card — 3 donut charts
 // ---------------------------------------------------------------------------
 
@@ -469,6 +606,8 @@ export function EvaluationPanel({ doctorId }: { doctorId: string }) {
               </ul>
             )}
           </div>
+
+          <TimeSeriesCard doctorId={doctorId} />
 
           {profile.patientDistribution && profile.patientDistribution.total > 0 && (
             <PatientDistributionCard distribution={profile.patientDistribution} />
