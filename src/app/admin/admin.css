@@ -1709,87 +1709,135 @@ details[open] .sample-details__toggle::before {
 .eval-case-issues p    { color: #92400E; }
 
 /* Profile grid */
-.eval-profile-summary {
-  padding: 12px 16px;
-  background: var(--surface, #FAFAF9);
-  border: 1px solid var(--border, #EAE6E2);
-  border-radius: 8px;
-  font-size: 14px;
-  line-height: 1.65;
-}
-
-.eval-profile-summary p { margin: 0; }
-
 .eval-profile-grid {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
-  flex-wrap: wrap;
 }
 
 .eval-profile-card {
-  padding: 10px 16px;
+  padding: 14px 16px;
   border: 1px solid var(--border, #EAE6E2);
   border-radius: 8px;
-  background: var(--surface, #FAFAF9);
+  background: #FFFEFC;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  min-width: 140px;
+  gap: 10px;
+  min-width: 0;
+}
+
+.eval-profile-card--summary {
+  grid-column: 1 / -1;
+  background: #F8FAFC;
+  border-color: #E2E8F0;
 }
 
 .eval-profile-label {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.eval-profile-value {
-  font-size: 14px;
-  color: var(--foreground);
-  font-weight: 500;
-}
-
-/* Gap list */
-.eval-gap-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.eval-gap-row {
-  padding: 12px 14px;
-  border: 1px solid var(--border, #EAE6E2);
-  border-radius: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.eval-gap-desc {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.eval-gap-desc strong {
-  font-size: 14px;
-  color: var(--foreground);
-}
-
-.eval-gap-freq {
   font-size: 12px;
+  font-weight: 700;
+  color: var(--brand, #9B2226);
+}
+
+.eval-profile-summary {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--foreground);
+}
+
+.eval-field-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.eval-field-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.eval-field-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--foreground);
+}
+
+.eval-field-head span:last-child {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.eval-field-bar {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--bg, #FAFAF8);
+  border: 1px solid var(--border, #EAE6E2);
+}
+
+.eval-field-bar span {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #9B2226, #C56B5F);
+}
+
+.eval-profile-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.eval-profile-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-left: 12px;
+  border-left: 2px solid var(--brand-light, #FDF4F4);
+}
+
+.eval-profile-list-main {
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--foreground);
+}
+
+.eval-profile-list-sub {
+  font-size: 12px;
+  line-height: 1.45;
   color: var(--muted);
 }
 
-.eval-gap-hint {
-  font-size: 13px;
+.eval-profile-list-hint {
+  font-size: 12.5px;
+  line-height: 1.5;
   color: #92400E;
   background: #FFFBEB;
-  padding: 6px 10px;
+  border: 1px solid #FEF3C7;
   border-radius: 6px;
+  padding: 5px 8px;
+  margin-top: 2px;
+}
+
+.eval-empty-note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+@media (max-width: 760px) {
+  .eval-profile-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ── Doctor profile v1.1 — warm clinical letter layout ── */
@@ -1903,6 +1951,40 @@ details[open] .sample-details__toggle::before {
   font-size: 13px;
   color: var(--text-muted);
   font-style: italic;
+}
+
+.profile-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.profile-list-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.profile-list-main {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text, #1A1A1A);
+}
+
+.profile-list-sub {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.profile-list-hint {
+  font-size: 13px;
+  color: var(--profile-tan);
+  padding: 6px 10px;
+  background: rgba(176, 117, 85, 0.07);
+  border-left: 3px solid var(--profile-tan);
+  border-radius: 0 6px 6px 0;
+  line-height: 1.5;
 }
 
 /* Strengths */
