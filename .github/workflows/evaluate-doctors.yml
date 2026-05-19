@@ -3,61 +3,90 @@ name: Evaluate Doctors
 on:
   workflow_dispatch:
     inputs:
-      email:
-        description: "Doctor email — leave blank to evaluate all active doctors"
+      doctor_email:
+        description: "Optional doctor email. Leave blank to evaluate all active doctors."
         required: false
-        default: ""
+        type: string
       doctor_id:
-        description: "Doctor UUID — takes precedence over email if both provided"
+        description: "Optional doctor UUID. Takes precedence over email."
         required: false
-        default: ""
+        type: string
+      force:
+        description: "Accepted for CLI compatibility. Goal 2 storage is append-only."
+        required: false
+        default: true
+        type: boolean
+      window_days:
+        description: "Evaluation window in days."
+        required: false
+        default: "14"
+        type: string
 
 jobs:
-  evaluate:
+  evaluate-doctors:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Trigger evaluation (with retry)
+      - name: Trigger Goal 2 doctor evaluation
+        shell: bash
+        env:
+          BASE_URL: ${{ secrets.ASSESS_BASE_URL }}
+          ASSESSMENT_API_KEY: ${{ secrets.ASSESSMENT_API_KEY }}
+          DOCTOR_EMAIL: ${{ inputs.doctor_email }}
+          DOCTOR_ID: ${{ inputs.doctor_id }}
+          FORCE: ${{ inputs.force }}
+          WINDOW_DAYS: ${{ inputs.window_days }}
         run: |
-          EMAIL="${{ github.event.inputs.email }}"
-          DOCTOR_ID="${{ github.event.inputs.doctor_id }}"
+          set -euo pipefail
 
-          if [ -n "$DOCTOR_ID" ]; then
-            BODY="{\"doctorId\":\"$DOCTOR_ID\"}"
-          elif [ -n "$EMAIL" ]; then
-            BODY="{\"doctorEmail\":\"$EMAIL\"}"
-          else
-            BODY="{}"
-          fi
+          BODY=$(node -e '
+            const body = {
+              force: process.env.FORCE === "true",
+              windowDays: Number(process.env.WINDOW_DAYS || "14")
+            };
+            if (process.env.DOCTOR_EMAIL) body.doctorEmail = process.env.DOCTOR_EMAIL.trim();
+            if (process.env.DOCTOR_ID) body.doctorId = process.env.DOCTOR_ID.trim();
+            process.stdout.write(JSON.stringify(body));
+          ')
 
           MAX_ATTEMPTS=3
           ATTEMPT=0
           DELAY=10
 
-          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+          while [ "$ATTEMPT" -lt "$MAX_ATTEMPTS" ]; do
             ATTEMPT=$((ATTEMPT + 1))
             echo "Attempt $ATTEMPT of $MAX_ATTEMPTS..."
 
-            STATUS=$(curl -s -o /tmp/result.json -w "%{http_code}" \
-              -X POST "${{ secrets.ASSESS_BASE_URL }}/api/cron/evaluate-doctors" \
-              -H "X-Assessment-Key: ${{ secrets.ASSESSMENT_API_KEY }}" \
+            STATUS=$(curl -s -o /tmp/evaluate-doctors-response.json -w "%{http_code}" \
+              -X POST "$BASE_URL/api/cron/evaluate-doctors" \
+              -H "X-Assessment-Key: $ASSESSMENT_API_KEY" \
               -H "Content-Type: application/json" \
-              -d "$BODY")
+              --data "$BODY")
 
-            cat /tmp/result.json
+            cat /tmp/evaluate-doctors-response.json
             echo ""
 
-            if [ "$STATUS" -eq 200 ]; then
-              FAILED=$(python3 -c "import json,sys; d=json.load(open('/tmp/result.json')); print(d.get('failed',0))" 2>/dev/null || echo "0")
-              if [ "$FAILED" -eq 0 ]; then
-                echo "Evaluation succeeded."
-                exit 0
-              fi
-              echo "Evaluation reported $FAILED failure(s) — retrying in ${DELAY}s..."
-            else
-              echo "HTTP $STATUS — retrying in ${DELAY}s..."
+            export STATUS
+            if node -e '
+              const fs = require("fs");
+              const status = Number(process.env.STATUS);
+              let body;
+              try {
+                body = JSON.parse(fs.readFileSync("/tmp/evaluate-doctors-response.json", "utf8"));
+              } catch (error) {
+                console.error("Invalid JSON response");
+                process.exit(1);
+              }
+              if (status < 200 || status >= 300) process.exit(1);
+              if (typeof body.processed !== "number" || typeof body.failed !== "number") process.exit(1);
+              if (body.failed > 0 || body.ok !== true) process.exit(1);
+            '; then
+              echo "Evaluation succeeded."
+              exit 0
             fi
-            sleep $DELAY
+
+            echo "Evaluation failed or returned failed doctors; retrying in ${DELAY}s..."
+            sleep "$DELAY"
             DELAY=$((DELAY * 2))
           done
 
