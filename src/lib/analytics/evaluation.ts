@@ -1,10 +1,9 @@
 /**
  * Doctor profile evaluation pipeline — Goal 2.
  *
- * Analyses a single doctor's input patterns over a rolling window (default 14d).
- * On-demand only — triggered by admin UI or GH Action workflow_dispatch.
- *
- * Goal 1 (AI output review) moved to sessionReview.ts — fleet-wide, on-demand.
+ * v1.1 keeps deterministic math in TypeScript and asks DeepSeek only for
+ * compact synthesis. The profile is admin-only and describes recording habits
+ * / AI interaction patterns, not clinical correctness.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -24,62 +23,62 @@ export class NoConsultationsError extends Error {
   }
 }
 
+export const DOCTOR_EVALUATION_PROMPT_VERSION = "doctor-eval-v1.1";
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-export type StrengthEntry = {
-  strength: string;
-  evidence: string; // "案例1、3、5"
+export type FieldCompletenessStat = {
+  field: "pastHistory" | "physicalExam" | "doctorQuestion";
+  label: string;
+  filled: number;
+  total: number;
+  rate: number;
 };
 
-export type FieldCompletenessEntry = {
-  field: string;
-  presentIn: string; // "9/10"
-};
-
-export type AiRecurringThemes = {
-  frequentSuggestions: string[];
-  frequentRisks: string[];
-  frequentClarifications: string[];
-};
-
-export type GapEntry = {
-  gap: string;
-  presentIn?: string;  // v1.1+: "3/10"
-  evidence?: string;   // v1.1+: "案例3、7、9"
-  frequency?: string;  // v1.0 compat
-  guidanceHint: string;
+export type ThemeCandidate = {
+  theme: string;
+  count: number;
+  rate: number;
+  caseNumbers: number[];
 };
 
 export type DoctorProfile = {
-  internalScore: number;
-  scoreDirection: "improving" | "stable" | "declining" | "first_run";
-  prescriptionStyle: string;
   profileSummary: string;
-  gaps: GapEntry[];
-  guidancePoints: string[];
-  /** Stored for Phase 2 doctor-facing surface. Not rendered in admin UI yet. */
-  doctorFacingHint: string;
-
-  // v1.1+ fields (optional for backward compat with old DB records)
-  headline?: string;
-  strengths?: StrengthEntry[];
-  fieldCompleteness?: FieldCompletenessEntry[];
-  aiRecurringThemes?: AiRecurringThemes;
-
-  // v1.0 deprecated (kept for reading old DB records)
-  inputCompleteness?: "high" | "medium" | "low";
-  weakFields?: string[];
+  fieldCompleteness: Array<{
+    field: string;
+    label: string;
+    filled: number;
+    total: number;
+    rate: number;
+  }>;
+  aiRecurringThemes: Array<{
+    theme: string;
+    frequency: string;
+    caseNumbers: number[];
+  }>;
+  strengths: Array<{
+    text: string;
+    caseNumbers: number[];
+  }>;
+  gaps: Array<{
+    field: string;
+    inputRate: number;
+    aiAskRate: number;
+    evidence: string;
+    caseNumbers: number[];
+    guidanceHint: string;
+  }>;
+  guidancePoints: Array<{
+    text: string;
+    caseNumbers: number[];
+  }>;
 };
 
 export type DoctorEvaluation = {
   doctorProfile: DoctorProfile;
 };
-
-// ---------------------------------------------------------------------------
-// Internal row type
-// ---------------------------------------------------------------------------
 
 type EvalRow = {
   form_data: Record<string, unknown> | null;
@@ -88,42 +87,68 @@ type EvalRow = {
 };
 
 // ---------------------------------------------------------------------------
-// Compact serializer — reduces token cost vs raw JSON by ~60%
+// Deterministic stats
 // ---------------------------------------------------------------------------
 
-// Max consultations sent to the evaluation model.
-// Stratified by prescription type, most recent cases preferred.
 const MAX_EVAL_CASES = 8;
 
+const FIELD_LABELS: Record<FieldCompletenessStat["field"], string> = {
+  pastHistory: "既往史",
+  physicalExam: "体格检查",
+  doctorQuestion: "医生问题",
+};
+
+const THEME_PATTERNS: Array<{ theme: string; patterns: RegExp[] }> = [
+  { theme: "既往史补充", patterns: [/既往史|病史|用药史|过敏史/] },
+  { theme: "血压随访", patterns: [/血压|高血压|降压/] },
+  { theme: "体格检查补充", patterns: [/体格检查|查体|体征|压痛|活动度|ROM/i] },
+  { theme: "舌脉补充", patterns: [/舌|脉|舌脉/] },
+  { theme: "补肾", patterns: [/补肾|肾虚|益肾/] },
+  { theme: "补气", patterns: [/补气|益气|气虚/] },
+  { theme: "活血", patterns: [/活血|化瘀|血瘀/] },
+  { theme: "温阳", patterns: [/温阳|阳虚|温补/] },
+];
+
 function truncate(s: string, max: number): string {
-  return s.length <= max ? s : s.slice(0, max) + "…";
+  return s.length <= max ? s : `${s.slice(0, max)}...`;
 }
 
 function cell(s: string, max: number): string {
-  // Strip pipes and newlines so table columns stay intact
   return truncate(s.replace(/[|\n\r]/g, " ").trim(), max);
+}
+
+function stringValue(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function isFilled(value: unknown): boolean {
+  if (Array.isArray(value)) return value.length > 0;
+  return stringValue(value).length > 0;
 }
 
 function joinArray(arr: unknown, max = 1, sep = "；"): string {
   if (!Array.isArray(arr)) return "";
   return arr
-    .filter((x): x is string => typeof x === "string" && x.length > 0)
+    .filter((x): x is string => typeof x === "string" && x.trim().length > 0)
     .slice(0, max)
     .join(sep);
 }
 
-/**
- * Stratified recent sample — most recent cases first, spread across
- * prescription types so the model sees variety. Returns at most MAX_EVAL_CASES
- * rows sorted back to chronological order.
- */
+function collectAnalysisText(value: unknown, out: string[] = []): string[] {
+  if (typeof value === "string") {
+    out.push(value);
+  } else if (Array.isArray(value)) {
+    for (const item of value) collectAnalysisText(item, out);
+  } else if (value && typeof value === "object") {
+    for (const item of Object.values(value)) collectAnalysisText(item, out);
+  }
+  return out;
+}
+
 export function sampleRecentCases(rows: EvalRow[], maxCases = MAX_EVAL_CASES): EvalRow[] {
   if (rows.length <= maxCases) return rows;
 
-  // rows come in ASC order; reverse = most recent first
   const byRecency = [...rows].reverse();
-
-  // Group by prescription type string
   const queues = new Map<string, EvalRow[]>();
   for (const row of byRecency) {
     const fd = row.form_data ?? {};
@@ -135,7 +160,6 @@ export function sampleRecentCases(rows: EvalRow[], maxCases = MAX_EVAL_CASES): E
     queues.set(key, q);
   }
 
-  // Round-robin across types (most recent from each type first)
   const typeQueues = [...queues.values()];
   const picked = new Set<EvalRow>();
   let round = 0;
@@ -144,29 +168,115 @@ export function sampleRecentCases(rows: EvalRow[], maxCases = MAX_EVAL_CASES): E
     for (const q of typeQueues) {
       if (picked.size >= maxCases) break;
       const next = q[round];
-      if (next && !picked.has(next)) { picked.add(next); added = true; }
+      if (next && !picked.has(next)) {
+        picked.add(next);
+        added = true;
+      }
     }
     if (!added) break;
     round++;
   }
 
-  // Restore chronological order
   return [...picked].sort(
     (a, b) => new Date(a.analyzed_at ?? 0).getTime() - new Date(b.analyzed_at ?? 0).getTime(),
   );
 }
 
-/**
- * Tabular serialization — column headers appear once, one row per case.
- * ~40-50% fewer tokens than the old per-case labelled format for 8+ cases.
- *
- * Column legend (prepended):
- *   #  性/岁  类型  主诉  诊断  证型  体检(>15字=详)  生命体征  既往史  处方  医问
- *   AI重点  AI建议  AI复核  AI风险
- */
+export function computeFieldCompleteness(rows: EvalRow[]): FieldCompletenessStat[] {
+  const total = rows.length;
+  return (Object.keys(FIELD_LABELS) as FieldCompletenessStat["field"][]).map((field) => {
+    const filled = rows.filter((row) => isFilled(row.form_data?.[field])).length;
+    return {
+      field,
+      label: FIELD_LABELS[field],
+      filled,
+      total,
+      rate: total > 0 ? filled / total : 0,
+    };
+  });
+}
+
+export function extractThemeCandidates(rows: EvalRow[]): ThemeCandidate[] {
+  const total = rows.length;
+  const candidates = THEME_PATTERNS.map(({ theme, patterns }) => {
+    const caseNumbers: number[] = [];
+    rows.forEach((row, index) => {
+      const text = collectAnalysisText(row.analysis_result).join(" ");
+      if (patterns.some((pattern) => pattern.test(text))) {
+        caseNumbers.push(index + 1);
+      }
+    });
+    return {
+      theme,
+      count: caseNumbers.length,
+      rate: total > 0 ? caseNumbers.length / total : 0,
+      caseNumbers,
+    };
+  });
+
+  return candidates
+    .filter((candidate) => candidate.count > 0)
+    .sort((a, b) => b.count - a.count || a.theme.localeCompare(b.theme));
+}
+
+function enforceDualEvidenceGaps(profile: DoctorProfile, completeness: FieldCompletenessStat[]): DoctorProfile {
+  const completenessByField = new Map(completeness.map((item) => [item.field, item]));
+  return {
+    ...profile,
+    fieldCompleteness: completeness,
+    gaps: profile.gaps
+      .map((gap) => {
+        const stat = completenessByField.get(gap.field as FieldCompletenessStat["field"]);
+        return stat ? { ...gap, inputRate: stat.rate } : gap;
+      })
+      .filter((gap) => gap.inputRate < 0.7 && gap.aiAskRate >= 0.3)
+      .slice(0, 4),
+  };
+}
+
+export function normalizeDoctorProfile(value: unknown): DoctorProfile {
+  const raw = value && typeof value === "object" ? value as Record<string, unknown> : {};
+
+  const listObjects = <T>(key: string): T[] => Array.isArray(raw[key]) ? raw[key] as T[] : [];
+  const textList = (key: string): string[] => Array.isArray(raw[key])
+    ? (raw[key] as unknown[]).filter((item): item is string => typeof item === "string")
+    : [];
+
+  const guidancePoints = Array.isArray(raw.guidancePoints)
+    ? (raw.guidancePoints as unknown[])
+        .filter((item): item is DoctorProfile["guidancePoints"][number] => (
+          Boolean(item) && typeof item === "object" && typeof (item as Record<string, unknown>).text === "string"
+        ))
+    : [];
+  const oldGuidance = textList("guidancePoints").map((text) => ({ text, caseNumbers: [] }));
+  const rawGaps = Array.isArray(raw.gaps) ? raw.gaps as Array<Record<string, unknown>> : [];
+  const v11Gaps = rawGaps
+    .filter((gap) => "field" in gap || "inputRate" in gap || "aiAskRate" in gap || "evidence" in gap)
+    .map((gap) => gap as DoctorProfile["gaps"][number]);
+  const oldGaps = rawGaps
+    .filter((gap) => !("field" in gap || "inputRate" in gap || "aiAskRate" in gap || "evidence" in gap))
+    .map((gap) => ({
+      field: stringValue(gap.gap) || "legacy",
+      inputRate: 0,
+      aiAskRate: 0,
+      evidence: stringValue(gap.frequency),
+      caseNumbers: [],
+      guidanceHint: stringValue(gap.guidanceHint),
+    }));
+
+  return {
+    profileSummary: stringValue(raw.profileSummary) || "暂无可展示的画像摘要。",
+    fieldCompleteness: listObjects<DoctorProfile["fieldCompleteness"][number]>("fieldCompleteness"),
+    aiRecurringThemes: listObjects<DoctorProfile["aiRecurringThemes"][number]>("aiRecurringThemes"),
+    strengths: listObjects<DoctorProfile["strengths"][number]>("strengths"),
+    gaps: v11Gaps.length ? v11Gaps : oldGaps,
+    guidancePoints: guidancePoints.length ? guidancePoints : oldGuidance,
+  };
+}
+
 export function serializeConsultationsCompact(rows: EvalRow[]): string {
   const SEP = " | ";
-  const HEADERS = [
+  const headers = [
     "#", "性/岁", "类型",
     "主诉", "诊断", "证型",
     "体检", "生命体征", "既往史",
@@ -201,7 +311,6 @@ export function serializeConsultationsCompact(rows: EvalRow[]): string {
       fd.pastHistory ? cell(String(fd.pastHistory), 40) : "[未填]",
       cell(String(fd.prescription ?? ""), 80),
       fd.doctorQuestion ? cell(String(fd.doctorQuestion), 40) : "",
-      // AI columns — 1 item each to keep rows compact
       cell(joinArray(ar?.keyPoints, 1), 50),
       cell(joinArray(g1?.sections?.[0]?.items, 1), 50),
       cell(joinArray(g0?.sections?.[1]?.items, 1), 50),
@@ -210,9 +319,28 @@ export function serializeConsultationsCompact(rows: EvalRow[]): string {
   });
 
   return [
-    `列说明：#=案例编号 | 体检>15字为"详" | 生命体征=[有]/[无] | 既往史=[未填]表示未填写 | 医问=空表示未填写`,
-    HEADERS,
+    `列说明：#=案例编号 | 生命体征=[有]/[无] | 既往史=[未填]表示未填写 | 医问=空表示未填写`,
+    headers,
     ...dataRows,
+  ].join("\n");
+}
+
+function serializeStats(completeness: FieldCompletenessStat[], themes: ThemeCandidate[]) {
+  const total = themes[0]?.rate ? Math.round(themes[0].count / themes[0].rate) : (completeness[0]?.total ?? 0);
+  const completenessLines = completeness
+    .map((item) => `${item.field}/${item.label}: ${item.filled}/${item.total} (${Math.round(item.rate * 100)}%)`)
+    .join("\n");
+  const themeLines = themes
+    .slice(0, 8)
+    .map((item) => `${item.theme}: ${item.count}/${total} (${Math.round(item.rate * 100)}%) cases=${item.caseNumbers.join(",")}`)
+    .join("\n");
+
+  return [
+    "DETERMINISTIC_FIELD_COMPLETENESS",
+    completenessLines || "none",
+    "",
+    "DETERMINISTIC_AI_THEME_CANDIDATES",
+    themeLines || "none",
   ].join("\n");
 }
 
@@ -224,7 +352,12 @@ export async function evaluateDoctor(
   client: SupabaseClient,
   doctorId: string,
   windowDays = 14,
-): Promise<{ evaluation: DoctorEvaluation; consultationCount: number; model: string }> {
+): Promise<{
+  evaluation: DoctorEvaluation;
+  consultationCount: number;
+  model: string;
+  promptVersion: string;
+}> {
   const { windowStart, windowEnd } = buildWindow(windowDays);
 
   const { data, error } = await client
@@ -240,19 +373,22 @@ export async function evaluateDoctor(
 
   const rows = (data ?? []) as EvalRow[];
   const consultationCount = rows.length;
+  if (consultationCount === 0) throw new NoConsultationsError(windowDays);
 
-  if (consultationCount === 0) {
-    throw new NoConsultationsError(windowDays);
-  }
-
-  // Stratified recent sample — keeps prompt within token budget
   const sampled = sampleRecentCases(rows);
+  const fieldCompleteness = computeFieldCompleteness(rows);
+  const themeCandidates = extractThemeCandidates(sampled);
   const serialized = serializeConsultationsCompact(sampled);
+  const stats = serializeStats(fieldCompleteness, themeCandidates);
 
   const userPrompt = [
     `请对以下 ${sampled.length} 条病案进行医生画像分析（窗口内共 ${consultationCount} 条，已按处方类型分层取最近 ${sampled.length} 条）。`,
     `窗口：过去 ${windowDays} 天`,
+    "请优先使用我提供的确定性统计，不要重新发明百分比。",
     "",
+    stats,
+    "",
+    "COMPACT_CASES",
     serialized,
   ].join("\n");
 
@@ -264,19 +400,17 @@ export async function evaluateDoctor(
   });
 
   const callStartedAt = Date.now();
-
   const result = await callDeepSeekJson<DoctorEvaluation>({
     messages: [
       { role: "system", content: DOCTOR_EVALUATION_SYSTEM_PROMPT },
       { role: "user", content: userPrompt },
     ],
     model,
-    maxTokens: 2000,    // schema output ~1000-1400 tokens; cap forces conciseness
+    maxTokens: 2000,
     timeoutMs: 90_000,
     repairJson: true,
     retryOnEmpty: true,
-    jsonMode: false,    // plain text mode: truncated output returns partial JSON
-                        // rather than null; repairJson handles the rest
+    jsonMode: false,
   });
 
   if (langfuse && trace) {
@@ -286,22 +420,63 @@ export async function evaluateDoctor(
       startTime: new Date(callStartedAt),
       endTime: new Date(),
       usageDetails: {
-        input:     result.usage?.prompt_tokens             ?? 0,
-        output:    result.usage?.completion_tokens         ?? 0,
-        total:     result.usage?.total_tokens              ?? 0,
-        cacheHit:  result.usage?.prompt_cache_hit_tokens   ?? 0,
-        cacheMiss: result.usage?.prompt_cache_miss_tokens  ?? 0,
+        input: result.usage?.prompt_tokens ?? 0,
+        output: result.usage?.completion_tokens ?? 0,
+        total: result.usage?.total_tokens ?? 0,
+        cacheHit: result.usage?.prompt_cache_hit_tokens ?? 0,
+        cacheMiss: result.usage?.prompt_cache_miss_tokens ?? 0,
       },
       metadata: {
-        repairedJson:     result.repairedJson ?? false,
-        latencyMs:        Date.now() - callStartedAt,
+        repairedJson: result.repairedJson ?? false,
+        latencyMs: Date.now() - callStartedAt,
         consultationCount,
-        sampledCount:     sampled.length,
+        sampledCount: sampled.length,
         windowDays,
       },
     });
     try { await langfuse.flushAsync(); } catch { /* non-critical */ }
   }
 
-  return { evaluation: result.data, consultationCount, model };
+  const normalizedProfile = normalizeDoctorProfile(result.data.doctorProfile);
+  const doctorProfile = enforceDualEvidenceGaps(normalizedProfile, fieldCompleteness);
+
+  return {
+    evaluation: { doctorProfile },
+    consultationCount,
+    model,
+    promptVersion: DOCTOR_EVALUATION_PROMPT_VERSION,
+  };
+}
+
+export async function insertDoctorEvaluation({
+  client,
+  doctorId,
+  windowDays,
+  evaluation,
+  consultationCount,
+  model,
+}: {
+  client: SupabaseClient;
+  doctorId: string;
+  windowDays: number;
+  evaluation: DoctorEvaluation;
+  consultationCount: number;
+  model: string;
+}) {
+  const { windowStart, windowEnd } = buildWindow(windowDays);
+  const { data, error } = await client
+    .from("analytics_doctor_evaluations")
+    .insert({
+      doctor_id: doctorId,
+      window_start: windowStart.toISOString(),
+      window_end: windowEnd.toISOString(),
+      consultation_count: consultationCount,
+      doctor_profile: evaluation.doctorProfile,
+      model,
+    })
+    .select("id")
+    .single();
+
+  if (error) throw new Error(error.message);
+  return data?.id ?? null;
 }

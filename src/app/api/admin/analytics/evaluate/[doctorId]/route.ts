@@ -2,11 +2,9 @@ import { type NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient, getServiceRoleClient } from "@/lib/supabase/server";
 import { isAdminDoctorEmail } from "@/lib/auth";
 import { apiError } from "@/lib/apiResponses";
-import { evaluateDoctor, NoConsultationsError } from "@/lib/analytics/evaluation";
-import { buildWindow } from "@/lib/analytics/stats";
+import { evaluateDoctor, insertDoctorEvaluation, NoConsultationsError } from "@/lib/analytics/evaluation";
 import { logServerEvent } from "@/lib/logging";
 
-// Evaluation calls DeepSeek with up to ~20 consultations — allow 60s
 export const maxDuration = 60;
 
 type RouteContext = { params: Promise<{ doctorId: string }> };
@@ -16,6 +14,10 @@ async function guardAdmin() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user || !(await isAdminDoctorEmail(user.email))) return null;
   return user;
+}
+
+function cleanWindowDays(value: unknown) {
+  return typeof value === "number" && value > 0 && value <= 90 ? value : 14;
 }
 
 // ---------------------------------------------------------------------------
@@ -43,16 +45,23 @@ export async function GET(_req: NextRequest, context: RouteContext) {
 }
 
 // ---------------------------------------------------------------------------
-// POST — trigger new evaluation for a doctor (append-only, 14-day window)
+// POST — trigger new evaluation for a doctor
 // ---------------------------------------------------------------------------
 
-export async function POST(_req: NextRequest, context: RouteContext) {
+export async function POST(req: NextRequest, context: RouteContext) {
   const user = await guardAdmin();
   if (!user) return apiError(403, "UNAUTHORIZED", "仅管理员可访问。");
 
   const { doctorId } = await context.params;
   const admin = getServiceRoleClient();
-  const windowDays = 14;
+
+  let windowDays = 14;
+  try {
+    const body = await req.json() as { windowDays?: number };
+    windowDays = cleanWindowDays(body.windowDays);
+  } catch {
+    // no body — use default
+  }
 
   try {
     const { evaluation, consultationCount, model } = await evaluateDoctor(
@@ -61,24 +70,20 @@ export async function POST(_req: NextRequest, context: RouteContext) {
       windowDays,
     );
 
-    const { windowStart, windowEnd } = buildWindow(windowDays);
+    const evaluationId = await insertDoctorEvaluation({
+      client: admin,
+      doctorId,
+      windowDays,
+      evaluation,
+      consultationCount,
+      model,
+    });
 
-    const { data: saved, error: saveError } = await admin
-      .from("analytics_doctor_evaluations")
-      .insert({
-        doctor_id:          doctorId,
-        window_start:       windowStart.toISOString(),
-        window_end:         windowEnd.toISOString(),
-        consultation_count: consultationCount,
-        doctor_profile:     evaluation.doctorProfile,
-        model,
-      })
-      .select("id,window_start,window_end,consultation_count,doctor_profile,model,created_at")
-      .single();
-
-    if (saveError) throw new Error(saveError.message);
-
-    return NextResponse.json({ ok: true, evaluation: saved });
+    return NextResponse.json({
+      ok: true,
+      evaluationId,
+      consultationCount,
+    });
   } catch (err) {
     if (err instanceof NoConsultationsError) {
       return apiError(400, "NO_CONSULTATIONS", err.message);
