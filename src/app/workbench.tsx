@@ -4,15 +4,16 @@ import {
   AlertTriangle,
   Brain,
   CheckCircle2,
-  ChevronDown,
   Clock,
   FileText,
   LoaderCircle,
   LogOut,
   Plus,
   Save,
+  Search,
   Settings2,
   Trash2,
+  X,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ReactNode, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -397,6 +398,7 @@ const HistoryPanel = memo(function HistoryPanel({
   onSelect,
   onNew,
   onDelete,
+  onClose,
   loading,
 }: {
   consultations: ConsultationSummary[];
@@ -404,49 +406,113 @@ const HistoryPanel = memo(function HistoryPanel({
   onSelect: (id: string) => void;
   onNew: () => void;
   onDelete: (id: string) => void;
+  onClose: () => void;
   loading: boolean;
 }) {
+  const [query, setQuery] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  // Focus search on open and close on Escape
+  useEffect(() => {
+    searchRef.current?.focus();
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return consultations;
+    return consultations.filter((c) =>
+      buildDisplayName(c).toLowerCase().includes(q)
+    );
+  }, [consultations, query]);
+
   return (
-    <div className="history-panel">
-      <div className="history-panel__header">
-        <span className="history-panel__title">
-          <Clock size={14} />
-          历史记录
-        </span>
-        <button className="history-panel__new" onClick={onNew} title="新建病案">
-          <Plus size={14} />
-        </button>
-      </div>
-      <div className="history-panel__list">
-        {loading && <div className="history-panel__empty">加载中…</div>}
-        {!loading && consultations.length === 0 && (
-          <div className="history-panel__empty">暂无历史记录</div>
-        )}
-        {consultations.map((c) => (
-          <div
-            key={c.id}
-            className={`history-item ${c.id === activeId ? "history-item--active" : ""}`}
-            onClick={() => onSelect(c.id)}
-          >
-            <div className="history-item__name">
-              {buildDisplayName(c)}
-            </div>
-            <div className="history-item__meta">
-              <span>{formatDate(c.updated_at)}</span>
-            </div>
-            <button
-              className="history-item__delete"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete(c.id);
-              }}
-              title="删除"
-              aria-label="删除病案"
-            >
-              <Trash2 size={12} />
+    /* Backdrop */
+    <div
+      className="history-overlay"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      role="dialog"
+      aria-modal="true"
+      aria-label="历史记录"
+    >
+      <div className="history-modal">
+        {/* Header */}
+        <div className="history-modal__header">
+          <span className="history-modal__title">
+            <Clock size={15} />
+            历史记录
+          </span>
+          <div className="history-modal__header-actions">
+            <button className="history-modal__new" onClick={() => { onNew(); onClose(); }} title="新建病案">
+              <Plus size={15} />
+              <span>新建</span>
+            </button>
+            <button className="history-modal__close" onClick={onClose} aria-label="关闭">
+              <X size={16} />
             </button>
           </div>
-        ))}
+        </div>
+
+        {/* Search */}
+        <div className="history-modal__search">
+          <Search size={14} className="history-search__icon" />
+          <input
+            ref={searchRef}
+            className="history-search__input"
+            type="text"
+            placeholder="搜索病案…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          {query && (
+            <button className="history-search__clear" onClick={() => setQuery("")} aria-label="清除搜索">
+              <X size={12} />
+            </button>
+          )}
+        </div>
+
+        {/* List */}
+        <div className="history-modal__list">
+          {loading && <div className="history-modal__empty">加载中…</div>}
+          {!loading && filtered.length === 0 && (
+            <div className="history-modal__empty">
+              {query ? "无匹配记录" : "暂无历史记录"}
+            </div>
+          )}
+          {filtered.map((c) => (
+            <div
+              key={c.id}
+              className={`history-item ${c.id === activeId ? "history-item--active" : ""}`}
+              onClick={() => { onSelect(c.id); onClose(); }}
+            >
+              <div className="history-item__name">{buildDisplayName(c)}</div>
+              <div className="history-item__meta">
+                <span>{formatDate(c.updated_at)}</span>
+              </div>
+              <button
+                className="history-item__delete"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(c.id);
+                }}
+                title="删除"
+                aria-label="删除病案"
+              >
+                <Trash2 size={12} />
+              </button>
+            </div>
+          ))}
+        </div>
+
+        {!loading && consultations.length > 0 && (
+          <div className="history-modal__footer">
+            共 {consultations.length} 条{query && `，匹配 ${filtered.length} 条`}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -699,29 +765,25 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
             </div>
           </div>
           <div className="workbench__actions">
-            <div className="btn-with-dropdown">
-              <button
-                className="btn btn--ghost btn--sm"
-                onClick={() => setHistoryOpen((o) => !o)}
-                title="历史记录"
-              >
-                <Clock size={15} />
-                <span>历史</span>
-                <ChevronDown size={13} className={historyOpen ? "rotate-180" : ""} />
-              </button>
-              {historyOpen && (
-                <div className="header-dropdown">
-                  <HistoryPanel
-                    consultations={consultations}
-                    activeId={activeId}
-                    onSelect={(id) => void handleSelectHistory(id)}
-                    onNew={handleNew}
-                    onDelete={(id) => void handleDeleteHistory(id)}
-                    loading={historyLoading}
-                  />
-                </div>
-              )}
-            </div>
+            <button
+              className="btn btn--ghost btn--sm"
+              onClick={() => setHistoryOpen((o) => !o)}
+              title="历史记录"
+            >
+              <Clock size={15} />
+              <span>历史</span>
+            </button>
+            {historyOpen && (
+              <HistoryPanel
+                consultations={consultations}
+                activeId={activeId}
+                onSelect={(id) => void handleSelectHistory(id)}
+                onNew={handleNew}
+                onDelete={(id) => void handleDeleteHistory(id)}
+                onClose={() => setHistoryOpen(false)}
+                loading={historyLoading}
+              />
+            )}
             <button className="btn btn--ghost btn--sm" onClick={handleNew} title="新建">
               <Plus size={15} />
               <span>新建</span>
