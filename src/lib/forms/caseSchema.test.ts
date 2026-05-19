@@ -15,21 +15,18 @@ describe("structuredCaseSchema", () => {
     }
   });
 
-  it("accepts single and multi-value prescriptionType arrays", () => {
-    expect(parse({ ...MINIMAL_VALID, prescriptionType: ["方药"] }).success).toBe(true);
-    expect(parse({ ...MINIMAL_VALID, prescriptionType: ["针灸", "综合调理"] }).success).toBe(true);
+  it("accepts each valid prescriptionType string", () => {
+    expect(parse({ ...MINIMAL_VALID, prescriptionType: "方药" }).success).toBe(true);
+    expect(parse({ ...MINIMAL_VALID, prescriptionType: "针灸" }).success).toBe(true);
+    expect(parse({ ...MINIMAL_VALID, prescriptionType: "综合调理" }).success).toBe(true);
   });
 
-  it("rejects empty prescriptionType array", () => {
-    expect(parse({ ...MINIMAL_VALID, prescriptionType: [] }).success).toBe(false);
+  it("rejects unknown prescription type value", () => {
+    expect(parse({ ...MINIMAL_VALID, prescriptionType: "推拿" }).success).toBe(false);
   });
 
-  it("rejects unknown prescription type value in array", () => {
-    expect(parse({ ...MINIMAL_VALID, prescriptionType: ["推拿"] }).success).toBe(false);
-  });
-
-  it("rejects non-array prescriptionType", () => {
-    expect(parse({ ...MINIMAL_VALID, prescriptionType: "方药" }).success).toBe(false);
+  it("rejects array prescriptionType", () => {
+    expect(parse({ ...MINIMAL_VALID, prescriptionType: ["方药"] }).success).toBe(false);
   });
 
   it("rejects unknown sex value", () => {

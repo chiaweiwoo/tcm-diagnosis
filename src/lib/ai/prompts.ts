@@ -103,7 +103,7 @@ function hasLiteratureRequest(form: StructuredCaseForm) {
 export function buildTcmAnalysisUserPrompt(form: StructuredCaseForm): string {
   const lines = [
     "请基于以下结构化病案进行临床复核。",
-    `处方类型：${form.prescriptionType.join("、")}`,
+    `处方类型：${form.prescriptionType}`,
     compactField("患者", `${form.patientSex}/${form.patientAge}岁`),
     `主诉：${form.chiefComplaint}`,
     `现病史：${form.currentIllness}`,

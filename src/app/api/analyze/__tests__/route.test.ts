@@ -188,7 +188,7 @@ describe("POST /api/analyze", () => {
 
   it("passes prescriptionType from form to buildAnalysisResult via title", async () => {
     const response = await POST(
-      makeRequest({ form: { ...MINIMAL_VALID, prescriptionType: ["针灸"] } }),
+      makeRequest({ form: { ...MINIMAL_VALID, prescriptionType: "针灸" } }),
     );
     const body = await parseResponse(response);
     const result = body.result as { title: string };

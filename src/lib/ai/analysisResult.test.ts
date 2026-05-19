@@ -16,7 +16,7 @@ describe("buildAnalysisResult", () => {
         随访监测: ["建议1个周期后复诊复核执行效果"],
         证据状态: ["基于临床经验与通用知识，尚未接入外部文献检索。"],
       },
-      ["方药"],
+      "方药",
     );
 
     expect(result.title).toBe("方药研判");
@@ -32,7 +32,7 @@ describe("buildAnalysisResult", () => {
   });
 
   it("falls back to safe defaults when sections are missing", () => {
-    const result = buildAnalysisResult({}, ["针灸"]);
+    const result = buildAnalysisResult({}, "针灸");
 
     expect(result.title).toBe("针灸研判");
     expect(result.keyPoints.length).toBeGreaterThan(0);
@@ -41,9 +41,9 @@ describe("buildAnalysisResult", () => {
     expect(result.groups).toHaveLength(3);
   });
 
-  it("builds title from multi-type array", () => {
-    const result = buildAnalysisResult({}, ["针灸", "综合调理"]);
-    expect(result.title).toBe("针灸+综合调理研判");
+  it("builds title from prescriptionType string", () => {
+    const result = buildAnalysisResult({}, "综合调理");
+    expect(result.title).toBe("综合调理研判");
   });
 
   it("normalizes wrong-shaped fields without throwing", () => {
@@ -60,7 +60,7 @@ describe("buildAnalysisResult", () => {
         随访监测: "复诊观察周期",
         证据状态: "",
       },
-      ["方药"],
+      "方药",
     );
 
     expect(result.keyPoints).toEqual(["先复核，再调整"]);
@@ -101,7 +101,7 @@ describe("ensureAnalysisResult", () => {
         cautions: ["注意出血风险"],
         evidence: ["基于临床经验"],
       },
-      ["方药"],
+      "方药",
     );
 
     expect(result).not.toBeNull();
@@ -126,7 +126,7 @@ describe("ensureAnalysisResult", () => {
         随访监测: [],
         证据状态: ["经验性复核"],
       },
-      ["针灸"],
+      "针灸",
     );
 
     expect(result).not.toBeNull();

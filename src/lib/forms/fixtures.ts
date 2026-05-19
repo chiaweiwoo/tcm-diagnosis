@@ -8,7 +8,7 @@ export const VALID_FIXTURES: StructuredCaseForm[] = [
   // 001 — PCOS / 妇科调周期 / 方药
   {
     consultationName: "PCOS调周期",
-    prescriptionType: ["方药"],
+    prescriptionType: "方药",
     patientAge: "33",
     patientSex: "女",
     chiefComplaint: "停经，月经不调，PCOS",
@@ -25,7 +25,7 @@ export const VALID_FIXTURES: StructuredCaseForm[] = [
   // 002 — 弹响指 / 针灸
   {
     consultationName: "弹响指针灸",
-    prescriptionType: ["针灸"],
+    prescriptionType: "针灸",
     patientAge: "54",
     patientSex: "女",
     chiefComplaint: "右侧拇指弹响指，无法弯曲",
@@ -41,7 +41,7 @@ export const VALID_FIXTURES: StructuredCaseForm[] = [
   // 003 — 阳痿 / 肝郁肾虚 / 方药
   {
     consultationName: "阳痿肝郁肾虚",
-    prescriptionType: ["方药"],
+    prescriptionType: "方药",
     patientAge: "65",
     patientSex: "男",
     chiefComplaint: "阳痿，偶尔无法完成射精",
@@ -56,7 +56,7 @@ export const VALID_FIXTURES: StructuredCaseForm[] = [
   // 004 — 眩晕 / 肝阴虚 / 针灸
   {
     consultationName: "眩晕肝阴虚针灸",
-    prescriptionType: ["针灸"],
+    prescriptionType: "针灸",
     patientAge: "52",
     patientSex: "女",
     chiefComplaint: "眩晕，自觉不平衡，左眼内有压力感",
@@ -72,7 +72,7 @@ export const VALID_FIXTURES: StructuredCaseForm[] = [
   // 005 — 肩痛腰痛 / 肌肉劳损 / 综合调理
   {
     consultationName: "肩腰劳损推拿",
-    prescriptionType: ["综合调理"],
+    prescriptionType: "综合调理",
     patientAge: "25",
     patientSex: "女",
     chiefComplaint: "右肩疼痛，左腰部僵硬不适",
@@ -88,7 +88,7 @@ export const VALID_FIXTURES: StructuredCaseForm[] = [
   // 006 — 腹胀便溏 / 脾虚湿盛 / 方药
   {
     consultationName: "腹胀脾虚湿盛",
-    prescriptionType: ["方药"],
+    prescriptionType: "方药",
     patientAge: "28",
     patientSex: "女",
     chiefComplaint: "腹胀，大便溏",
@@ -104,7 +104,7 @@ export const VALID_FIXTURES: StructuredCaseForm[] = [
   // 007 — 梨状肌综合征 / 综合调理
   {
     consultationName: "梨状肌综合征",
-    prescriptionType: ["综合调理"],
+    prescriptionType: "综合调理",
     patientAge: "36",
     patientSex: "女",
     chiefComplaint: "左腰臀部疼痛酸楚，往左下肢外侧放射性麻痹",
@@ -120,7 +120,7 @@ export const VALID_FIXTURES: StructuredCaseForm[] = [
   // 008 — 中焦湿热 / GI / 方药
   {
     consultationName: "中焦湿热GI",
-    prescriptionType: ["方药"],
+    prescriptionType: "方药",
     patientAge: "56",
     patientSex: "女",
     chiefComplaint: "腹胀，偶尔胃酸倒流，大便不净感",
@@ -136,7 +136,7 @@ export const VALID_FIXTURES: StructuredCaseForm[] = [
   // 009 — 不寐 / 心脾两虚 / 方药
   {
     consultationName: "不寐心脾两虚",
-    prescriptionType: ["方药"],
+    prescriptionType: "方药",
     patientAge: "45",
     patientSex: "女",
     chiefComplaint: "入睡困难，多梦，醒后难以复睡",
@@ -153,7 +153,7 @@ export const VALID_FIXTURES: StructuredCaseForm[] = [
   // 010 — 颈椎病 / 气滞血瘀 / 综合调理
   {
     consultationName: "颈椎病综合调理",
-    prescriptionType: ["针灸", "综合调理"],
+    prescriptionType: "综合调理",
     patientAge: "40",
     patientSex: "男",
     chiefComplaint: "颈肩酸痛，伴右上肢放射性麻木",
@@ -171,7 +171,7 @@ export const VALID_FIXTURES: StructuredCaseForm[] = [
 /** Minimal valid fixture for quick single-case tests */
 export const MINIMAL_VALID: StructuredCaseForm = {
   consultationName: "",
-  prescriptionType: ["方药"],
+  prescriptionType: "方药",
   patientAge: "30",
   patientSex: "女",
   chiefComplaint: "头痛，眩晕",

@@ -66,7 +66,7 @@ const REQUIRED_FIELDS: (keyof StructuredCaseForm)[] = [
 
 const EMPTY_FORM: StructuredCaseForm = {
   consultationName: "",
-  prescriptionType: ["方药"],
+  prescriptionType: "方药",
   patientAge: "",
   patientSex: "女",
   chiefComplaint: "",
@@ -544,7 +544,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
       }
       const analysis = ensureAnalysisResult(
         record.analysis_result,
-        normalizePrescriptionType((record.form_data as StructuredCaseForm | null)?.prescriptionType),
+        normalizePrescriptionType((record.form_data as StructuredCaseForm | null | undefined)?.prescriptionType),
       );
       setResult(analysis);
       setMeta(record.model_meta ?? null);
@@ -796,25 +796,16 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
               <div className="form-group">
                 <label className="form-label form-label--required">处方类型 Prescription Type</label>
                 <div className="segmented-control">
-                  {PRESCRIPTION_TYPES.map((pt) => {
-                    const selected = form.prescriptionType.includes(pt);
-                    return (
-                      <button
-                        key={pt}
-                        className={`segmented-btn ${selected ? "segmented-btn--active" : ""}`}
-                        onClick={() => {
-                          const current = form.prescriptionType;
-                          const next = selected
-                            ? current.filter((t) => t !== pt)
-                            : [...current, pt];
-                          setField("prescriptionType", next.length ? next : [pt]);
-                        }}
-                        type="button"
-                      >
-                        {pt}
-                      </button>
-                    );
-                  })}
+                  {PRESCRIPTION_TYPES.map((pt) => (
+                    <button
+                      key={pt}
+                      className={`segmented-btn ${form.prescriptionType === pt ? "segmented-btn--active" : ""}`}
+                      onClick={() => setField("prescriptionType", pt)}
+                      type="button"
+                    >
+                      {pt}
+                    </button>
+                  ))}
                 </div>
                 <FieldError message={touched.has("prescriptionType") ? displayErrors.prescriptionType as string | undefined : undefined} />
               </div>
@@ -914,9 +905,9 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
               <textarea
                 className={`form-textarea form-textarea--tall ${touched.has("prescription") ? (displayErrors.prescription ? "form-input--error" : "form-input--valid") : ""}`}
                 placeholder={
-                  form.prescriptionType.includes("针灸") && !form.prescriptionType.includes("方药")
+                  form.prescriptionType === "针灸"
                     ? "例：百会、太冲、风池，平补平泻，留针20分钟"
-                    : form.prescriptionType.includes("综合调理") && !form.prescriptionType.includes("方药")
+                    : form.prescriptionType === "综合调理"
                     ? "例：穴位 + 方药 + 生活调摄建议"
                     : "例：天麻钩藤饮加减，天麻10g 钩藤15g…"
                 }

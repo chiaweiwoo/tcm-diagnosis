@@ -38,9 +38,7 @@ export const structuredCaseSchema = z
       .optional()
       .default(""),
 
-    prescriptionType: z
-      .array(z.enum(PRESCRIPTION_TYPES))
-      .min(1, MSG.REQUIRED),
+    prescriptionType: z.enum(PRESCRIPTION_TYPES, { error: MSG.REQUIRED }),
 
     patientAge: z
       .string()
