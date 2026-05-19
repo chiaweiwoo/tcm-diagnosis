@@ -381,10 +381,20 @@ Migrations: `supabase/migrations/` (numbered SQL). **Committing a migration file
 
 ## Langfuse Integration
 
-SDK v3 API. Per analyze call, Langfuse receives:
-- `usageDetails`: `{ input, output, total, cacheHit, cacheMiss }` (token counts from API response)
-- `metadata`: model, latency, prompt version, prescriptionType label, repairedJson flag
-- Cost is computed by Langfuse's own model registry from token counts — no local `costDetails` sent.
+SDK v3 API. Per analyze call, `trace.generation()` receives three distinct usage fields:
+
+- **`usage`** — standard Langfuse field: `{ input, output, total, unit: "TOKENS" }`. This is the field Langfuse reads for model registry lookups and display.
+- **`usageDetails`** — cache breakdown for visibility: `{ cacheHit, cacheMiss }` (prompt_cache_hit/miss_tokens from DeepSeek).
+- **`costDetails`** — explicit USD cost: `{ input: inputCostUsd, output: outputCostUsd, total: totalCostUsd }`. Computed locally because DeepSeek is not in Langfuse's model registry.
+- **`metadata`** — model, latency, prompt version, prescriptionType label, repairedJson flag.
+
+Cost formula (DeepSeek cache-aware pricing):
+```
+inputCost  = (cacheHit × HIT_PER_M + cacheMiss × MISS_PER_M) / 1_000_000
+outputCost = (outputTokens × OUT_PER_M) / 1_000_000
+```
+Defaults: `HIT_PER_M=0.07`, `MISS_PER_M=0.27`, `OUT_PER_M=1.10` (USD per 1M tokens).
+Override via env vars: `DEEPSEEK_PRICE_INPUT_HIT`, `DEEPSEEK_PRICE_INPUT_MISS`, `DEEPSEEK_PRICE_OUTPUT`.
 
 **No clinical text ever reaches Langfuse.** Token usage and cost are monitored at `jp.cloud.langfuse.com`.
 
@@ -396,7 +406,7 @@ Env var: `LANGFUSE_BASE_URL` — defaults to `https://jp.cloud.langfuse.com` if 
 
 - Analyze: `DEEPSEEK_MODEL_FAST` (flash). No other model exposed to doctors.
 - Evaluation (Goal 1+2): `DEEPSEEK_MODEL_FAST`. Escalate to `deepseek-reasoner` only if quality fails.
-- Cost is tracked exclusively in Langfuse via its model registry.
+- Cost is tracked in Langfuse via explicit `costDetails` (not the model registry — DeepSeek is not registered there).
 - `model_meta` stored in `consultations` has shape `{ model, promptVersion, durationSeconds, repairedJson }`. Token counts and cost live in Langfuse only.
 - Token usage and cost are internal only — never shown to doctors.
 
@@ -450,6 +460,12 @@ Expected — repair is built in. Check `repairedJson: true` in logs. If repair t
 
 **Admin pages can't see brand CSS variables**
 Brand tokens (`--brand`, etc.) must be defined in `globals.css`, not only in `workbench.css`. `workbench.css` only loads on `/` route.
+
+**Langfuse shows $0 cost / missing token counts**
+Two independent failure modes — both must be correct:
+1. **Wrong field for tokens**: Langfuse reads the standard `usage` field (`{ input, output, total, unit: "TOKENS" }`) for display and registry lookups. Putting token counts only in `usageDetails` (a freeform custom field) means they never reach the cost engine.
+2. **Model not in registry**: DeepSeek models are not in Langfuse's built-in model registry. Even with correct token counts in `usage`, Langfuse cannot compute cost without a registry entry. Fix: pass `costDetails: { input, output, total }` with USD amounts computed locally. Use `usageDetails` for additional breakdown (e.g. cache hit/miss) — it is display-only.
+- Always send all three: `usage` (standard tokens), `usageDetails` (extras), `costDetails` (explicit USD).
 
 ---
 
