@@ -52,21 +52,49 @@ export async function POST(request: NextRequest) {
     const latencyMs = Date.now() - startedAt;
 
     after(async () => {
-      // Langfuse: tokens only. Cost computed by Langfuse model registry.
+      // Langfuse: tokens + computed cost only.
       // NO clinical text — form fields and AI output stay in Supabase exclusively.
       if (langfuse && trace) {
+        const u = result.usage;
+        const inputTokens  = u?.prompt_tokens             ?? 0;
+        const outputTokens = u?.completion_tokens         ?? 0;
+        const totalTokens  = u?.total_tokens              ?? 0;
+        const cacheHit     = u?.prompt_cache_hit_tokens   ?? 0;
+        const cacheMiss    = u?.prompt_cache_miss_tokens  ?? 0;
+
+        // DeepSeek Chat (V3 / Flash) pricing in USD per 1M tokens.
+        // Override via env vars if the model changes.
+        const HIT_PER_M  = parseFloat(process.env.DEEPSEEK_PRICE_INPUT_HIT  ?? "0.07");
+        const MISS_PER_M = parseFloat(process.env.DEEPSEEK_PRICE_INPUT_MISS ?? "0.27");
+        const OUT_PER_M  = parseFloat(process.env.DEEPSEEK_PRICE_OUTPUT     ?? "1.10");
+
+        const inputCostUsd  = (cacheHit * HIT_PER_M + cacheMiss * MISS_PER_M) / 1_000_000;
+        const outputCostUsd = (outputTokens * OUT_PER_M) / 1_000_000;
+        const totalCostUsd  = inputCostUsd + outputCostUsd;
+
         trace.generation({
           name: "deepseek-analyze",
           model: result.model,
           startTime: new Date(deepseekStartedAt),
           endTime: new Date(),
-          // usageDetails is the v3 API (usage is deprecated)
+          // usage — standard field Langfuse uses for model registry lookup
+          usage: {
+            input:  inputTokens,
+            output: outputTokens,
+            total:  totalTokens,
+            unit:   "TOKENS",
+          },
+          // usageDetails — cache breakdown for visibility in the UI
           usageDetails: {
-            input:    result.usage?.prompt_tokens             ?? 0,
-            output:   result.usage?.completion_tokens         ?? 0,
-            total:    result.usage?.total_tokens              ?? 0,
-            cacheHit: result.usage?.prompt_cache_hit_tokens   ?? 0,
-            cacheMiss:result.usage?.prompt_cache_miss_tokens  ?? 0,
+            cacheHit,
+            cacheMiss,
+          },
+          // costDetails — explicit USD cost so Langfuse shows it even without
+          // DeepSeek in its model registry
+          costDetails: {
+            input:  inputCostUsd,
+            output: outputCostUsd,
+            total:  totalCostUsd,
           },
           metadata: {
             prescriptionType: form.prescriptionType,
