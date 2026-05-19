@@ -602,7 +602,16 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
     try {
       const record = await apiGetConsultation(id);
       if (record.form_data) {
-        const parsed = structuredCaseSchema.safeParse(record.form_data);
+        // Backward compat: records saved before the prescriptionType array→string
+        // migration store the value as e.g. ["方药"]. Normalize before parsing.
+        const raw = record.form_data as Record<string, unknown>;
+        const coerced = {
+          ...raw,
+          prescriptionType: Array.isArray(raw.prescriptionType)
+            ? (raw.prescriptionType[0] ?? "方药")
+            : raw.prescriptionType,
+        };
+        const parsed = structuredCaseSchema.safeParse(coerced);
         if (parsed.success) {
           setForm(parsed.data);
           setTouched(new Set(REQUIRED_FIELDS));
