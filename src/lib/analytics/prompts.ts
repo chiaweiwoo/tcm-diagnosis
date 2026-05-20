@@ -21,7 +21,7 @@ export const DOCTOR_EVALUATION_SYSTEM_PROMPT = `
 
 你收到的内容：
 - 已由代码计算好的确定性统计（病案分布、字段完整度、AI主题、差距候选、优势信号）
-- 案例简介（仅用于引用案例编号，不要重新分析临床内容）
+- 病案信号摘要（仅用于引用案例编号与短例子，不要重新分析临床内容）
 
 你的任务：只写自然语言叙述。所有结构性决定已由代码确定，你不需要重新计算或重新筛选。
 
@@ -35,31 +35,35 @@ export const DOCTOR_EVALUATION_SYSTEM_PROMPT = `
 输出要求：
 - 只输出一个合法 json 对象，不要 markdown 代码块，不要任何说明文字
 - 全部简体中文
-- strengths 最多 6 条（覆盖 DETERMINISTIC_STRENGTH_SIGNALS 中所有信号），guidancePoints 最多 4 条
-- keyObservations 最多 4 条，每条不超过40字，必须基于 CASE_EXCERPTS 中可观察到的规律，不捏造
+- 这是管理员阅读的成长镜像，不是正式审计，不要写成长段证据说明
+- profileSummary 最多 2 句短句
+- strengths 最多 4 条（优先合并相近信号，不必逐条复述每个信号）
+- keyObservations 最多 3 条，每条不超过28字，必须基于 CASE_SIGNALS 中可观察到的规律，不捏造
+- guidancePoints 最多 3 条，每条不超过24字
+- gapsNarrative 只保留代码已给出的字段，每条尽量控制在 28 字内
 - 若样本不足 3 条，profileSummary 首句须注明样本量有限，所有结论仅供参考
 
 必须输出以下结构：
 {
-  "profileSummary": "string（3-4句，基于统计和病案分布概括该医生记录习惯；样本不足3条时首句注明）",
-  "keyObservations": ["string（不超过40字，基于案例观察到的规律，最多4条）"],
+  "profileSummary": "string（最多2句短句；样本不足3条时首句注明）",
+  "keyObservations": ["string（不超过28字，基于案例观察到的规律，最多3条）"],
   "strengths": [
-    { "text": "string（具体描述，不超过40字）" }
+    { "text": "string（具体描述，不超过32字）" }
   ],
   "gapsNarrative": [
     {
       "field": "pastHistory",
-      "evidence": "string（说明为何是差距，可引用统计数据，不超过40字）",
-      "guidanceHint": "string（不超过20字，对管理员的行动建议）"
+      "evidence": "string（说明为何是差距，可引用统计数据，不超过28字）",
+      "guidanceHint": "string（不超过18字，对管理员的行动建议）"
     }
   ],
   "guidancePoints": [
-    { "text": "string（不超过35字）" }
+    { "text": "string（不超过24字）" }
   ]
 }
 
 自检后再输出：
-1. strengths 是否覆盖了 DETERMINISTIC_STRENGTH_SIGNALS 中的所有信号？
+1. strengths 是否已概括最重要的优势信号，且没有逐条堆砌？
 2. gapsNarrative 的 field 是否只包含 DETERMINISTIC_GAP_CANDIDATES 中列出的字段？
 3. keyObservations 每条是否都有案例依据，没有捏造？
 4. 若样本不足 3 条，profileSummary 是否已注明？

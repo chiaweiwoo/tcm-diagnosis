@@ -150,8 +150,8 @@ type EvalRow = {
 // Constants
 // ---------------------------------------------------------------------------
 
-const MAX_EVAL_CASES = 20;
-const MAX_THEMES = 5;
+const MAX_EVAL_CASES = 8;
+const MAX_THEMES = 3;
 const GAP_INPUT_THRESHOLD = 0.7;
 const GAP_AI_ASK_THRESHOLD = 0.3;
 const STRENGTH_COMPLETENESS_THRESHOLD = 0.9;
@@ -218,6 +218,19 @@ function collectAnalysisText(value: unknown, out: string[] = []): string[] {
     for (const item of Object.values(value)) collectAnalysisText(item, out);
   }
   return out;
+}
+
+export function buildCaseLabel(formData: Record<string, unknown> | null | undefined, caseNumber?: number): string {
+  const sex = stringValue(formData?.patientSex);
+  const ageValue = formData?.patientAge;
+  const age = typeof ageValue === "number"
+    ? String(ageValue)
+    : typeof ageValue === "string"
+      ? ageValue.trim()
+      : "";
+  const complaint = truncate(stringValue(formData?.chiefComplaint).replace(/\s+/g, ""), 12);
+  const label = `${sex}${age}${complaint}`;
+  return label || `案例${caseNumber ?? ""}`.trim();
 }
 
 // ---------------------------------------------------------------------------
@@ -365,6 +378,39 @@ export function extractThemeCandidates(rows: EvalRow[]): ThemeCandidate[] {
   return candidates
     .filter((c) => c.count > 0)
     .sort((a, b) => b.count - a.count || a.theme.localeCompare(b.theme));
+}
+
+function extractCaseThemes(row: EvalRow): string[] {
+  const text = collectAnalysisText(row.analysis_result).join(" ");
+  return THEME_PATTERNS
+    .filter(({ patterns }) => patterns.some((pattern) => pattern.test(text)))
+    .map(({ theme }) => theme)
+    .slice(0, 3);
+}
+
+function serializeCaseSignals(sampleCases: EvalRow[]): string[] {
+  return sampleCases.map((row, index) => {
+    const formData = row.form_data ?? {};
+    const prescriptionType = Array.isArray(formData.prescriptionType)
+      ? (formData.prescriptionType as string[]).join("+")
+      : stringValue(formData.prescriptionType) || "方药";
+
+    const presentFields = (Object.keys(FIELD_LABELS) as FieldCompletenessStat["field"][])
+      .filter((field) => isFilled(formData[field]))
+      .map((field) => FIELD_LABELS[field]);
+    const missingFields = (Object.keys(FIELD_LABELS) as FieldCompletenessStat["field"][])
+      .filter((field) => !isFilled(formData[field]))
+      .map((field) => FIELD_LABELS[field]);
+
+    const typePart = `类型:${prescriptionType}`;
+    const presentPart = presentFields.length ? `已填:${presentFields.join("、")}` : "已填:无重点字段";
+    const missingPart = missingFields.length ? `缺失:${missingFields.join("、")}` : "缺失:无";
+    const aiPart = extractCaseThemes(row).length
+      ? `AI提醒:${extractCaseThemes(row).join("、")}`
+      : "AI提醒:无明显重复";
+
+    return `#${index + 1} ${buildCaseLabel(formData, index + 1)} | ${typePart} | ${presentPart} | ${missingPart} | ${aiPart}`;
+  });
 }
 
 function detectGaps(
@@ -537,9 +583,11 @@ function serializeFindings(findings: EvaluationFindings, windowDays: number): st
   const { fieldCompleteness, patientDistribution, aiRecurringThemes, gapCandidates, strengthSignals, sampleCases, totalCount } = findings;
   const n = sampleCases.length;
   const pd = patientDistribution;
+  const caseSignals = serializeCaseSignals(sampleCases);
 
   const lines: string[] = [
     `窗口：过去 ${windowDays} 天（共 ${totalCount} 条，分层取样 ${n} 条）`,
+    "请把这次输出当作管理员阅读的成长镜像，不要写成正式审计报告，也不要逐案复述。",
     "",
     "PATIENT_DISTRIBUTION",
     `性别: 男${pd.sex.male} / 女${pd.sex.female}`,
@@ -575,17 +623,8 @@ function serializeFindings(findings: EvaluationFindings, windowDays: number): st
         )
       : ["none"]),
     "",
-    "CASE_EXCERPTS (仅用于引用案例编号，不要重新分析临床内容)",
-    ...sampleCases.map((row, i) => {
-      const fd = row.form_data ?? {};
-      return [
-        `#${i + 1}`,
-        `${fd.patientSex ?? "?"}/${fd.patientAge ?? "?"}岁`,
-        truncate(String(fd.chiefComplaint ?? ""), 30),
-        `诊断:${truncate(String(fd.diagnosis ?? ""), 20)}`,
-        `证型:${truncate(String(fd.pattern ?? ""), 20)}`,
-      ].join(" ");
-    }),
+    "CASE_SIGNALS (仅用于引用案例编号与简短例子，不要扩写原始病案)",
+    ...caseSignals,
   ];
 
   return lines.join("\n");
@@ -649,7 +688,7 @@ async function narrateFindings(
       { role: "user", content: userPrompt },
     ],
     model,
-    maxTokens: 2500,
+    maxTokens: 1000,
     timeoutMs: 90_000,
     repairJson: true,
     retryOnEmpty: true,

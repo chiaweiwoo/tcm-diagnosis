@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildCaseLabel,
   computeFieldCompleteness,
   extractThemeCandidates,
   normalizeDoctorProfile,
@@ -70,6 +71,15 @@ describe("Goal 2 deterministic evaluation helpers", () => {
       rate: 0.5,
       caseNumbers: [1],
     });
+  });
+
+  it("builds short browse-style case labels for signal summaries", () => {
+    expect(buildCaseLabel({
+      patientSex: "女",
+      patientAge: 52,
+      chiefComplaint: "眩晕日久，伴颈肩僵硬",
+    }, 1)).toBe("女52眩晕日久，伴颈肩僵硬");
+    expect(buildCaseLabel({}, 3)).toBe("案例3");
   });
 
   it("normalizes old profile rows into the v1.1 display shape", () => {
