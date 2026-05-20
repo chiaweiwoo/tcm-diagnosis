@@ -13,6 +13,10 @@ function normalizeName(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
+function normalizeCaseId(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
 function isUnauthorized(error: unknown) {
   return error instanceof Error && error.message === "Unauthorized";
 }
@@ -58,6 +62,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     const body = (await request.json()) as {
       consultationName?: unknown;
+      caseId?: unknown;
       aiFeedback?: unknown;
       formData?: unknown;
       analysisResult?: unknown;
@@ -66,6 +71,9 @@ export async function PATCH(request: Request, context: RouteContext) {
       analysisStatus?: unknown;
     };
 
+    const caseIdValue = Object.hasOwn(body, "caseId")
+      ? normalizeCaseId(body.caseId)
+      : undefined;
     const feedbackValue = Object.hasOwn(body, "aiFeedback")
       ? (typeof body.aiFeedback === "string" ? body.aiFeedback.trim() : "")
       : undefined;
@@ -78,7 +86,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       Object.hasOwn(body, "analysisStatus");
 
     if (existing.analysis_status === "analyzed" && wantsLockedFieldChange) {
-      return apiError(409, "READ_ONLY_RECORD", "已分析病案不可修改原始内容，仅可更新给AI回馈。");
+      return apiError(409, "READ_ONLY_RECORD", "已分析病案不可修改原始内容，仅可更新病案编号与给AI回馈。");
     }
 
     // Detect whether form data changed to reset analysis state
@@ -94,6 +102,12 @@ export async function PATCH(request: Request, context: RouteContext) {
         consultation_name: Object.hasOwn(body, "consultationName")
           ? normalizeName(body.consultationName)
           : existing.consultation_name,
+        ...(caseIdValue !== undefined
+          ? {
+              case_id: caseIdValue,
+              case_id_updated_at: new Date().toISOString(),
+            }
+          : {}),
         ...(feedbackValue !== undefined
           ? {
               ai_feedback: feedbackValue || null,

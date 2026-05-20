@@ -80,10 +80,11 @@ beforeEach(() => {
         });
       }
       if (String(url).includes("/api/consultations/") && !String(url).endsWith("/consultations/")) {
-        return makeOkJson({ record: { id: "abc", form_data: null, analysis_result: null, model_meta: null, analysis_status: "draft", created_at: new Date().toISOString(), updated_at: new Date().toISOString(), analyzed_at: null, consultation_name: null, ai_feedback: null, ai_feedback_updated_at: null } });
+        return makeOkJson({ record: { id: "abc", form_data: null, analysis_result: null, model_meta: null, analysis_status: "draft", created_at: new Date().toISOString(), updated_at: new Date().toISOString(), analyzed_at: null, consultation_name: null, case_id: null, case_id_updated_at: null, ai_feedback: null, ai_feedback_updated_at: null } });
       }
       if (url === "/api/consultations" || String(url).startsWith("/api/consultations")) {
-        return makeOkJson({ record: { id: "new-123", form_data: null, analysis_result: null, model_meta: null, analysis_status: "analyzed", created_at: new Date().toISOString(), updated_at: new Date().toISOString(), analyzed_at: new Date().toISOString(), consultation_name: null, ai_feedback: null, ai_feedback_updated_at: null } });
+        const body = init?.body ? JSON.parse(String(init.body)) as { caseId?: string | null; aiFeedback?: string | null } : {};
+        return makeOkJson({ record: { id: "new-123", form_data: null, analysis_result: null, model_meta: null, analysis_status: "analyzed", created_at: new Date().toISOString(), updated_at: new Date().toISOString(), analyzed_at: new Date().toISOString(), consultation_name: null, case_id: body.caseId ?? null, case_id_updated_at: body.caseId ? new Date().toISOString() : null, ai_feedback: body.aiFeedback ?? null, ai_feedback_updated_at: body.aiFeedback ? new Date().toISOString() : null } });
       }
       return makeErrJson(404, "not found");
     }),
@@ -305,7 +306,7 @@ describe("Analyze flow", () => {
     expect(screen.getByText("注意肝功能")).toBeInTheDocument();
   });
 
-  it("shows feedback section after analyze and submits feedback", async () => {
+  it("shows feedback section after analyze and saves case id + feedback through header save", async () => {
     const user = userEvent.setup();
     render(<Workbench />);
     await waitFor(() => screen.getByText("开始分析"));
@@ -314,9 +315,13 @@ describe("Analyze flow", () => {
     await user.click(screen.getByText("开始分析"));
 
     await waitFor(() => screen.getByText("给AI回馈 Feedback to AI"));
+    expect(screen.queryByText("提交回馈")).not.toBeInTheDocument();
+
+    const caseIdInput = screen.getByPlaceholderText("例：0004222");
+    await user.type(caseIdInput, "0004222");
     const textarea = screen.getByPlaceholderText(/整体方向有帮助/);
     await user.type(textarea, "建议保留风险提示，但可以更具体。");
-    await user.click(screen.getByText("提交回馈"));
+    await user.click(screen.getByTitle("保存"));
 
     const fetchMock = vi.mocked(global.fetch);
     await waitFor(() => {
@@ -325,7 +330,39 @@ describe("Analyze flow", () => {
       );
       expect(feedbackCall).toBeDefined();
       expect(String(feedbackCall?.[1]?.body)).toContain("aiFeedback");
+      expect(String(feedbackCall?.[1]?.body)).toContain("caseId");
     });
+  });
+
+  it("keeps analyzed form fields read-only while Case ID remains editable", async () => {
+    const user = userEvent.setup();
+    render(<Workbench />);
+    await waitFor(() => screen.getByText("开始分析"));
+
+    await fillRequiredFields(user);
+    await user.click(screen.getByText("开始分析"));
+
+    await waitFor(() => screen.getByText("给AI回馈 Feedback to AI"));
+    expect(screen.getByPlaceholderText(/头痛眩晕反复发作/)).toBeDisabled();
+    expect(screen.getByPlaceholderText("例：0004222")).not.toBeDisabled();
+  });
+
+  it("asks before discarding unsaved post-analysis Case ID changes", async () => {
+    const user = userEvent.setup();
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+    render(<Workbench />);
+    await waitFor(() => screen.getByText("开始分析"));
+
+    await fillRequiredFields(user);
+    await user.click(screen.getByText("开始分析"));
+
+    await waitFor(() => screen.getByText("给AI回馈 Feedback to AI"));
+    await user.type(screen.getByPlaceholderText("例：0004222"), "0004222");
+    await user.click(screen.getByText("新建"));
+
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(screen.getByPlaceholderText("例：0004222")).toHaveValue("0004222");
+    confirmSpy.mockRestore();
   });
 
   it("shows error toast when analyze API fails", async () => {

@@ -38,6 +38,8 @@ type ApiMeta = {
 type ConsultationSummary = {
   id: string;
   consultation_name: string | null;
+  case_id: string | null;
+  case_id_updated_at: string | null;
   form_data: StructuredCaseForm | null;
   analysis_status: "draft" | "analyzed";
   created_at: string;
@@ -142,6 +144,7 @@ async function apiGetConsultation(id: string): Promise<ConsultationRecord> {
 
 async function apiSaveNew(payload: {
   consultationName: string;
+  caseId?: string | null;
   formData: StructuredCaseForm;
   analysisResult: AnalysisResult;
   analysisRaw: unknown;
@@ -152,6 +155,7 @@ async function apiSaveNew(payload: {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       consultationName: payload.consultationName || null,
+      caseId: payload.caseId ?? null,
       formData: payload.formData,
       analysisResult: payload.analysisResult,
       analysisRaw: payload.analysisRaw,
@@ -168,6 +172,7 @@ async function apiUpdateConsultation(
   id: string,
   payload: {
     consultationName?: string;
+    caseId?: string | null;
     aiFeedback?: string | null;
     formData?: StructuredCaseForm;
     analysisResult?: AnalysisResult;
@@ -181,6 +186,7 @@ async function apiUpdateConsultation(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       ...(payload.consultationName !== undefined ? { consultationName: payload.consultationName } : {}),
+      ...(payload.caseId !== undefined ? { caseId: payload.caseId } : {}),
       ...(payload.aiFeedback !== undefined ? { aiFeedback: payload.aiFeedback } : {}),
       ...(payload.formData !== undefined ? { formData: payload.formData } : {}),
       ...(payload.analysisResult !== undefined ? { analysisResult: payload.analysisResult } : {}),
@@ -322,6 +328,28 @@ function formatSavedTime(d: Date) {
   return `${period} ${h}:${m}`;
 }
 
+function normalizeCaseId(value: string) {
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function isNumericCaseId(value: string | null) {
+  return !!value && /^\d+$/.test(value);
+}
+
+function buildAdjacentCaseId(value: string, delta: -1 | 1) {
+  const numericValue = Number.parseInt(value, 10);
+  if (!Number.isFinite(numericValue)) return null;
+  const nextValue = numericValue + delta;
+  if (nextValue < 0) return null;
+  return String(nextValue).padStart(value.length, "0");
+}
+
+type RelatedTimeline = {
+  previous: ConsultationSummary[];
+  next: ConsultationSummary[];
+};
+
 // ---------------------------------------------------------------------------
 // Status bar
 // ---------------------------------------------------------------------------
@@ -396,14 +424,10 @@ const StatusBar = memo(function StatusBar({
 const FeedbackCard = memo(function FeedbackCard({
   value,
   onChange,
-  onSubmit,
-  saving,
   updatedAt,
 }: {
   value: string;
   onChange: (value: string) => void;
-  onSubmit: () => void;
-  saving: boolean;
   updatedAt: Date | null;
 }) {
   return (
@@ -429,19 +453,61 @@ const FeedbackCard = memo(function FeedbackCard({
           rows={4}
           maxLength={1000}
         />
-        <div className="feedback-card__actions">
-          <button
-            type="button"
-            className="btn btn--ghost btn--sm"
-            onClick={onSubmit}
-            disabled={saving}
-          >
-            {saving ? <LoaderCircle size={15} className="spin" /> : <MessageSquare size={15} />}
-            <span>{saving ? "提交中…" : "提交回馈"}</span>
-          </button>
-        </div>
       </div>
     </section>
+  );
+});
+
+const CaseLinkTimeline = memo(function CaseLinkTimeline({
+  currentCaseId,
+  related,
+  onSelect,
+}: {
+  currentCaseId: string;
+  related: RelatedTimeline;
+  onSelect: (id: string) => void;
+}) {
+  if (!related.previous.length && !related.next.length) return null;
+
+  return (
+    <div className="case-linkage">
+      <div className="case-linkage__line" aria-hidden />
+      {related.previous.map((record) => (
+        <button
+          key={`prev-${record.id}`}
+          type="button"
+          className="case-linkage__item"
+          onClick={() => onSelect(record.id)}
+        >
+          <span className="case-linkage__dot" aria-hidden />
+          <span className="case-linkage__item-main">
+            <span className="case-linkage__case-id">{record.case_id}</span>
+            <span className="case-linkage__name">{buildDisplayName(record)}</span>
+          </span>
+        </button>
+      ))}
+      <div className="case-linkage__item case-linkage__item--current">
+        <span className="case-linkage__dot case-linkage__dot--current" aria-hidden />
+        <span className="case-linkage__item-main">
+          <span className="case-linkage__case-id">{currentCaseId}</span>
+          <span className="case-linkage__name">当前病案</span>
+        </span>
+      </div>
+      {related.next.map((record) => (
+        <button
+          key={`next-${record.id}`}
+          type="button"
+          className="case-linkage__item"
+          onClick={() => onSelect(record.id)}
+        >
+          <span className="case-linkage__dot" aria-hidden />
+          <span className="case-linkage__item-main">
+            <span className="case-linkage__case-id">{record.case_id}</span>
+            <span className="case-linkage__name">{buildDisplayName(record)}</span>
+          </span>
+        </button>
+      ))}
+    </div>
   );
 });
 
@@ -601,13 +667,16 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [meta, setMeta] = useState<ApiMeta | null>(null);
   const [rawResult, setRawResult] = useState<unknown>(null);
+  const [caseId, setCaseId] = useState("");
+  const [caseIdUpdatedAt, setCaseIdUpdatedAt] = useState<Date | null>(null);
+  const [savedCaseId, setSavedCaseId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState("");
   const [feedbackUpdatedAt, setFeedbackUpdatedAt] = useState<Date | null>(null);
+  const [savedFeedback, setSavedFeedback] = useState("");
   const [recordLocked, setRecordLocked] = useState(false);
 
   const [analyzing, setAnalyzing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [feedbackSaving, setFeedbackSaving] = useState(false);
 
   const [consultations, setConsultations] = useState<ConsultationSummary[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -617,10 +686,46 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
   const [toast, setToast] = useState<ToastState | null>(null);
   const resultRef = useRef<HTMLDivElement>(null);
 
+  const normalizedCaseId = normalizeCaseId(caseId);
+  const caseIdDirty = normalizedCaseId !== savedCaseId;
+  const feedbackDirty = feedback !== savedFeedback;
+  const hasUnsavedChanges = saveStatus === "unsaved" || caseIdDirty || feedbackDirty;
+  const relatedTimeline = useMemo<RelatedTimeline | null>(() => {
+    if (!activeId || !normalizedCaseId || !isNumericCaseId(normalizedCaseId)) return null;
+    const previousId = buildAdjacentCaseId(normalizedCaseId, -1);
+    const nextId = buildAdjacentCaseId(normalizedCaseId, 1);
+    if (!previousId && !nextId) return null;
+
+    const previous = previousId
+      ? consultations.filter((item) => item.id !== activeId && normalizeCaseId(item.case_id ?? "") === previousId)
+      : [];
+    const next = nextId
+      ? consultations.filter((item) => item.id !== activeId && normalizeCaseId(item.case_id ?? "") === nextId)
+      : [];
+
+    if (!previous.length && !next.length) return null;
+    return { previous, next };
+  }, [activeId, consultations, normalizedCaseId]);
+
   const showToast = useCallback((message: string, tone: ToastState["tone"] = "info") => {
     setToast({ message, tone });
   }, []);
   const dismissToast = useCallback(() => setToast(null), []);
+
+  const confirmDiscardChanges = useCallback(() => {
+    if (!hasUnsavedChanges) return true;
+    return window.confirm("你有未保存的修改，离开后将丢失。是否继续？");
+  }, [hasUnsavedChanges]);
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [hasUnsavedChanges]);
 
   // Load consultation list on mount
   useEffect(() => {
@@ -646,14 +751,29 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
     setTouched((prev) => new Set([...prev, key]));
   }, []);
 
+  const handleCaseIdChange = useCallback((value: string) => {
+    setCaseId(value);
+    setSaveStatus((prev) => prev === "saving" ? prev : "unsaved");
+  }, []);
+
+  const handleFeedbackChange = useCallback((value: string) => {
+    setFeedback(value);
+    setSaveStatus((prev) => prev === "saving" ? prev : "unsaved");
+  }, []);
+
   function handleNew() {
+    if (!confirmDiscardChanges()) return;
     setForm(EMPTY_FORM);
     setTouched(new Set());
     setResult(null);
     setMeta(null);
     setRawResult(null);
+    setCaseId("");
+    setCaseIdUpdatedAt(null);
+    setSavedCaseId(null);
     setFeedback("");
     setFeedbackUpdatedAt(null);
+    setSavedFeedback("");
     setRecordLocked(false);
     setActiveId(null);
     setHistoryOpen(false);
@@ -663,6 +783,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
   }
 
   async function handleSelectHistory(id: string) {
+    if (id !== activeId && !confirmDiscardChanges()) return;
     try {
       const record = await apiGetConsultation(id);
       if (record.form_data) {
@@ -688,8 +809,12 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
       setResult(analysis);
       setMeta(record.model_meta ?? null);
       setRawResult(record.analysis_raw ?? null);
+      setCaseId(record.case_id ?? "");
+      setCaseIdUpdatedAt(record.case_id_updated_at ? new Date(record.case_id_updated_at) : null);
+      setSavedCaseId(normalizeCaseId(record.case_id ?? ""));
       setFeedback(record.ai_feedback ?? "");
       setFeedbackUpdatedAt(record.ai_feedback_updated_at ? new Date(record.ai_feedback_updated_at) : null);
+      setSavedFeedback(record.ai_feedback ?? "");
       setRecordLocked(record.analysis_status === "analyzed");
       setActiveId(id);
       setHistoryOpen(false);
@@ -703,6 +828,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
   }
 
   async function handleDeleteHistory(id: string) {
+    if (!confirmDiscardChanges()) return;
     try {
       await apiDeleteConsultation(id);
       setConsultations((prev) => prev.filter((c) => c.id !== id));
@@ -747,6 +873,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
         setSaveStatus("saving");
         if (activeId) {
           const updated = await apiUpdateConsultation(activeId, {
+            caseId: normalizedCaseId,
             formData: form,
             analysisResult: data.result,
             analysisRaw: data.raw,
@@ -754,11 +881,16 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
             analysisStatus: "analyzed",
           });
           setConsultations((prev) => prev.map((c) => (c.id === activeId ? { ...c, ...updated } : c)));
+          setCaseId(updated.case_id ?? "");
+          setCaseIdUpdatedAt(updated.case_id_updated_at ? new Date(updated.case_id_updated_at) : null);
+          setSavedCaseId(normalizeCaseId(updated.case_id ?? ""));
           setFeedback(updated.ai_feedback ?? "");
           setFeedbackUpdatedAt(updated.ai_feedback_updated_at ? new Date(updated.ai_feedback_updated_at) : null);
+          setSavedFeedback(updated.ai_feedback ?? "");
         } else {
           const saved = await apiSaveNew({
             consultationName: form.consultationName || "",
+            caseId: normalizedCaseId,
             formData: form,
             analysisResult: data.result,
             analysisRaw: data.raw,
@@ -766,6 +898,10 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
           });
           setActiveId(saved.id);
           setConsultations((prev) => [saved, ...prev]);
+          setCaseId(saved.case_id ?? "");
+          setCaseIdUpdatedAt(saved.case_id_updated_at ? new Date(saved.case_id_updated_at) : null);
+          setSavedCaseId(normalizeCaseId(saved.case_id ?? ""));
+          setSavedFeedback(saved.ai_feedback ?? "");
         }
         setSaveStatus("saved");
         setSavedAt(new Date());
@@ -788,9 +924,22 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
     setSaveStatus("saving");
     try {
       const saveMeta: ApiMeta = meta ?? {};
-      if (activeId) {
+      if (activeId && recordLocked) {
+        const updated = await apiUpdateConsultation(activeId, {
+          caseId: normalizedCaseId,
+          aiFeedback: feedback,
+        });
+        setConsultations((prev) => prev.map((c) => (c.id === activeId ? { ...c, ...updated } : c)));
+        setCaseId(updated.case_id ?? "");
+        setCaseIdUpdatedAt(updated.case_id_updated_at ? new Date(updated.case_id_updated_at) : null);
+        setSavedCaseId(normalizeCaseId(updated.case_id ?? ""));
+        setFeedback(updated.ai_feedback ?? "");
+        setFeedbackUpdatedAt(updated.ai_feedback_updated_at ? new Date(updated.ai_feedback_updated_at) : null);
+        setSavedFeedback(updated.ai_feedback ?? "");
+      } else if (activeId) {
         const updated = await apiUpdateConsultation(activeId, {
           consultationName: form.consultationName,
+          caseId: normalizedCaseId,
           formData: form,
           analysisResult: result,
           analysisRaw: rawResult,
@@ -798,11 +947,16 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
           analysisStatus: "analyzed",
         });
         setConsultations((prev) => prev.map((c) => (c.id === activeId ? { ...c, ...updated } : c)));
+        setCaseId(updated.case_id ?? "");
+        setCaseIdUpdatedAt(updated.case_id_updated_at ? new Date(updated.case_id_updated_at) : null);
+        setSavedCaseId(normalizeCaseId(updated.case_id ?? ""));
         setFeedback(updated.ai_feedback ?? "");
         setFeedbackUpdatedAt(updated.ai_feedback_updated_at ? new Date(updated.ai_feedback_updated_at) : null);
+        setSavedFeedback(updated.ai_feedback ?? "");
       } else {
         const saved = await apiSaveNew({
           consultationName: form.consultationName || "",
+          caseId: normalizedCaseId,
           formData: form,
           analysisResult: result,
           analysisRaw: rawResult,
@@ -810,6 +964,10 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
         });
         setActiveId(saved.id);
         setConsultations((prev) => [saved, ...prev]);
+        setCaseId(saved.case_id ?? "");
+        setCaseIdUpdatedAt(saved.case_id_updated_at ? new Date(saved.case_id_updated_at) : null);
+        setSavedCaseId(normalizeCaseId(saved.case_id ?? ""));
+        setSavedFeedback(saved.ai_feedback ?? "");
       }
       const now = new Date();
       setSaveStatus("saved");
@@ -821,22 +979,6 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
       showToast("保存失败，请稍后重试。", "error");
     } finally {
       setSaving(false);
-    }
-  }
-
-  async function handleSubmitFeedback() {
-    if (!activeId) return;
-    setFeedbackSaving(true);
-    try {
-      const updated = await apiUpdateConsultation(activeId, { aiFeedback: feedback });
-      setFeedback(updated.ai_feedback ?? "");
-      const updatedAt = updated.ai_feedback_updated_at ? new Date(updated.ai_feedback_updated_at) : new Date();
-      setFeedbackUpdatedAt(updatedAt);
-      showToast("已提交AI回馈。", "success");
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : "提交回馈失败，请稍后重试。", "error");
-    } finally {
-      setFeedbackSaving(false);
     }
   }
 
@@ -886,7 +1028,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
               <Plus size={15} />
               <span>新建</span>
             </button>
-            {result && !recordLocked && (
+            {result && (!recordLocked || hasUnsavedChanges) && (
               <button
                 className="btn btn--ghost btn--sm"
                 onClick={() => void handleSave()}
@@ -903,7 +1045,16 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
                 <span className="sr-only">后台管理</span>
               </a>
             )}
-            <a className="btn btn--ghost btn--sm" href="/auth/signout" title="退出">
+            <a
+              className="btn btn--ghost btn--sm"
+              href="/auth/signout"
+              title="退出"
+              onClick={(event) => {
+                if (!confirmDiscardChanges()) {
+                  event.preventDefault();
+                }
+              }}
+            >
               <LogOut size={15} />
               <span className="sr-only">退出</span>
             </a>
@@ -1112,6 +1263,34 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
               analyzing={analyzing}
               form={form}
             />
+
+            <div className="case-id-panel">
+              <div className="case-id-panel__header">
+                <div>
+                  <label className="form-label" htmlFor="case-id-input">病案编号 Case ID</label>
+                  <p className="case-id-panel__hint">用于和外部系统病案号对应，可选填写。</p>
+                </div>
+                {caseIdUpdatedAt ? (
+                  <span className="case-id-panel__meta">上次更新 {formatSavedTime(caseIdUpdatedAt)}</span>
+                ) : null}
+              </div>
+              <input
+                id="case-id-input"
+                className="form-input case-id-panel__input"
+                type="text"
+                placeholder="例：0004222"
+                value={caseId}
+                onChange={(event) => handleCaseIdChange(event.target.value)}
+                maxLength={64}
+              />
+              {relatedTimeline && normalizedCaseId ? (
+                <CaseLinkTimeline
+                  currentCaseId={normalizedCaseId}
+                  related={relatedTimeline}
+                  onSelect={(id) => void handleSelectHistory(id)}
+                />
+              ) : null}
+            </div>
           </div>
         </section>
 
@@ -1204,9 +1383,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
         {!analyzing && result && activeId && (
           <FeedbackCard
             value={feedback}
-            onChange={setFeedback}
-            onSubmit={() => void handleSubmitFeedback()}
-            saving={feedbackSaving}
+            onChange={handleFeedbackChange}
             updatedAt={feedbackUpdatedAt}
           />
         )}

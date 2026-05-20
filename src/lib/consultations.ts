@@ -5,6 +5,8 @@ export type ConsultationRecord = {
   doctor_id: string;
   doctor_email: string;
   consultation_name: string | null;
+  case_id: string | null;
+  case_id_updated_at: string | null;
   ai_feedback: string | null;
   ai_feedback_updated_at: string | null;
   form_data: unknown | null;
@@ -21,6 +23,8 @@ type ConsultationPatch = Partial<
   Pick<
     ConsultationRecord,
     | "consultation_name"
+    | "case_id"
+    | "case_id_updated_at"
     | "ai_feedback"
     | "ai_feedback_updated_at"
     | "form_data"
@@ -47,7 +51,7 @@ function dbError(error: { message?: string } | null) {
 }
 
 const LIST_COLUMNS =
-  "id,doctor_id,doctor_email,consultation_name,ai_feedback,ai_feedback_updated_at,form_data,analysis_status,created_at,updated_at,analyzed_at";
+  "id,doctor_id,doctor_email,consultation_name,case_id,case_id_updated_at,ai_feedback,ai_feedback_updated_at,form_data,analysis_status,created_at,updated_at,analyzed_at";
 
 export async function listConsultations(
   client: SupabaseClient,
@@ -86,6 +90,7 @@ export async function createConsultation(
     doctorId: string;
     doctorEmail: string;
     consultationName?: string | null;
+    caseId?: string | null;
     formData?: unknown;
   },
 ): Promise<ConsultationRecord> {
@@ -95,6 +100,8 @@ export async function createConsultation(
       doctor_id: input.doctorId,
       doctor_email: input.doctorEmail,
       consultation_name: input.consultationName ?? null,
+      case_id: input.caseId ?? null,
+      case_id_updated_at: input.caseId ? new Date().toISOString() : null,
       form_data: input.formData ?? null,
       analysis_status: "draft",
     })
