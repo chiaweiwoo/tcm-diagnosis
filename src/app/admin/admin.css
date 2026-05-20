@@ -2673,3 +2673,172 @@ details[open] .sample-details__toggle::before {
   flex: 1;
   text-align: center;
 }
+
+/* Updated doctor consultation list */
+.ctable-toolbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.ctable-search {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: min(100%, 360px);
+  flex: 1;
+}
+
+.ctable-search__label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.ctable-search__input {
+  width: 100%;
+  min-height: 40px;
+  padding: 10px 12px;
+  border: 1px solid var(--border, #EAE6E2);
+  border-radius: 10px;
+  background: var(--surface, #fff);
+  font-size: 14px;
+  color: var(--text, #1A1A1A);
+}
+
+.ctable-search__input:focus {
+  outline: none;
+  border-color: var(--border-focus, #9B2226);
+  box-shadow: 0 0 0 3px rgba(155, 34, 38, 0.08);
+}
+
+.ctable-toolbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.ctable-selection-note {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.ctable-copy-btn {
+  min-height: 40px;
+  padding-inline: 14px;
+}
+
+.ctable-feedback,
+.ctable-empty {
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.ctable-feedback--success {
+  background: #F0FDF4;
+  border: 1px solid #BBF7D0;
+  color: #15803D;
+}
+
+.ctable-feedback--error {
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+  color: #B91C1C;
+}
+
+.ctable-empty {
+  background: #FAFAF9;
+  border: 1px solid var(--border, #EAE6E2);
+  color: var(--muted);
+}
+
+.ctable-desktop {
+  display: block;
+}
+
+.ctable-mobile-list {
+  display: none;
+}
+
+.ctable-th--checkbox { width: 44px; padding-left: 14px; }
+.ctable-th--name  { width: 56%; }
+.ctable-th--type  { width: 16%; }
+.ctable-th--date  { width: 28%; }
+
+.ctable-row.is-selected {
+  background: #FDF6F5;
+}
+
+.ctable-td--checkbox {
+  width: 44px;
+  padding-left: 14px;
+  overflow: visible;
+  max-width: none;
+}
+
+.ctable-mobile-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border, #EAE6E2);
+  border-radius: 12px;
+  background: #FFFEFC;
+}
+
+.ctable-mobile-card.is-selected {
+  border-color: #E6B8AE;
+  background: #FDF6F5;
+}
+
+.ctable-mobile-card__top {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.ctable-mobile-card__name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text, #1A1A1A);
+  line-height: 1.45;
+}
+
+.ctable-mobile-card__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-left: 28px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+@media (max-width: 768px) {
+  .ctable-wrap {
+    overflow-x: visible;
+  }
+
+  .ctable-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ctable-toolbar__actions {
+    justify-content: space-between;
+  }
+
+  .ctable-desktop {
+    display: none;
+  }
+
+  .ctable-mobile-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+}

@@ -3,14 +3,14 @@
 import { useRouter, useSearchParams } from "next/navigation";
 
 const TABS = [
-  { key: "records", label: "病案列表" },
   { key: "profile", label: "临床画像" },
+  { key: "records", label: "病例列表" },
 ] as const;
 
 export function DoctorTabs({ doctorId }: { doctorId: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const activeTab = searchParams.get("tab") ?? "records";
+  const activeTab = searchParams.get("tab") ?? "profile";
 
   function goTab(key: string) {
     router.push(`/admin/users/${doctorId}?tab=${key}`);

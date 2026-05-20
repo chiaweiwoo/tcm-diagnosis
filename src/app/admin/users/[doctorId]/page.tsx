@@ -16,7 +16,6 @@ type ConsultationRow = {
   doctor_email: string;
   consultation_name: string | null;
   form_data: StructuredCaseForm | null;
-  analysis_status: "draft" | "analyzed";
   updated_at: string;
 };
 
@@ -63,7 +62,7 @@ function formatSGT(iso: string) {
 
 export default async function DoctorPage({ params, searchParams }: RouteContext) {
   const { doctorId } = await params;
-  const { tab = "records" } = await searchParams;
+  const { tab = "profile" } = await searchParams;
   const { email, records } = await loadData(doctorId);
 
   return (
@@ -88,7 +87,7 @@ export default async function DoctorPage({ params, searchParams }: RouteContext)
         <DoctorTabs doctorId={doctorId} />
       </Suspense>
 
-      {/* Tab: 病案列表 */}
+      {/* Tab: 病例列表 */}
       {tab === "records" && (
         <>
           {records.length === 0 ? (
@@ -105,7 +104,6 @@ export default async function DoctorPage({ params, searchParams }: RouteContext)
                       ? rec.form_data.prescriptionType.join("、")
                       : rec.form_data.prescriptionType)
                   : "—",
-                analysis_status: rec.analysis_status,
                 date: formatSGT(rec.updated_at),
               }))}
             />
