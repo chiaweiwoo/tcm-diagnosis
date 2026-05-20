@@ -58,12 +58,28 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     const body = (await request.json()) as {
       consultationName?: unknown;
+      aiFeedback?: unknown;
       formData?: unknown;
       analysisResult?: unknown;
       analysisRaw?: unknown;
       modelMeta?: unknown;
       analysisStatus?: unknown;
     };
+
+    const feedbackValue = Object.hasOwn(body, "aiFeedback")
+      ? (typeof body.aiFeedback === "string" ? body.aiFeedback.trim() : "")
+      : undefined;
+    const wantsLockedFieldChange =
+      Object.hasOwn(body, "consultationName") ||
+      Object.hasOwn(body, "formData") ||
+      Object.hasOwn(body, "analysisResult") ||
+      Object.hasOwn(body, "analysisRaw") ||
+      Object.hasOwn(body, "modelMeta") ||
+      Object.hasOwn(body, "analysisStatus");
+
+    if (existing.analysis_status === "analyzed" && wantsLockedFieldChange) {
+      return apiError(409, "READ_ONLY_RECORD", "已分析病案不可修改原始内容，仅可更新给AI回馈。");
+    }
 
     // Detect whether form data changed to reset analysis state
     const newFormData = Object.hasOwn(body, "formData") ? (body.formData ?? null) : undefined;
@@ -78,6 +94,12 @@ export async function PATCH(request: Request, context: RouteContext) {
         consultation_name: Object.hasOwn(body, "consultationName")
           ? normalizeName(body.consultationName)
           : existing.consultation_name,
+        ...(feedbackValue !== undefined
+          ? {
+              ai_feedback: feedbackValue || null,
+              ai_feedback_updated_at: new Date().toISOString(),
+            }
+          : {}),
         ...(newFormData !== undefined
           ? {
               form_data: newFormData,

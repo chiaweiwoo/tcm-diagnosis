@@ -443,6 +443,24 @@
   margin-bottom: 14px;
 }
 
+.readonly-banner {
+  padding: 8px 14px;
+  background: #FFFBEB;
+  border: 1px solid #FDE68A;
+  border-radius: var(--radius);
+  font-size: 13px;
+  color: #92400E;
+  font-weight: 500;
+  margin-bottom: 14px;
+}
+
+.form-fieldset {
+  border: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
 .form-row {
   display: grid;
   gap: 7px;
@@ -521,6 +539,13 @@
   box-shadow: 0 0 0 3px rgba(155, 34, 38, 0.12);
 }
 
+.form-input:disabled,
+.form-textarea:disabled {
+  background: #F7F4EF;
+  color: #6F665E;
+  cursor: not-allowed;
+}
+
 .form-input--error,
 .form-textarea.form-input--error {
   border-color: var(--error);
@@ -581,12 +606,22 @@
   color: var(--brand);
 }
 
+.segmented-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.82;
+}
+
 /* ---------- Submit area ---------- */
 
 .form-submit {
   margin-top: 10px;
   display: flex;
   justify-content: center;
+}
+
+.readonly-submit-note {
+  font-size: 13px;
+  color: var(--text-muted);
 }
 
 /* ---------- Status bar ---------- */
@@ -890,6 +925,65 @@
   font-size: 12px;
   color: var(--text-muted);
   font-style: italic;
+}
+
+/* ---------- Feedback card ---------- */
+
+.feedback-section {
+  max-width: 1100px;
+  margin: 10px auto 0;
+}
+
+.feedback-card {
+  background: #FFFEFC;
+  border: 1px solid #DDD0BF;
+  border-radius: var(--radius-lg);
+  padding: 14px 18px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.feedback-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.feedback-card__title {
+  margin: 0 0 4px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.feedback-card__hint {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+.feedback-card__meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.feedback-card__textarea {
+  min-height: 108px;
+  background: #FFFDFC;
+}
+
+.feedback-card__actions {
+  display: flex;
+  justify-content: flex-end;
 }
 
 /* ---------- Result metadata ---------- */

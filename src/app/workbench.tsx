@@ -8,6 +8,7 @@ import {
   FileText,
   LoaderCircle,
   LogOut,
+  MessageSquare,
   Plus,
   Save,
   Search,
@@ -45,6 +46,8 @@ type ConsultationSummary = {
 };
 
 type ConsultationRecord = ConsultationSummary & {
+  ai_feedback: string | null;
+  ai_feedback_updated_at: string | null;
   analysis_result: unknown | null;
   analysis_raw: unknown | null;
   model_meta: ApiMeta | null;
@@ -165,6 +168,7 @@ async function apiUpdateConsultation(
   id: string,
   payload: {
     consultationName?: string;
+    aiFeedback?: string | null;
     formData?: StructuredCaseForm;
     analysisResult?: AnalysisResult;
     analysisRaw?: unknown;
@@ -177,6 +181,7 @@ async function apiUpdateConsultation(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       ...(payload.consultationName !== undefined ? { consultationName: payload.consultationName } : {}),
+      ...(payload.aiFeedback !== undefined ? { aiFeedback: payload.aiFeedback } : {}),
       ...(payload.formData !== undefined ? { formData: payload.formData } : {}),
       ...(payload.analysisResult !== undefined ? { analysisResult: payload.analysisResult } : {}),
       ...(payload.analysisRaw !== undefined ? { analysisRaw: payload.analysisRaw } : {}),
@@ -388,6 +393,58 @@ const StatusBar = memo(function StatusBar({
   );
 });
 
+const FeedbackCard = memo(function FeedbackCard({
+  value,
+  onChange,
+  onSubmit,
+  saving,
+  updatedAt,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
+  saving: boolean;
+  updatedAt: Date | null;
+}) {
+  return (
+    <section className="feedback-section">
+      <div className="feedback-card">
+        <div className="feedback-card__header">
+          <div>
+            <h3 className="feedback-card__title">
+              <MessageSquare size={15} />
+              给AI回馈 Feedback to AI
+            </h3>
+            <p className="feedback-card__hint">可选填写：记录这次建议哪里有帮助、哪里不准确，帮助后续优化。</p>
+          </div>
+          {updatedAt ? (
+            <span className="feedback-card__meta">上次提交 {formatSavedTime(updatedAt)}</span>
+          ) : null}
+        </div>
+        <textarea
+          className="form-textarea feedback-card__textarea"
+          placeholder="例：整体方向有帮助，但方药剂量建议偏保守；希望下次更强调药物相互作用。"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          rows={4}
+          maxLength={1000}
+        />
+        <div className="feedback-card__actions">
+          <button
+            type="button"
+            className="btn btn--ghost btn--sm"
+            onClick={onSubmit}
+            disabled={saving}
+          >
+            {saving ? <LoaderCircle size={15} className="spin" /> : <MessageSquare size={15} />}
+            <span>{saving ? "提交中…" : "提交回馈"}</span>
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+});
+
 // ---------------------------------------------------------------------------
 // History panel
 // ---------------------------------------------------------------------------
@@ -544,9 +601,13 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [meta, setMeta] = useState<ApiMeta | null>(null);
   const [rawResult, setRawResult] = useState<unknown>(null);
+  const [feedback, setFeedback] = useState("");
+  const [feedbackUpdatedAt, setFeedbackUpdatedAt] = useState<Date | null>(null);
+  const [recordLocked, setRecordLocked] = useState(false);
 
   const [analyzing, setAnalyzing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [feedbackSaving, setFeedbackSaving] = useState(false);
 
   const [consultations, setConsultations] = useState<ConsultationSummary[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -591,6 +652,9 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
     setResult(null);
     setMeta(null);
     setRawResult(null);
+    setFeedback("");
+    setFeedbackUpdatedAt(null);
+    setRecordLocked(false);
     setActiveId(null);
     setHistoryOpen(false);
     setSaveStatus("new");
@@ -624,6 +688,9 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
       setResult(analysis);
       setMeta(record.model_meta ?? null);
       setRawResult(record.analysis_raw ?? null);
+      setFeedback(record.ai_feedback ?? "");
+      setFeedbackUpdatedAt(record.ai_feedback_updated_at ? new Date(record.ai_feedback_updated_at) : null);
+      setRecordLocked(record.analysis_status === "analyzed");
       setActiveId(id);
       setHistoryOpen(false);
       setSaveStatus("saved");
@@ -687,6 +754,8 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
             analysisStatus: "analyzed",
           });
           setConsultations((prev) => prev.map((c) => (c.id === activeId ? { ...c, ...updated } : c)));
+          setFeedback(updated.ai_feedback ?? "");
+          setFeedbackUpdatedAt(updated.ai_feedback_updated_at ? new Date(updated.ai_feedback_updated_at) : null);
         } else {
           const saved = await apiSaveNew({
             consultationName: form.consultationName || "",
@@ -700,6 +769,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
         }
         setSaveStatus("saved");
         setSavedAt(new Date());
+        setRecordLocked(true);
       } catch {
         // Auto-save failure is non-blocking; doctor can retry via save button
         setSaveStatus("unsaved");
@@ -728,6 +798,8 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
           analysisStatus: "analyzed",
         });
         setConsultations((prev) => prev.map((c) => (c.id === activeId ? { ...c, ...updated } : c)));
+        setFeedback(updated.ai_feedback ?? "");
+        setFeedbackUpdatedAt(updated.ai_feedback_updated_at ? new Date(updated.ai_feedback_updated_at) : null);
       } else {
         const saved = await apiSaveNew({
           consultationName: form.consultationName || "",
@@ -742,12 +814,29 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
       const now = new Date();
       setSaveStatus("saved");
       setSavedAt(now);
+      setRecordLocked(true);
       showToast("已保存。", "success");
     } catch {
       setSaveStatus("unsaved");
       showToast("保存失败，请稍后重试。", "error");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleSubmitFeedback() {
+    if (!activeId) return;
+    setFeedbackSaving(true);
+    try {
+      const updated = await apiUpdateConsultation(activeId, { aiFeedback: feedback });
+      setFeedback(updated.ai_feedback ?? "");
+      const updatedAt = updated.ai_feedback_updated_at ? new Date(updated.ai_feedback_updated_at) : new Date();
+      setFeedbackUpdatedAt(updatedAt);
+      showToast("已提交AI回馈。", "success");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "提交回馈失败，请稍后重试。", "error");
+    } finally {
+      setFeedbackSaving(false);
     }
   }
 
@@ -797,7 +886,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
               <Plus size={15} />
               <span>新建</span>
             </button>
-            {result && (
+            {result && !recordLocked && (
               <button
                 className="btn btn--ghost btn--sm"
                 onClick={() => void handleSave()}
@@ -834,6 +923,13 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
             )}
 
             {/* Row 1: Meta strip — sex / age / prescription type */}
+            {recordLocked && (
+              <div className="readonly-banner">
+                该病案已完成分析并归档，原始字段仅供查看；如需补充意见，请使用下方“给AI回馈”。
+              </div>
+            )}
+
+            <fieldset className="form-fieldset" disabled={recordLocked}>
             <div className="form-row--meta">
               <div className="form-group">
                 <label className="form-label">性别 Gender</label>
@@ -991,19 +1087,21 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
               <FieldError message={touched.has("prescription") ? displayErrors.prescription : undefined} />
             </div>
 
+            </fieldset>
+
             {/* Submit */}
             <div className="form-submit">
               <button
                 className="btn btn--primary btn--lg"
                 onClick={() => void handleAnalyze()}
-                disabled={analyzing || Object.keys(liveErrors).length > 0}
+                disabled={recordLocked || analyzing || Object.keys(liveErrors).length > 0}
               >
                 {analyzing ? (
                   <>
                     <LoaderCircle size={18} className="spin" />
                     分析中…
                   </>
-                ) : "开始分析"}
+                ) : recordLocked ? "已归档" : "开始分析"}
               </button>
             </div>
 
@@ -1101,6 +1199,16 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
               </div>
             )}
           </section>
+        )}
+
+        {!analyzing && result && activeId && (
+          <FeedbackCard
+            value={feedback}
+            onChange={setFeedback}
+            onSubmit={() => void handleSubmitFeedback()}
+            saving={feedbackSaving}
+            updatedAt={feedbackUpdatedAt}
+          />
         )}
       </main>
 

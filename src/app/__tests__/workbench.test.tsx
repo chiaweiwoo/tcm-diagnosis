@@ -65,8 +65,9 @@ const MOCK_RESULT = {
 beforeEach(() => {
   vi.stubGlobal(
     "fetch",
-    vi.fn((url: string) => {
-      if (url === "/api/consultations") {
+    vi.fn((url: string, init?: RequestInit) => {
+      const method = init?.method ?? "GET";
+      if (url === "/api/consultations" && method === "GET") {
         return makeOkJson({ records: [] });
       }
       if (url === "/api/analyze") {
@@ -79,10 +80,10 @@ beforeEach(() => {
         });
       }
       if (String(url).includes("/api/consultations/") && !String(url).endsWith("/consultations/")) {
-        return makeOkJson({ record: { id: "abc", form_data: null, analysis_result: null, model_meta: null, analysis_status: "draft", created_at: new Date().toISOString(), updated_at: new Date().toISOString(), analyzed_at: null, consultation_name: null } });
+        return makeOkJson({ record: { id: "abc", form_data: null, analysis_result: null, model_meta: null, analysis_status: "draft", created_at: new Date().toISOString(), updated_at: new Date().toISOString(), analyzed_at: null, consultation_name: null, ai_feedback: null, ai_feedback_updated_at: null } });
       }
       if (url === "/api/consultations" || String(url).startsWith("/api/consultations")) {
-        return makeOkJson({ record: { id: "new-123", form_data: null, analysis_result: null, model_meta: null, analysis_status: "analyzed", created_at: new Date().toISOString(), updated_at: new Date().toISOString(), analyzed_at: new Date().toISOString(), consultation_name: null } });
+        return makeOkJson({ record: { id: "new-123", form_data: null, analysis_result: null, model_meta: null, analysis_status: "analyzed", created_at: new Date().toISOString(), updated_at: new Date().toISOString(), analyzed_at: new Date().toISOString(), consultation_name: null, ai_feedback: null, ai_feedback_updated_at: null } });
       }
       return makeErrJson(404, "not found");
     }),
@@ -302,6 +303,29 @@ describe("Analyze flow", () => {
 
     await waitFor(() => screen.getByText("风险与提醒 Cautions"));
     expect(screen.getByText("注意肝功能")).toBeInTheDocument();
+  });
+
+  it("shows feedback section after analyze and submits feedback", async () => {
+    const user = userEvent.setup();
+    render(<Workbench />);
+    await waitFor(() => screen.getByText("开始分析"));
+
+    await fillRequiredFields(user);
+    await user.click(screen.getByText("开始分析"));
+
+    await waitFor(() => screen.getByText("给AI回馈 Feedback to AI"));
+    const textarea = screen.getByPlaceholderText(/整体方向有帮助/);
+    await user.type(textarea, "建议保留风险提示，但可以更具体。");
+    await user.click(screen.getByText("提交回馈"));
+
+    const fetchMock = vi.mocked(global.fetch);
+    await waitFor(() => {
+      const feedbackCall = fetchMock.mock.calls.find(
+        ([url, options]) => String(url).includes("/api/consultations/") && options?.method === "PATCH",
+      );
+      expect(feedbackCall).toBeDefined();
+      expect(String(feedbackCall?.[1]?.body)).toContain("aiFeedback");
+    });
   });
 
   it("shows error toast when analyze API fails", async () => {
