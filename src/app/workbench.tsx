@@ -668,7 +668,6 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
   const [meta, setMeta] = useState<ApiMeta | null>(null);
   const [rawResult, setRawResult] = useState<unknown>(null);
   const [caseId, setCaseId] = useState("");
-  const [caseIdUpdatedAt, setCaseIdUpdatedAt] = useState<Date | null>(null);
   const [savedCaseId, setSavedCaseId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState("");
   const [feedbackUpdatedAt, setFeedbackUpdatedAt] = useState<Date | null>(null);
@@ -769,7 +768,6 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
     setMeta(null);
     setRawResult(null);
     setCaseId("");
-    setCaseIdUpdatedAt(null);
     setSavedCaseId(null);
     setFeedback("");
     setFeedbackUpdatedAt(null);
@@ -810,7 +808,6 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
       setMeta(record.model_meta ?? null);
       setRawResult(record.analysis_raw ?? null);
       setCaseId(record.case_id ?? "");
-      setCaseIdUpdatedAt(record.case_id_updated_at ? new Date(record.case_id_updated_at) : null);
       setSavedCaseId(normalizeCaseId(record.case_id ?? ""));
       setFeedback(record.ai_feedback ?? "");
       setFeedbackUpdatedAt(record.ai_feedback_updated_at ? new Date(record.ai_feedback_updated_at) : null);
@@ -882,7 +879,6 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
           });
           setConsultations((prev) => prev.map((c) => (c.id === activeId ? { ...c, ...updated } : c)));
           setCaseId(updated.case_id ?? "");
-          setCaseIdUpdatedAt(updated.case_id_updated_at ? new Date(updated.case_id_updated_at) : null);
           setSavedCaseId(normalizeCaseId(updated.case_id ?? ""));
           setFeedback(updated.ai_feedback ?? "");
           setFeedbackUpdatedAt(updated.ai_feedback_updated_at ? new Date(updated.ai_feedback_updated_at) : null);
@@ -899,7 +895,6 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
           setActiveId(saved.id);
           setConsultations((prev) => [saved, ...prev]);
           setCaseId(saved.case_id ?? "");
-          setCaseIdUpdatedAt(saved.case_id_updated_at ? new Date(saved.case_id_updated_at) : null);
           setSavedCaseId(normalizeCaseId(saved.case_id ?? ""));
           setSavedFeedback(saved.ai_feedback ?? "");
         }
@@ -931,7 +926,6 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
         });
         setConsultations((prev) => prev.map((c) => (c.id === activeId ? { ...c, ...updated } : c)));
         setCaseId(updated.case_id ?? "");
-        setCaseIdUpdatedAt(updated.case_id_updated_at ? new Date(updated.case_id_updated_at) : null);
         setSavedCaseId(normalizeCaseId(updated.case_id ?? ""));
         setFeedback(updated.ai_feedback ?? "");
         setFeedbackUpdatedAt(updated.ai_feedback_updated_at ? new Date(updated.ai_feedback_updated_at) : null);
@@ -948,7 +942,6 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
         });
         setConsultations((prev) => prev.map((c) => (c.id === activeId ? { ...c, ...updated } : c)));
         setCaseId(updated.case_id ?? "");
-        setCaseIdUpdatedAt(updated.case_id_updated_at ? new Date(updated.case_id_updated_at) : null);
         setSavedCaseId(normalizeCaseId(updated.case_id ?? ""));
         setFeedback(updated.ai_feedback ?? "");
         setFeedbackUpdatedAt(updated.ai_feedback_updated_at ? new Date(updated.ai_feedback_updated_at) : null);
@@ -965,7 +958,6 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
         setActiveId(saved.id);
         setConsultations((prev) => [saved, ...prev]);
         setCaseId(saved.case_id ?? "");
-        setCaseIdUpdatedAt(saved.case_id_updated_at ? new Date(saved.case_id_updated_at) : null);
         setSavedCaseId(normalizeCaseId(saved.case_id ?? ""));
         setSavedFeedback(saved.ai_feedback ?? "");
       }
@@ -1080,54 +1072,69 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
               </div>
             )}
 
-            <fieldset className="form-fieldset" disabled={recordLocked}>
             <div className="form-row--meta">
-              <div className="form-group">
-                <label className="form-label">性别 Gender</label>
-                <div className="segmented-control">
-                  {SEX_VALUES.map((sex) => (
-                    <button
-                      key={sex}
-                      className={`segmented-btn ${form.patientSex === sex ? "segmented-btn--active" : ""}`}
-                      onClick={() => setField("patientSex", sex)}
-                      type="button"
-                    >
-                      {sex}
-                    </button>
-                  ))}
+              <fieldset className="form-fieldset form-fieldset--meta" disabled={recordLocked}>
+                <div className="form-group">
+                  <label className="form-label">性别 Gender</label>
+                  <div className="segmented-control">
+                    {SEX_VALUES.map((sex) => (
+                      <button
+                        key={sex}
+                        className={`segmented-btn ${form.patientSex === sex ? "segmented-btn--active" : ""}`}
+                        onClick={() => setField("patientSex", sex)}
+                        type="button"
+                      >
+                        {sex}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+                <div className="form-group">
+                  <label className="form-label form-label--required">年龄 Age</label>
+                  <input
+                    className={`form-input form-input--sm ${touched.has("patientAge") ? (displayErrors.patientAge ? "form-input--error" : "form-input--valid") : ""}`}
+                    type="number"
+                    placeholder="岁"
+                    value={form.patientAge}
+                    onChange={(e) => setField("patientAge", e.target.value)}
+                    onBlur={() => markTouched("patientAge")}
+                    min={1}
+                    max={120}
+                  />
+                  <FieldError message={touched.has("patientAge") ? displayErrors.patientAge : undefined} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label form-label--required">处方类型 Prescription Type</label>
+                  <div className="segmented-control">
+                    {PRESCRIPTION_TYPES.map((pt) => (
+                      <button
+                        key={pt}
+                        className={`segmented-btn ${form.prescriptionType === pt ? "segmented-btn--active" : ""}`}
+                        onClick={() => setField("prescriptionType", pt)}
+                        type="button"
+                      >
+                        {pt}
+                      </button>
+                    ))}
+                  </div>
+                  <FieldError message={touched.has("prescriptionType") ? displayErrors.prescriptionType as string | undefined : undefined} />
+                </div>
+              </fieldset>
               <div className="form-group">
-                <label className="form-label form-label--required">年龄 Age</label>
+                <label className="form-label" htmlFor="case-id-input">病案编号 Case ID</label>
                 <input
-                  className={`form-input form-input--sm ${touched.has("patientAge") ? (displayErrors.patientAge ? "form-input--error" : "form-input--valid") : ""}`}
-                  type="number"
-                  placeholder="岁"
-                  value={form.patientAge}
-                  onChange={(e) => setField("patientAge", e.target.value)}
-                  onBlur={() => markTouched("patientAge")}
-                  min={1}
-                  max={120}
+                  id="case-id-input"
+                  className="form-input form-input--sm case-id-panel__input"
+                  type="text"
+                  placeholder="例：0004222"
+                  value={caseId}
+                  onChange={(event) => handleCaseIdChange(event.target.value)}
+                  maxLength={64}
                 />
-                <FieldError message={touched.has("patientAge") ? displayErrors.patientAge : undefined} />
-              </div>
-              <div className="form-group">
-                <label className="form-label form-label--required">处方类型 Prescription Type</label>
-                <div className="segmented-control">
-                  {PRESCRIPTION_TYPES.map((pt) => (
-                    <button
-                      key={pt}
-                      className={`segmented-btn ${form.prescriptionType === pt ? "segmented-btn--active" : ""}`}
-                      onClick={() => setField("prescriptionType", pt)}
-                      type="button"
-                    >
-                      {pt}
-                    </button>
-                  ))}
-                </div>
-                <FieldError message={touched.has("prescriptionType") ? displayErrors.prescriptionType as string | undefined : undefined} />
               </div>
             </div>
+
+            <fieldset className="form-fieldset" disabled={recordLocked}>
 
             {/* Row 2: Chief complaint */}
             <div className="form-group">
@@ -1264,33 +1271,13 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
               form={form}
             />
 
-            <div className="case-id-panel">
-              <div className="case-id-panel__header">
-                <div>
-                  <label className="form-label" htmlFor="case-id-input">病案编号 Case ID</label>
-                  <p className="case-id-panel__hint">用于和外部系统病案号对应，可选填写。</p>
-                </div>
-                {caseIdUpdatedAt ? (
-                  <span className="case-id-panel__meta">上次更新 {formatSavedTime(caseIdUpdatedAt)}</span>
-                ) : null}
-              </div>
-              <input
-                id="case-id-input"
-                className="form-input case-id-panel__input"
-                type="text"
-                placeholder="例：0004222"
-                value={caseId}
-                onChange={(event) => handleCaseIdChange(event.target.value)}
-                maxLength={64}
+            {relatedTimeline && normalizedCaseId ? (
+              <CaseLinkTimeline
+                currentCaseId={normalizedCaseId}
+                related={relatedTimeline}
+                onSelect={(id) => void handleSelectHistory(id)}
               />
-              {relatedTimeline && normalizedCaseId ? (
-                <CaseLinkTimeline
-                  currentCaseId={normalizedCaseId}
-                  related={relatedTimeline}
-                  onSelect={(id) => void handleSelectHistory(id)}
-                />
-              ) : null}
-            </div>
+            ) : null}
           </div>
         </section>
 
