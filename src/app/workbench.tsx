@@ -40,6 +40,8 @@ type ConsultationSummary = {
   consultation_name: string | null;
   case_id: string | null;
   case_id_updated_at: string | null;
+  related_case_id: string | null;
+  related_case_id_updated_at: string | null;
   form_data: StructuredCaseForm | null;
   analysis_status: "draft" | "analyzed";
   created_at: string;
@@ -145,6 +147,7 @@ async function apiGetConsultation(id: string): Promise<ConsultationRecord> {
 async function apiSaveNew(payload: {
   consultationName: string;
   caseId?: string | null;
+  relatedCaseId?: string | null;
   formData: StructuredCaseForm;
   analysisResult: AnalysisResult;
   analysisRaw: unknown;
@@ -156,6 +159,7 @@ async function apiSaveNew(payload: {
     body: JSON.stringify({
       consultationName: payload.consultationName || null,
       caseId: payload.caseId ?? null,
+      relatedCaseId: payload.relatedCaseId ?? null,
       formData: payload.formData,
       analysisResult: payload.analysisResult,
       analysisRaw: payload.analysisRaw,
@@ -173,6 +177,7 @@ async function apiUpdateConsultation(
   payload: {
     consultationName?: string;
     caseId?: string | null;
+    relatedCaseId?: string | null;
     aiFeedback?: string | null;
     formData?: StructuredCaseForm;
     analysisResult?: AnalysisResult;
@@ -187,6 +192,7 @@ async function apiUpdateConsultation(
     body: JSON.stringify({
       ...(payload.consultationName !== undefined ? { consultationName: payload.consultationName } : {}),
       ...(payload.caseId !== undefined ? { caseId: payload.caseId } : {}),
+      ...(payload.relatedCaseId !== undefined ? { relatedCaseId: payload.relatedCaseId } : {}),
       ...(payload.aiFeedback !== undefined ? { aiFeedback: payload.aiFeedback } : {}),
       ...(payload.formData !== undefined ? { formData: payload.formData } : {}),
       ...(payload.analysisResult !== undefined ? { analysisResult: payload.analysisResult } : {}),
@@ -669,6 +675,8 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
   const [rawResult, setRawResult] = useState<unknown>(null);
   const [caseId, setCaseId] = useState("");
   const [savedCaseId, setSavedCaseId] = useState<string | null>(null);
+  const [relatedCaseId, setRelatedCaseId] = useState("");
+  const [savedRelatedCaseId, setSavedRelatedCaseId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState("");
   const [feedbackUpdatedAt, setFeedbackUpdatedAt] = useState<Date | null>(null);
   const [savedFeedback, setSavedFeedback] = useState("");
@@ -686,9 +694,11 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
   const resultRef = useRef<HTMLDivElement>(null);
 
   const normalizedCaseId = normalizeCaseId(caseId);
+  const normalizedRelatedCaseId = normalizeCaseId(relatedCaseId);
   const caseIdDirty = normalizedCaseId !== savedCaseId;
+  const relatedCaseIdDirty = normalizedRelatedCaseId !== savedRelatedCaseId;
   const feedbackDirty = feedback !== savedFeedback;
-  const hasUnsavedChanges = saveStatus === "unsaved" || caseIdDirty || feedbackDirty;
+  const hasUnsavedChanges = saveStatus === "unsaved" || caseIdDirty || relatedCaseIdDirty || feedbackDirty;
   const relatedTimeline = useMemo<RelatedTimeline | null>(() => {
     if (!activeId || !normalizedCaseId || !isNumericCaseId(normalizedCaseId)) return null;
     const previousId = buildAdjacentCaseId(normalizedCaseId, -1);
@@ -760,6 +770,11 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
     setSaveStatus((prev) => prev === "saving" ? prev : "unsaved");
   }, []);
 
+  const handleRelatedCaseIdChange = useCallback((value: string) => {
+    setRelatedCaseId(value);
+    setSaveStatus((prev) => prev === "saving" ? prev : "unsaved");
+  }, []);
+
   function handleNew() {
     if (!confirmDiscardChanges()) return;
     setForm(EMPTY_FORM);
@@ -769,6 +784,8 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
     setRawResult(null);
     setCaseId("");
     setSavedCaseId(null);
+    setRelatedCaseId("");
+    setSavedRelatedCaseId(null);
     setFeedback("");
     setFeedbackUpdatedAt(null);
     setSavedFeedback("");
@@ -809,6 +826,8 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
       setRawResult(record.analysis_raw ?? null);
       setCaseId(record.case_id ?? "");
       setSavedCaseId(normalizeCaseId(record.case_id ?? ""));
+      setRelatedCaseId(record.related_case_id ?? "");
+      setSavedRelatedCaseId(normalizeCaseId(record.related_case_id ?? ""));
       setFeedback(record.ai_feedback ?? "");
       setFeedbackUpdatedAt(record.ai_feedback_updated_at ? new Date(record.ai_feedback_updated_at) : null);
       setSavedFeedback(record.ai_feedback ?? "");
@@ -871,6 +890,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
         if (activeId) {
           const updated = await apiUpdateConsultation(activeId, {
             caseId: normalizedCaseId,
+            relatedCaseId: normalizedRelatedCaseId,
             formData: form,
             analysisResult: data.result,
             analysisRaw: data.raw,
@@ -880,6 +900,8 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
           setConsultations((prev) => prev.map((c) => (c.id === activeId ? { ...c, ...updated } : c)));
           setCaseId(updated.case_id ?? "");
           setSavedCaseId(normalizeCaseId(updated.case_id ?? ""));
+          setRelatedCaseId(updated.related_case_id ?? "");
+          setSavedRelatedCaseId(normalizeCaseId(updated.related_case_id ?? ""));
           setFeedback(updated.ai_feedback ?? "");
           setFeedbackUpdatedAt(updated.ai_feedback_updated_at ? new Date(updated.ai_feedback_updated_at) : null);
           setSavedFeedback(updated.ai_feedback ?? "");
@@ -887,6 +909,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
           const saved = await apiSaveNew({
             consultationName: form.consultationName || "",
             caseId: normalizedCaseId,
+            relatedCaseId: normalizedRelatedCaseId,
             formData: form,
             analysisResult: data.result,
             analysisRaw: data.raw,
@@ -896,6 +919,8 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
           setConsultations((prev) => [saved, ...prev]);
           setCaseId(saved.case_id ?? "");
           setSavedCaseId(normalizeCaseId(saved.case_id ?? ""));
+          setRelatedCaseId(saved.related_case_id ?? "");
+          setSavedRelatedCaseId(normalizeCaseId(saved.related_case_id ?? ""));
           setSavedFeedback(saved.ai_feedback ?? "");
         }
         setSaveStatus("saved");
@@ -922,11 +947,14 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
       if (activeId && recordLocked) {
         const updated = await apiUpdateConsultation(activeId, {
           caseId: normalizedCaseId,
+          relatedCaseId: normalizedRelatedCaseId,
           aiFeedback: feedback,
         });
         setConsultations((prev) => prev.map((c) => (c.id === activeId ? { ...c, ...updated } : c)));
         setCaseId(updated.case_id ?? "");
         setSavedCaseId(normalizeCaseId(updated.case_id ?? ""));
+        setRelatedCaseId(updated.related_case_id ?? "");
+        setSavedRelatedCaseId(normalizeCaseId(updated.related_case_id ?? ""));
         setFeedback(updated.ai_feedback ?? "");
         setFeedbackUpdatedAt(updated.ai_feedback_updated_at ? new Date(updated.ai_feedback_updated_at) : null);
         setSavedFeedback(updated.ai_feedback ?? "");
@@ -934,6 +962,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
         const updated = await apiUpdateConsultation(activeId, {
           consultationName: form.consultationName,
           caseId: normalizedCaseId,
+          relatedCaseId: normalizedRelatedCaseId,
           formData: form,
           analysisResult: result,
           analysisRaw: rawResult,
@@ -943,6 +972,8 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
         setConsultations((prev) => prev.map((c) => (c.id === activeId ? { ...c, ...updated } : c)));
         setCaseId(updated.case_id ?? "");
         setSavedCaseId(normalizeCaseId(updated.case_id ?? ""));
+        setRelatedCaseId(updated.related_case_id ?? "");
+        setSavedRelatedCaseId(normalizeCaseId(updated.related_case_id ?? ""));
         setFeedback(updated.ai_feedback ?? "");
         setFeedbackUpdatedAt(updated.ai_feedback_updated_at ? new Date(updated.ai_feedback_updated_at) : null);
         setSavedFeedback(updated.ai_feedback ?? "");
@@ -950,6 +981,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
         const saved = await apiSaveNew({
           consultationName: form.consultationName || "",
           caseId: normalizedCaseId,
+          relatedCaseId: normalizedRelatedCaseId,
           formData: form,
           analysisResult: result,
           analysisRaw: rawResult,
@@ -959,6 +991,8 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
         setConsultations((prev) => [saved, ...prev]);
         setCaseId(saved.case_id ?? "");
         setSavedCaseId(normalizeCaseId(saved.case_id ?? ""));
+        setRelatedCaseId(saved.related_case_id ?? "");
+        setSavedRelatedCaseId(normalizeCaseId(saved.related_case_id ?? ""));
         setSavedFeedback(saved.ai_feedback ?? "");
       }
       const now = new Date();
@@ -1129,6 +1163,18 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
                   placeholder="例：0004222"
                   value={caseId}
                   onChange={(event) => handleCaseIdChange(event.target.value)}
+                  maxLength={64}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label" htmlFor="related-case-id-input">关联病案编号 Related Case ID</label>
+                <input
+                  id="related-case-id-input"
+                  className="form-input form-input--sm case-id-panel__input"
+                  type="text"
+                  placeholder="例：0004221"
+                  value={relatedCaseId}
+                  onChange={(event) => handleRelatedCaseIdChange(event.target.value)}
                   maxLength={64}
                 />
               </div>

@@ -80,11 +80,11 @@ beforeEach(() => {
         });
       }
       if (String(url).includes("/api/consultations/") && !String(url).endsWith("/consultations/")) {
-        return makeOkJson({ record: { id: "abc", form_data: null, analysis_result: null, model_meta: null, analysis_status: "draft", created_at: new Date().toISOString(), updated_at: new Date().toISOString(), analyzed_at: null, consultation_name: null, case_id: null, case_id_updated_at: null, ai_feedback: null, ai_feedback_updated_at: null } });
+        return makeOkJson({ record: { id: "abc", form_data: null, analysis_result: null, model_meta: null, analysis_status: "draft", created_at: new Date().toISOString(), updated_at: new Date().toISOString(), analyzed_at: null, consultation_name: null, case_id: null, case_id_updated_at: null, related_case_id: null, related_case_id_updated_at: null, ai_feedback: null, ai_feedback_updated_at: null } });
       }
       if (url === "/api/consultations" || String(url).startsWith("/api/consultations")) {
-        const body = init?.body ? JSON.parse(String(init.body)) as { caseId?: string | null; aiFeedback?: string | null } : {};
-        return makeOkJson({ record: { id: "new-123", form_data: null, analysis_result: null, model_meta: null, analysis_status: "analyzed", created_at: new Date().toISOString(), updated_at: new Date().toISOString(), analyzed_at: new Date().toISOString(), consultation_name: null, case_id: body.caseId ?? null, case_id_updated_at: body.caseId ? new Date().toISOString() : null, ai_feedback: body.aiFeedback ?? null, ai_feedback_updated_at: body.aiFeedback ? new Date().toISOString() : null } });
+        const body = init?.body ? JSON.parse(String(init.body)) as { caseId?: string | null; relatedCaseId?: string | null; aiFeedback?: string | null } : {};
+        return makeOkJson({ record: { id: "new-123", form_data: null, analysis_result: null, model_meta: null, analysis_status: "analyzed", created_at: new Date().toISOString(), updated_at: new Date().toISOString(), analyzed_at: new Date().toISOString(), consultation_name: null, case_id: body.caseId ?? null, case_id_updated_at: body.caseId ? new Date().toISOString() : null, related_case_id: body.relatedCaseId ?? null, related_case_id_updated_at: body.relatedCaseId ? new Date().toISOString() : null, ai_feedback: body.aiFeedback ?? null, ai_feedback_updated_at: body.aiFeedback ? new Date().toISOString() : null } });
       }
       return makeErrJson(404, "not found");
     }),
@@ -306,7 +306,7 @@ describe("Analyze flow", () => {
     expect(screen.getByText("注意肝功能")).toBeInTheDocument();
   });
 
-  it("shows feedback section after analyze and saves case id + feedback through header save", async () => {
+  it("shows feedback section after analyze and saves case id + related case id + feedback through header save", async () => {
     const user = userEvent.setup();
     render(<Workbench />);
     await waitFor(() => screen.getByText("开始分析"));
@@ -318,7 +318,9 @@ describe("Analyze flow", () => {
     expect(screen.queryByText("提交回馈")).not.toBeInTheDocument();
 
     const caseIdInput = screen.getByPlaceholderText("例：0004222");
+    const relatedCaseIdInput = screen.getByPlaceholderText("例：0004221");
     await user.type(caseIdInput, "0004222");
+    await user.type(relatedCaseIdInput, "0004221");
     const textarea = screen.getByPlaceholderText(/整体方向有帮助/);
     await user.type(textarea, "建议保留风险提示，但可以更具体。");
     await user.click(screen.getByTitle("保存"));
@@ -331,6 +333,7 @@ describe("Analyze flow", () => {
       expect(feedbackCall).toBeDefined();
       expect(String(feedbackCall?.[1]?.body)).toContain("aiFeedback");
       expect(String(feedbackCall?.[1]?.body)).toContain("caseId");
+      expect(String(feedbackCall?.[1]?.body)).toContain("relatedCaseId");
     });
   });
 
@@ -345,6 +348,7 @@ describe("Analyze flow", () => {
     await waitFor(() => screen.getByText("给AI回馈 Feedback to AI"));
     expect(screen.getByPlaceholderText(/头痛眩晕反复发作/)).toBeDisabled();
     expect(screen.getByPlaceholderText("例：0004222")).not.toBeDisabled();
+    expect(screen.getByPlaceholderText("例：0004221")).not.toBeDisabled();
   });
 
   it("asks before discarding unsaved post-analysis Case ID changes", async () => {

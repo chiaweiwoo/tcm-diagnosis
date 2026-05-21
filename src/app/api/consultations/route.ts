@@ -39,6 +39,7 @@ export async function POST(request: Request) {
     const body = (await request.json()) as {
       consultationName?: unknown;
       caseId?: unknown;
+      relatedCaseId?: unknown;
       formData?: unknown;
       analysisResult?: unknown;
       analysisRaw?: unknown;
@@ -51,6 +52,7 @@ export async function POST(request: Request) {
       doctorEmail: doctor.email,
       consultationName: normalizeName(body.consultationName),
       caseId: typeof body.caseId === "string" && body.caseId.trim() ? body.caseId.trim() : null,
+      relatedCaseId: typeof body.relatedCaseId === "string" && body.relatedCaseId.trim() ? body.relatedCaseId.trim() : null,
       formData: body.formData ?? null,
     });
 

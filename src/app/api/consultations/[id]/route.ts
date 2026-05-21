@@ -63,6 +63,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     const body = (await request.json()) as {
       consultationName?: unknown;
       caseId?: unknown;
+      relatedCaseId?: unknown;
       aiFeedback?: unknown;
       formData?: unknown;
       analysisResult?: unknown;
@@ -73,6 +74,9 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     const caseIdValue = Object.hasOwn(body, "caseId")
       ? normalizeCaseId(body.caseId)
+      : undefined;
+    const relatedCaseIdValue = Object.hasOwn(body, "relatedCaseId")
+      ? normalizeCaseId(body.relatedCaseId)
       : undefined;
     const feedbackValue = Object.hasOwn(body, "aiFeedback")
       ? (typeof body.aiFeedback === "string" ? body.aiFeedback.trim() : "")
@@ -86,7 +90,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       Object.hasOwn(body, "analysisStatus");
 
     if (existing.analysis_status === "analyzed" && wantsLockedFieldChange) {
-      return apiError(409, "READ_ONLY_RECORD", "已分析病案不可修改原始内容，仅可更新病案编号与给AI回馈。");
+      return apiError(409, "READ_ONLY_RECORD", "已分析病案不可修改原始内容，仅可更新病案编号、关联病案编号与给AI回馈。");
     }
 
     // Detect whether form data changed to reset analysis state
@@ -106,6 +110,12 @@ export async function PATCH(request: Request, context: RouteContext) {
           ? {
               case_id: caseIdValue,
               case_id_updated_at: new Date().toISOString(),
+            }
+          : {}),
+        ...(relatedCaseIdValue !== undefined
+          ? {
+              related_case_id: relatedCaseIdValue,
+              related_case_id_updated_at: new Date().toISOString(),
             }
           : {}),
         ...(feedbackValue !== undefined
