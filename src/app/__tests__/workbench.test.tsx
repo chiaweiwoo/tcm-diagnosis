@@ -608,6 +608,75 @@ describe("History panel", () => {
     expect(screen.getByText("暂无历史记录")).toBeInTheDocument();
   });
 
+  it("searches history by case id and related case id", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string, init?: RequestInit) => {
+        const method = init?.method ?? "GET";
+        if (url === "/api/consultations" && method === "GET") {
+          return makeOkJson({
+            records: [
+              {
+                id: "case-1",
+                consultation_name: null,
+                case_id: "000325",
+                case_id_updated_at: new Date().toISOString(),
+                related_case_id: "000221",
+                related_case_id_updated_at: new Date().toISOString(),
+                form_data: {
+                  patientSex: "\u5973",
+                  patientAge: "52",
+                  chiefComplaint: "\u7729\u6655",
+                },
+                analysis_status: "analyzed",
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                analyzed_at: new Date().toISOString(),
+              },
+            ],
+          });
+        }
+        if (String(url).includes("/api/consultations/") && method === "GET") {
+          return makeOkJson({
+            record: {
+              id: "case-1",
+              form_data: null,
+              analysis_result: null,
+              model_meta: null,
+              analysis_status: "draft",
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              analyzed_at: null,
+              consultation_name: null,
+              case_id: "000325",
+              case_id_updated_at: new Date().toISOString(),
+              related_case_id: "000221",
+              related_case_id_updated_at: new Date().toISOString(),
+              ai_feedback: null,
+              ai_feedback_updated_at: null,
+            },
+          });
+        }
+        return makeErrJson(404, "not found");
+      }),
+    );
+
+    const user = userEvent.setup();
+    render(<Workbench />);
+    await waitFor(() => screen.getByText("\u5386\u53f2"));
+
+    await user.click(screen.getByText("\u5386\u53f2"));
+    await waitFor(() => screen.getByText("\u5386\u53f2\u8bb0\u5f55"));
+
+    const searchInput = screen.getByPlaceholderText("搜索病案…");
+    await user.type(searchInput, "000221");
+
+    await waitFor(() => {
+      expect(screen.getByText("Case 000325")).toBeInTheDocument();
+      expect(screen.getByText("Related 000221")).toBeInTheDocument();
+    });
+  });
+
   it("closes history panel when clicking 新建", async () => {
     const user = userEvent.setup();
     render(<Workbench />);

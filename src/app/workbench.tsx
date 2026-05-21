@@ -506,7 +506,6 @@ const HistoryPanel = memo(function HistoryPanel({
   consultations,
   activeId,
   onSelect,
-  onNew,
   onDelete,
   onClose,
   loading,
@@ -514,7 +513,6 @@ const HistoryPanel = memo(function HistoryPanel({
   consultations: ConsultationSummary[];
   activeId: string | null;
   onSelect: (id: string) => void;
-  onNew: () => void;
   onDelete: (id: string) => void;
   onClose: () => void;
   loading: boolean;
@@ -535,9 +533,12 @@ const HistoryPanel = memo(function HistoryPanel({
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return consultations;
-    return consultations.filter((c) =>
-      buildDisplayName(c).toLowerCase().includes(q)
-    );
+    return consultations.filter((c) => {
+      const displayName = buildDisplayName(c).toLowerCase();
+      const caseId = (c.case_id ?? "").toLowerCase();
+      const relatedCaseId = (c.related_case_id ?? "").toLowerCase();
+      return displayName.includes(q) || caseId.includes(q) || relatedCaseId.includes(q);
+    });
   }, [consultations, query]);
 
   return (
@@ -557,10 +558,6 @@ const HistoryPanel = memo(function HistoryPanel({
             历史记录
           </span>
           <div className="history-modal__header-actions">
-            <button className="history-modal__new" onClick={() => { onNew(); onClose(); }} title="新建病案">
-              <Plus size={15} />
-              <span>新建</span>
-            </button>
             <button className="history-modal__close" onClick={onClose} aria-label="关闭">
               <X size={16} />
             </button>
@@ -599,7 +596,15 @@ const HistoryPanel = memo(function HistoryPanel({
               className={`history-item ${c.id === activeId ? "history-item--active" : ""}`}
               onClick={() => { onSelect(c.id); onClose(); }}
             >
-              <div className="history-item__name">{buildDisplayName(c)}</div>
+              <div className="history-item__main">
+                <div className="history-item__name">{buildDisplayName(c)}</div>
+                {(c.case_id || c.related_case_id) && (
+                  <div className="history-item__ids">
+                    {c.case_id ? <span className="history-item__tag">Case {c.case_id}</span> : null}
+                    {c.related_case_id ? <span className="history-item__tag">Related {c.related_case_id}</span> : null}
+                  </div>
+                )}
+              </div>
               <div className="history-item__meta">
                 <span>{formatDate(c.updated_at)}</span>
               </div>
@@ -1042,7 +1047,6 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
                 consultations={consultations}
                 activeId={activeId}
                 onSelect={(id) => void handleSelectHistory(id)}
-                onNew={handleNew}
                 onDelete={(id) => void handleDeleteHistory(id)}
                 onClose={() => setHistoryOpen(false)}
                 loading={historyLoading}
