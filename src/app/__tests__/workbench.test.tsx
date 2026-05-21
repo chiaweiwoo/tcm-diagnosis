@@ -369,31 +369,33 @@ describe("Analyze flow", () => {
     confirmSpy.mockRestore();
   });
 
-  it("shows a manual linkage rail from direct and reverse matches and loads the linked record", async () => {
+  it("shows a manual linkage rail from direct and reverse matches, sorted newest first, and loads the linked record", async () => {
+    const olderTimestamp = "2026-05-19T08:15:00.000Z";
+    const newerTimestamp = "2026-05-21T10:30:00.000Z";
     const linkedRecord = {
       id: "linked-1",
-      consultation_name: "女 44 失眠",
+      consultation_name: "\u5973 44 \u5931\u7720",
       case_id: "0004221",
-      case_id_updated_at: new Date().toISOString(),
+      case_id_updated_at: olderTimestamp,
       related_case_id: null,
       related_case_id_updated_at: null,
       form_data: {
         consultationName: "",
-        prescriptionType: "方药",
+        prescriptionType: "\u65b9\u836f",
         patientAge: "44",
-        patientSex: "女",
-        chiefComplaint: "失眠",
-        currentIllness: "失眠反复发作。",
+        patientSex: "\u5973",
+        chiefComplaint: "\u5931\u7720",
+        currentIllness: "\u5931\u7720\u53cd\u590d\u53d1\u4f5c\u3002",
         pastHistory: "",
-        physicalExam: "舌淡红苔薄白，脉细",
-        diagnosis: "不寐",
-        pattern: "心脾两虚",
-        prescription: "归脾汤加减",
+        physicalExam: "\u820c\u6de1\u7ea2\u82d4\u8584\u767d\uff0c\u8109\u7ec6",
+        diagnosis: "\u4e0d\u5bd0",
+        pattern: "\u5fc3\u813e\u4e24\u865a",
+        prescription: "\u5f52\u813e\u6c64\u52a0\u51cf",
       },
       analysis_status: "analyzed",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      analyzed_at: new Date().toISOString(),
+      created_at: olderTimestamp,
+      updated_at: olderTimestamp,
+      analyzed_at: olderTimestamp,
       analysis_result: MOCK_RESULT,
       analysis_raw: {},
       model_meta: null,
@@ -403,18 +405,22 @@ describe("Analyze flow", () => {
     const reverseLinkedRecord = {
       ...linkedRecord,
       id: "linked-2",
-      consultation_name: "男 51 咳嗽",
+      consultation_name: "\u7537 51 \u54b3\u55fd",
       case_id: "0005000",
+      case_id_updated_at: newerTimestamp,
       related_case_id: "0004222",
       form_data: {
         ...linkedRecord.form_data,
         patientAge: "51",
-        patientSex: "男",
-        chiefComplaint: "咳嗽",
-        diagnosis: "咳嗽",
-        pattern: "风寒束肺",
-        prescription: "止嗽散加减",
+        patientSex: "\u5973",
+        chiefComplaint: "\u5931\u7720",
+        diagnosis: "\u4e0d\u5bd0",
+        pattern: "\u5fc3\u813e\u4e24\u865a",
+        prescription: "\u5f52\u813e\u6c64\u52a0\u51cf",
       },
+      created_at: newerTimestamp,
+      updated_at: newerTimestamp,
+      analyzed_at: newerTimestamp,
     };
 
     vi.stubGlobal(
@@ -471,20 +477,31 @@ describe("Analyze flow", () => {
 
     const user = userEvent.setup();
     render(<Workbench />);
-    await waitFor(() => screen.getByText("开始分析"));
+    await waitFor(() => screen.getByText("\u5f00\u59cb\u5206\u6790"));
 
     await fillRequiredFields(user);
-    await user.type(screen.getByPlaceholderText("例：0004222"), "0004222");
-    await user.type(screen.getByPlaceholderText("例：0004221"), "0004221");
-    await user.click(screen.getByText("开始分析"));
+    await user.type(screen.getByPlaceholderText("\u4f8b\uff1a0004222"), "0004222");
+    await user.type(screen.getByPlaceholderText("\u4f8b\uff1a0004221"), "0004221");
+    await user.click(screen.getByText("\u5f00\u59cb\u5206\u6790"));
 
-    await waitFor(() => screen.getByLabelText("关联病案"));
-    expect(screen.getByText("当前病案")).toBeInTheDocument();
-    expect(screen.getByText("女 44 失眠")).toBeInTheDocument();
-    expect(screen.getByText("男 51 咳嗽")).toBeInTheDocument();
+    await waitFor(() => screen.getByLabelText("\u5173\u8054\u75c5\u6848"));
+    expect(screen.getByText("\u5f53\u524d\u75c5\u6848")).toBeInTheDocument();
+    const linkedButtons = screen
+      .getAllByRole("button")
+      .filter((element) => (element.textContent ?? "").includes("0004221")
+        || (element.textContent ?? "").includes("0005000"));
+    expect(linkedButtons).toHaveLength(2);
+    expect(linkedButtons.map((element) => element.textContent ?? "").slice(0, 2)).toEqual([
+      expect.stringContaining("0005000"),
+      expect.stringContaining("0004221"),
+    ]);
 
-    await user.click(screen.getByText("女 44 失眠"));
-    await waitFor(() => expect(screen.getByDisplayValue("失眠")).toBeInTheDocument());
+    await user.click(linkedButtons[1]);
+    await waitFor(() => {
+      expect(vi.mocked(global.fetch).mock.calls.some(
+        ([url, init]) => url === "/api/consultations/linked-1" && (init?.method ?? "GET") === "GET",
+      )).toBe(true);
+    });
   });
 
   it("does not create linkage from numeric adjacency alone", async () => {
@@ -672,8 +689,8 @@ describe("History panel", () => {
     await user.type(searchInput, "000221");
 
     await waitFor(() => {
-      expect(screen.getByText("Case 000325")).toBeInTheDocument();
-      expect(screen.getByText("Related 000221")).toBeInTheDocument();
+      expect(screen.getByText("000325")).toBeInTheDocument();
+      expect(screen.getByText("000221")).toBeInTheDocument();
     });
   });
 

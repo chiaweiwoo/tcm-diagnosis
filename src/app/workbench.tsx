@@ -339,6 +339,14 @@ function normalizeCaseId(value: string) {
   return trimmed ? trimmed : null;
 }
 
+function getConsultationSortTime(record: Pick<ConsultationSummary, "updated_at" | "created_at">) {
+  const updated = Date.parse(record.updated_at);
+  if (!Number.isNaN(updated)) return updated;
+  const created = Date.parse(record.created_at);
+  if (!Number.isNaN(created)) return created;
+  return 0;
+}
+
 type LinkedCaseRail = {
   linkedRecords: ConsultationSummary[];
 };
@@ -596,15 +604,13 @@ const HistoryPanel = memo(function HistoryPanel({
               className={`history-item ${c.id === activeId ? "history-item--active" : ""}`}
               onClick={() => { onSelect(c.id); onClose(); }}
             >
-              <div className="history-item__main">
-                <div className="history-item__name">{buildDisplayName(c)}</div>
-                {(c.case_id || c.related_case_id) && (
-                  <div className="history-item__ids">
-                    {c.case_id ? <span className="history-item__tag">Case {c.case_id}</span> : null}
-                    {c.related_case_id ? <span className="history-item__tag">Related {c.related_case_id}</span> : null}
-                  </div>
-                )}
-              </div>
+              <div className="history-item__name">{buildDisplayName(c)}</div>
+              <span className="history-item__pill history-item__pill--case">
+                {c.case_id ?? "—"}
+              </span>
+              <span className="history-item__pill history-item__pill--related">
+                {c.related_case_id ?? "—"}
+              </span>
               <div className="history-item__meta">
                 <span>{formatDate(c.updated_at)}</span>
               </div>
@@ -707,7 +713,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
 
     const linkedRecords = [...directMatches, ...reverseMatches].filter(
       (item, index, items) => items.findIndex((candidate) => candidate.id === item.id) === index,
-    );
+    ).sort((a, b) => getConsultationSortTime(b) - getConsultationSortTime(a));
 
     if (!linkedRecords.length) return null;
     return { linkedRecords };
