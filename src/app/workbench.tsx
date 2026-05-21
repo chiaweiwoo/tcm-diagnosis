@@ -348,7 +348,7 @@ function getConsultationSortTime(record: Pick<ConsultationSummary, "updated_at" 
 }
 
 type LinkedCaseRail = {
-  linkedRecords: ConsultationSummary[];
+  timelineRecords: ConsultationSummary[];
 };
 
 // ---------------------------------------------------------------------------
@@ -461,46 +461,57 @@ const FeedbackCard = memo(function FeedbackCard({
 
 const CaseLinkTimeline = memo(function CaseLinkTimeline({
   currentRecord,
-  linkedRecords,
+  timelineRecords,
   onSelect,
 }: {
   currentRecord: ConsultationSummary;
-  linkedRecords: ConsultationSummary[];
+  timelineRecords: ConsultationSummary[];
   onSelect: (id: string) => void;
 }) {
-  if (!linkedRecords.length) return null;
+  if (!timelineRecords.length) return null;
 
   return (
-    <aside className="case-linkage-rail" aria-label="关联病案">
+    <aside className="case-linkage-rail" aria-label="\u5173\u8054\u75c5\u6848">
       <div className="case-linkage-rail__header">
-        <span className="case-linkage-rail__title">关联病案</span>
+        <span className="case-linkage-rail__title">\u5173\u8054\u75c5\u6848</span>
       </div>
       <div className="case-linkage">
         <div className="case-linkage__line" aria-hidden />
-        <span className="case-linkage__section-label">当前病案</span>
-        <div className="case-linkage__item case-linkage__item--current">
-          <span className="case-linkage__dot case-linkage__dot--current" aria-hidden />
-          <span className="case-linkage__item-main">
-            <span className="case-linkage__case-id">{currentRecord.case_id ?? "未填写病案编号"}</span>
-            <span className="case-linkage__name">{buildDisplayName(currentRecord)}</span>
-          </span>
-        </div>
+        {timelineRecords.map((record) => {
+          const isCurrent = record.id === currentRecord.id;
 
-        <span className="case-linkage__section-label">关联病案</span>
-        {linkedRecords.map((record) => (
-          <button
-            key={`linked-${record.id}`}
-            type="button"
-            className="case-linkage__item"
-            onClick={() => onSelect(record.id)}
-          >
-            <span className="case-linkage__dot" aria-hidden />
-            <span className="case-linkage__item-main">
-              <span className="case-linkage__case-id">{record.case_id ?? "未填写病案编号"}</span>
-              <span className="case-linkage__name">{buildDisplayName(record)}</span>
-            </span>
-          </button>
-        ))}
+          if (isCurrent) {
+            return (
+              <div key={`timeline-${record.id}`} className="case-linkage__item case-linkage__item--current">
+                <span className="case-linkage__dot case-linkage__dot--current" aria-hidden />
+                <span className="case-linkage__item-main">
+                  <span className="case-linkage__item-head">
+                    <span className="case-linkage__case-id">{record.case_id ?? "\u672a\u586b\u5199\u75c5\u6848\u7f16\u53f7"}</span>
+                    <span className="case-linkage__status">\u5f53\u524d\u75c5\u6848</span>
+                  </span>
+                  <span className="case-linkage__name">{buildDisplayName(record)}</span>
+                  <span className="case-linkage__time">{formatDate(record.updated_at)}</span>
+                </span>
+              </div>
+            );
+          }
+
+          return (
+            <button
+              key={`timeline-${record.id}`}
+              type="button"
+              className="case-linkage__item"
+              onClick={() => onSelect(record.id)}
+            >
+              <span className="case-linkage__dot" aria-hidden />
+              <span className="case-linkage__item-main">
+                <span className="case-linkage__case-id">{record.case_id ?? "\u672a\u586b\u5199\u75c5\u6848\u7f16\u53f7"}</span>
+                <span className="case-linkage__name">{buildDisplayName(record)}</span>
+                <span className="case-linkage__time">{formatDate(record.updated_at)}</span>
+              </span>
+            </button>
+          );
+        })}
       </div>
     </aside>
   );
@@ -590,6 +601,13 @@ const HistoryPanel = memo(function HistoryPanel({
           )}
         </div>
 
+        <div className="history-table-head" aria-hidden>
+          <span className="history-table-head__name">病案</span>
+          <span className="history-table-head__case">病案编号</span>
+          <span className="history-table-head__related">关联编号</span>
+          <span className="history-table-head__time">更新时间</span>
+        </div>
+
         {/* List */}
         <div className="history-modal__list">
           {loading && <div className="history-modal__empty">加载中…</div>}
@@ -605,12 +623,16 @@ const HistoryPanel = memo(function HistoryPanel({
               onClick={() => { onSelect(c.id); onClose(); }}
             >
               <div className="history-item__name">{buildDisplayName(c)}</div>
-              <span className="history-item__pill history-item__pill--case">
-                {c.case_id ?? "—"}
-              </span>
-              <span className="history-item__pill history-item__pill--related">
-                {c.related_case_id ?? "—"}
-              </span>
+              {c.case_id ? (
+                <span className="history-item__pill history-item__pill--case">{c.case_id}</span>
+              ) : (
+                <span className="history-item__pill-spacer" aria-hidden />
+              )}
+              {c.related_case_id ? (
+                <span className="history-item__pill history-item__pill--related">{c.related_case_id}</span>
+              ) : (
+                <span className="history-item__pill-spacer" aria-hidden />
+              )}
               <div className="history-item__meta">
                 <span>{formatDate(c.updated_at)}</span>
               </div>
@@ -695,10 +717,10 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
     if (!activeId) return null;
 
     const currentRecord = consultations.find((item) => item.id === activeId);
-    if (!currentRecord) return null;
+    const currentCase = normalizedCaseId;
+    const currentRelated = normalizedRelatedCaseId;
 
-    const currentCase = normalizeCaseId(currentRecord.case_id ?? "");
-    const currentRelated = normalizeCaseId(currentRecord.related_case_id ?? "");
+    if (!currentRecord && !currentCase && !currentRelated) return null;
 
     const directMatches = currentRelated
       ? consultations.filter(
@@ -716,8 +738,24 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
     ).sort((a, b) => getConsultationSortTime(b) - getConsultationSortTime(a));
 
     if (!linkedRecords.length) return null;
-    return { linkedRecords };
-  }, [activeId, consultations]);
+    const timelineCurrent = currentRecord ?? {
+      id: activeId,
+      consultation_name: null,
+      case_id: currentCase || null,
+      case_id_updated_at: null,
+      related_case_id: currentRelated || null,
+      related_case_id_updated_at: null,
+      form_data: form,
+      analysis_status: recordLocked ? "analyzed" : "draft",
+      created_at: "",
+      updated_at: savedAt?.toISOString() ?? "",
+      analyzed_at: null,
+    };
+    const timelineRecords = [timelineCurrent, ...linkedRecords].sort(
+      (a, b) => getConsultationSortTime(b) - getConsultationSortTime(a),
+    );
+    return { timelineRecords };
+  }, [activeId, consultations, form, normalizedCaseId, normalizedRelatedCaseId, recordLocked, savedAt]);
 
   const showToast = useCallback((message: string, tone: ToastState["tone"] = "info") => {
     setToast({ message, tone });
@@ -1441,7 +1479,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
                 analyzed_at: null,
               }
             }
-            linkedRecords={linkedCaseRail.linkedRecords}
+            timelineRecords={linkedCaseRail.timelineRecords}
             onSelect={(id) => void handleSelectHistory(id)}
           />
         ) : null}

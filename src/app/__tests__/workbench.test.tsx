@@ -4,7 +4,7 @@
  * All network calls are mocked.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import Workbench from "../workbench";
 
@@ -371,6 +371,7 @@ describe("Analyze flow", () => {
 
   it("shows a manual linkage rail from direct and reverse matches, sorted newest first, and loads the linked record", async () => {
     const olderTimestamp = "2026-05-19T08:15:00.000Z";
+    const currentTimestamp = "2026-05-20T09:00:00.000Z";
     const newerTimestamp = "2026-05-21T10:30:00.000Z";
     const linkedRecord = {
       id: "linked-1",
@@ -402,6 +403,27 @@ describe("Analyze flow", () => {
       ai_feedback: null,
       ai_feedback_updated_at: null,
     };
+    const currentRecord = {
+      ...linkedRecord,
+      id: "current-1",
+      consultation_name: "\u5973 55 \u53cd\u590d\u5934\u6655\u76ee\u773c1\u5e74",
+      case_id: "0004222",
+      case_id_updated_at: currentTimestamp,
+      related_case_id: "0004221",
+      related_case_id_updated_at: currentTimestamp,
+      form_data: {
+        ...linkedRecord.form_data,
+        patientAge: "55",
+        chiefComplaint: "\u53cd\u590d\u5934\u6655\u76ee\u773c1\u5e74",
+        currentIllness: "\u53cd\u590d\u5934\u6655\u76ee\u773c1\u5e74\uff0c\u8fd11\u6708\u53d1\u4f5c\u9891\u7e41\u3002",
+        diagnosis: "\u7729\u6655",
+        pattern: "\u75f0\u6e7f\u4e2d\u963b",
+        prescription: "\u534a\u590f\u767d\u672f\u5929\u9ebb\u6c64\u52a0\u51cf",
+      },
+      created_at: currentTimestamp,
+      updated_at: currentTimestamp,
+      analyzed_at: currentTimestamp,
+    };
     const reverseLinkedRecord = {
       ...linkedRecord,
       id: "linked-2",
@@ -412,11 +434,11 @@ describe("Analyze flow", () => {
       form_data: {
         ...linkedRecord.form_data,
         patientAge: "51",
-        patientSex: "\u5973",
-        chiefComplaint: "\u5931\u7720",
-        diagnosis: "\u4e0d\u5bd0",
-        pattern: "\u5fc3\u813e\u4e24\u865a",
-        prescription: "\u5f52\u813e\u6c64\u52a0\u51cf",
+        patientSex: "\u7537",
+        chiefComplaint: "\u54b3\u55fd",
+        diagnosis: "\u54b3\u55fd",
+        pattern: "\u98ce\u5bd2\u675f\u80ba",
+        prescription: "\u6b62\u55fd\u6563\u52a0\u51cf",
       },
       created_at: newerTimestamp,
       updated_at: newerTimestamp,
@@ -428,39 +450,10 @@ describe("Analyze flow", () => {
       vi.fn((url: string, init?: RequestInit) => {
         const method = init?.method ?? "GET";
         if (url === "/api/consultations" && method === "GET") {
-          return makeOkJson({ records: [linkedRecord, reverseLinkedRecord] });
+          return makeOkJson({ records: [currentRecord, linkedRecord, reverseLinkedRecord] });
         }
-        if (url === "/api/analyze") {
-          return makeOkJson({
-            result: MOCK_RESULT,
-            raw: {},
-            model: "deepseek-flash",
-            promptVersion: "tcm-analysis-v0.8",
-            repairedJson: false,
-          });
-        }
-        if (url === "/api/consultations" && method === "POST") {
-          const body = JSON.parse(String(init?.body)) as { caseId?: string | null; relatedCaseId?: string | null };
-          return makeOkJson({
-            record: {
-              id: "new-123",
-              consultation_name: null,
-              case_id: body.caseId ?? null,
-              case_id_updated_at: body.caseId ? new Date().toISOString() : null,
-              related_case_id: body.relatedCaseId ?? null,
-              related_case_id_updated_at: body.relatedCaseId ? new Date().toISOString() : null,
-              form_data: null,
-              analysis_status: "analyzed",
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-              analyzed_at: new Date().toISOString(),
-              analysis_result: null,
-              analysis_raw: null,
-              model_meta: null,
-              ai_feedback: null,
-              ai_feedback_updated_at: null,
-            },
-          });
+        if (url === "/api/consultations/current-1" && method === "GET") {
+          return makeOkJson({ record: currentRecord });
         }
         if (url === "/api/consultations/linked-1" && method === "GET") {
           return makeOkJson({ record: linkedRecord });
@@ -468,25 +461,27 @@ describe("Analyze flow", () => {
         if (url === "/api/consultations/linked-2" && method === "GET") {
           return makeOkJson({ record: reverseLinkedRecord });
         }
-        if (String(url).includes("/api/consultations/") && method === "GET") {
-          return makeOkJson({ record: linkedRecord });
-        }
         return makeErrJson(404, "not found");
       }),
     );
 
     const user = userEvent.setup();
     render(<Workbench />);
-    await waitFor(() => screen.getByText("\u5f00\u59cb\u5206\u6790"));
+    await waitFor(() => screen.getByText("\u5386\u53f2"));
+    await user.click(screen.getByText("\u5386\u53f2"));
+    await waitFor(() => screen.getByText("\u5386\u53f2\u8bb0\u5f55"));
+    await user.click(screen.getByText("\u5973 55 \u53cd\u590d\u5934\u6655\u76ee\u773c1\u5e74"));
 
-    await fillRequiredFields(user);
-    await user.type(screen.getByPlaceholderText("\u4f8b\uff1a0004222"), "0004222");
-    await user.type(screen.getByPlaceholderText("\u4f8b\uff1a0004221"), "0004221");
-    await user.click(screen.getByText("\u5f00\u59cb\u5206\u6790"));
-
-    await waitFor(() => screen.getByLabelText("\u5173\u8054\u75c5\u6848"));
-    expect(screen.getByText("\u5f53\u524d\u75c5\u6848")).toBeInTheDocument();
-    const linkedButtons = screen
+    await waitFor(() => {
+      expect(document.querySelector(".case-linkage-rail")).not.toBeNull();
+    });
+    const timelineRail = document.querySelector(".case-linkage-rail");
+    expect(timelineRail).not.toBeNull();
+    const currentTimelineItem = (timelineRail as HTMLElement).querySelector(".case-linkage__item--current");
+    expect(currentTimelineItem).not.toBeNull();
+    expect(currentTimelineItem?.textContent).toContain("0004222");
+    expect(currentTimelineItem?.textContent).toContain("2026-05-20");
+    const linkedButtons = within(timelineRail as HTMLElement)
       .getAllByRole("button")
       .filter((element) => (element.textContent ?? "").includes("0004221")
         || (element.textContent ?? "").includes("0005000"));
@@ -692,6 +687,48 @@ describe("History panel", () => {
       expect(screen.getByText("000325")).toBeInTheDocument();
       expect(screen.getByText("000221")).toBeInTheDocument();
     });
+  });
+
+  it("does not show empty case id pills in history rows", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string, init?: RequestInit) => {
+        const method = init?.method ?? "GET";
+        if (url === "/api/consultations" && method === "GET") {
+          return makeOkJson({
+            records: [
+              {
+                id: "case-empty",
+                consultation_name: null,
+                case_id: null,
+                case_id_updated_at: null,
+                related_case_id: null,
+                related_case_id_updated_at: null,
+                form_data: {
+                  patientSex: "\u5973",
+                  patientAge: "45",
+                  chiefComplaint: "\u6e7f\u75b9\u53cd\u590d\u53d1\u4f5c",
+                },
+                analysis_status: "analyzed",
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                analyzed_at: new Date().toISOString(),
+              },
+            ],
+          });
+        }
+        return makeErrJson(404, "not found");
+      }),
+    );
+
+    const user = userEvent.setup();
+    render(<Workbench />);
+    await waitFor(() => screen.getByText("\u5386\u53f2"));
+
+    await user.click(screen.getByText("\u5386\u53f2"));
+    await waitFor(() => screen.getByText("\u5386\u53f2\u8bb0\u5f55"));
+
+    expect(document.querySelectorAll(".history-item__pill")).toHaveLength(0);
   });
 
   it("closes history panel when clicking 新建", async () => {
