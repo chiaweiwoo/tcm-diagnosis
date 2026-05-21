@@ -5,8 +5,20 @@ import { getCurrentDoctor } from "@/lib/currentDoctor";
 import { createServerSupabaseClient, getServiceRoleClient } from "@/lib/supabase/server";
 import { logServerEvent } from "@/lib/logging";
 
+const CASE_ID_MAX_LENGTH = 64;
+
 function normalizeName(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function normalizeCaseId(value: unknown) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (trimmed.length > CASE_ID_MAX_LENGTH) {
+    throw new Error("CASE_ID_TOO_LONG");
+  }
+  return trimmed;
 }
 
 export async function GET() {
@@ -51,8 +63,8 @@ export async function POST(request: Request) {
       doctorId: doctor.id,
       doctorEmail: doctor.email,
       consultationName: normalizeName(body.consultationName),
-      caseId: typeof body.caseId === "string" && body.caseId.trim() ? body.caseId.trim() : null,
-      relatedCaseId: typeof body.relatedCaseId === "string" && body.relatedCaseId.trim() ? body.relatedCaseId.trim() : null,
+      caseId: normalizeCaseId(body.caseId),
+      relatedCaseId: normalizeCaseId(body.relatedCaseId),
       formData: body.formData ?? null,
     });
 
@@ -76,6 +88,9 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof Error && error.message === "Unauthorized") {
       return apiError(401, "UNAUTHORIZED", "请先登录。");
+    }
+    if (error instanceof Error && error.message === "CASE_ID_TOO_LONG") {
+      return apiError(400, "CASE_ID_TOO_LONG", "病案编号与关联病案编号不能超过64个字符。");
     }
 
     await logServerEvent({

@@ -369,6 +369,216 @@ describe("Analyze flow", () => {
     confirmSpy.mockRestore();
   });
 
+  it("shows a manual linkage rail from direct and reverse matches and loads the linked record", async () => {
+    const linkedRecord = {
+      id: "linked-1",
+      consultation_name: "女 44 失眠",
+      case_id: "0004221",
+      case_id_updated_at: new Date().toISOString(),
+      related_case_id: null,
+      related_case_id_updated_at: null,
+      form_data: {
+        consultationName: "",
+        prescriptionType: "方药",
+        patientAge: "44",
+        patientSex: "女",
+        chiefComplaint: "失眠",
+        currentIllness: "失眠反复发作。",
+        pastHistory: "",
+        physicalExam: "舌淡红苔薄白，脉细",
+        diagnosis: "不寐",
+        pattern: "心脾两虚",
+        prescription: "归脾汤加减",
+      },
+      analysis_status: "analyzed",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      analyzed_at: new Date().toISOString(),
+      analysis_result: MOCK_RESULT,
+      analysis_raw: {},
+      model_meta: null,
+      ai_feedback: null,
+      ai_feedback_updated_at: null,
+    };
+    const reverseLinkedRecord = {
+      ...linkedRecord,
+      id: "linked-2",
+      consultation_name: "男 51 咳嗽",
+      case_id: "0005000",
+      related_case_id: "0004222",
+      form_data: {
+        ...linkedRecord.form_data,
+        patientAge: "51",
+        patientSex: "男",
+        chiefComplaint: "咳嗽",
+        diagnosis: "咳嗽",
+        pattern: "风寒束肺",
+        prescription: "止嗽散加减",
+      },
+    };
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string, init?: RequestInit) => {
+        const method = init?.method ?? "GET";
+        if (url === "/api/consultations" && method === "GET") {
+          return makeOkJson({ records: [linkedRecord, reverseLinkedRecord] });
+        }
+        if (url === "/api/analyze") {
+          return makeOkJson({
+            result: MOCK_RESULT,
+            raw: {},
+            model: "deepseek-flash",
+            promptVersion: "tcm-analysis-v0.8",
+            repairedJson: false,
+          });
+        }
+        if (url === "/api/consultations" && method === "POST") {
+          const body = JSON.parse(String(init?.body)) as { caseId?: string | null; relatedCaseId?: string | null };
+          return makeOkJson({
+            record: {
+              id: "new-123",
+              consultation_name: null,
+              case_id: body.caseId ?? null,
+              case_id_updated_at: body.caseId ? new Date().toISOString() : null,
+              related_case_id: body.relatedCaseId ?? null,
+              related_case_id_updated_at: body.relatedCaseId ? new Date().toISOString() : null,
+              form_data: null,
+              analysis_status: "analyzed",
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              analyzed_at: new Date().toISOString(),
+              analysis_result: null,
+              analysis_raw: null,
+              model_meta: null,
+              ai_feedback: null,
+              ai_feedback_updated_at: null,
+            },
+          });
+        }
+        if (url === "/api/consultations/linked-1" && method === "GET") {
+          return makeOkJson({ record: linkedRecord });
+        }
+        if (url === "/api/consultations/linked-2" && method === "GET") {
+          return makeOkJson({ record: reverseLinkedRecord });
+        }
+        if (String(url).includes("/api/consultations/") && method === "GET") {
+          return makeOkJson({ record: linkedRecord });
+        }
+        return makeErrJson(404, "not found");
+      }),
+    );
+
+    const user = userEvent.setup();
+    render(<Workbench />);
+    await waitFor(() => screen.getByText("开始分析"));
+
+    await fillRequiredFields(user);
+    await user.type(screen.getByPlaceholderText("例：0004222"), "0004222");
+    await user.type(screen.getByPlaceholderText("例：0004221"), "0004221");
+    await user.click(screen.getByText("开始分析"));
+
+    await waitFor(() => screen.getByLabelText("关联病案"));
+    expect(screen.getByText("当前病案")).toBeInTheDocument();
+    expect(screen.getByText("女 44 失眠")).toBeInTheDocument();
+    expect(screen.getByText("男 51 咳嗽")).toBeInTheDocument();
+
+    await user.click(screen.getByText("女 44 失眠"));
+    await waitFor(() => expect(screen.getByDisplayValue("失眠")).toBeInTheDocument());
+  });
+
+  it("does not create linkage from numeric adjacency alone", async () => {
+    const adjacentRecord = {
+      id: "adjacent-1",
+      consultation_name: "女 52 眩晕",
+      case_id: "0004221",
+      case_id_updated_at: new Date().toISOString(),
+      related_case_id: null,
+      related_case_id_updated_at: null,
+      form_data: null,
+      analysis_status: "draft",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      analyzed_at: null,
+    };
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string, init?: RequestInit) => {
+        const method = init?.method ?? "GET";
+        if (url === "/api/consultations" && method === "GET") {
+          return makeOkJson({ records: [adjacentRecord] });
+        }
+        if (url === "/api/analyze") {
+          return makeOkJson({
+            result: MOCK_RESULT,
+            raw: {},
+            model: "deepseek-flash",
+            promptVersion: "tcm-analysis-v0.8",
+            repairedJson: false,
+          });
+        }
+        if (url === "/api/consultations" && method === "POST") {
+          const body = JSON.parse(String(init?.body)) as { caseId?: string | null; relatedCaseId?: string | null };
+          return makeOkJson({
+            record: {
+              id: "new-123",
+              consultation_name: null,
+              case_id: body.caseId ?? null,
+              case_id_updated_at: body.caseId ? new Date().toISOString() : null,
+              related_case_id: body.relatedCaseId ?? null,
+              related_case_id_updated_at: body.relatedCaseId ? new Date().toISOString() : null,
+              form_data: null,
+              analysis_status: "analyzed",
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              analyzed_at: new Date().toISOString(),
+              analysis_result: null,
+              analysis_raw: null,
+              model_meta: null,
+              ai_feedback: null,
+              ai_feedback_updated_at: null,
+            },
+          });
+        }
+        return makeErrJson(404, "not found");
+      }),
+    );
+
+    const user = userEvent.setup();
+    render(<Workbench />);
+    await waitFor(() => screen.getByText("开始分析"));
+
+    await fillRequiredFields(user);
+    await user.type(screen.getByPlaceholderText("例：0004222"), "0004222");
+    await user.click(screen.getByText("开始分析"));
+
+    await waitFor(() => screen.getByText("给AI回馈 Feedback to AI"));
+    expect(screen.queryByText("关联病案")).not.toBeInTheDocument();
+  });
+
+  it("deleting a dirty active record confirms once and resets cleanly", async () => {
+    const user = userEvent.setup();
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    render(<Workbench />);
+    await waitFor(() => screen.getByText("开始分析"));
+
+    await fillRequiredFields(user);
+    await user.click(screen.getByText("开始分析"));
+    await waitFor(() => screen.getByText("给AI回馈 Feedback to AI"));
+
+    await user.type(screen.getByPlaceholderText("例：0004222"), "0004222");
+    await user.click(screen.getByText("历史"));
+    await waitFor(() => screen.getByLabelText("删除病案"));
+    await user.click(screen.getByLabelText("删除病案"));
+
+    const fetchMock = vi.mocked(global.fetch);
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls.some(([url, init]) => String(url).includes("/api/consultations/new-123") && init?.method === "DELETE")).toBe(true);
+    expect(screen.getByPlaceholderText("例：0004222")).toHaveValue("");
+    confirmSpy.mockRestore();
+  });
+
   it("shows error toast when analyze API fails", async () => {
     vi.mocked(global.fetch).mockImplementationOnce(() => makeOkJson({ records: [] })); // initial history load
     vi.mocked(global.fetch).mockImplementationOnce(() => makeErrJson(503, "服务暂时不可用"));

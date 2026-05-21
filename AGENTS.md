@@ -101,7 +101,7 @@ Helps registered TCM doctors:
 - Fill in a structured 9-field clinical form (no free-text draft)
 - Receive simplified-Chinese clinical review output directly
 - Save consultation history for later comparison
-- Leave optional `病案编号 Case ID` and `给AI回馈 Feedback to AI` notes on analyzed records
+- Leave optional `病案编号 Case ID`, `关联病案编号 Related Case ID`, and `给AI回馈 Feedback to AI` notes on analyzed records
 
 ---
 
@@ -169,7 +169,7 @@ Never define a token only in `workbench.css` — admin pages won't see it. Add i
 
 - Single-step pipeline: doctor fills structured form → POST /api/analyze → result. No organize step.
 - Analyze always uses `DEEPSEEK_MODEL_FAST` (flash). No mode selector exposed to doctors.
-- Once a consultation is saved as `analysis_status="analyzed"`, its clinical fields become read-only in the workbench. Doctors may still edit `病案编号 Case ID` and `给AI回馈 Feedback to AI` on that record, and both save through the header `保存` button.
+- Once a consultation is saved as `analysis_status="analyzed"`, its clinical fields become read-only in the workbench. Doctors may still edit `病案编号 Case ID`, `关联病案编号 Related Case ID`, and `给AI回馈 Feedback to AI` on that record, and all three save through the header `保存` button.
 - Core analysis sections must be structurally stable — all sections always present, even if empty with a fallback string.
 - Analyze output reading order: 重点结论 → 当前思路 → 建议优化 → 可选思路 → 风险与提醒 → 随访监测 → 证据状态.
 - UI result layout: 3 columns — 判断 (当前思路) / 方案 (建议优化+可选) / 随访监测. Plus 重点结论 banner and 风险与提醒 warning box at top.

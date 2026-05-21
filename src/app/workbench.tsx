@@ -339,21 +339,8 @@ function normalizeCaseId(value: string) {
   return trimmed ? trimmed : null;
 }
 
-function isNumericCaseId(value: string | null) {
-  return !!value && /^\d+$/.test(value);
-}
-
-function buildAdjacentCaseId(value: string, delta: -1 | 1) {
-  const numericValue = Number.parseInt(value, 10);
-  if (!Number.isFinite(numericValue)) return null;
-  const nextValue = numericValue + delta;
-  if (nextValue < 0) return null;
-  return String(nextValue).padStart(value.length, "0");
-}
-
-type RelatedTimeline = {
-  previous: ConsultationSummary[];
-  next: ConsultationSummary[];
+type LinkedCaseRail = {
+  linkedRecords: ConsultationSummary[];
 };
 
 // ---------------------------------------------------------------------------
@@ -465,55 +452,49 @@ const FeedbackCard = memo(function FeedbackCard({
 });
 
 const CaseLinkTimeline = memo(function CaseLinkTimeline({
-  currentCaseId,
-  related,
+  currentRecord,
+  linkedRecords,
   onSelect,
 }: {
-  currentCaseId: string;
-  related: RelatedTimeline;
+  currentRecord: ConsultationSummary;
+  linkedRecords: ConsultationSummary[];
   onSelect: (id: string) => void;
 }) {
-  if (!related.previous.length && !related.next.length) return null;
+  if (!linkedRecords.length) return null;
 
   return (
-    <div className="case-linkage">
-      <div className="case-linkage__line" aria-hidden />
-      {related.previous.map((record) => (
-        <button
-          key={`prev-${record.id}`}
-          type="button"
-          className="case-linkage__item"
-          onClick={() => onSelect(record.id)}
-        >
-          <span className="case-linkage__dot" aria-hidden />
-          <span className="case-linkage__item-main">
-            <span className="case-linkage__case-id">{record.case_id}</span>
-            <span className="case-linkage__name">{buildDisplayName(record)}</span>
-          </span>
-        </button>
-      ))}
-      <div className="case-linkage__item case-linkage__item--current">
-        <span className="case-linkage__dot case-linkage__dot--current" aria-hidden />
-        <span className="case-linkage__item-main">
-          <span className="case-linkage__case-id">{currentCaseId}</span>
-          <span className="case-linkage__name">当前病案</span>
-        </span>
+    <aside className="case-linkage-rail" aria-label="关联病案">
+      <div className="case-linkage-rail__header">
+        <span className="case-linkage-rail__title">关联病案</span>
       </div>
-      {related.next.map((record) => (
-        <button
-          key={`next-${record.id}`}
-          type="button"
-          className="case-linkage__item"
-          onClick={() => onSelect(record.id)}
-        >
-          <span className="case-linkage__dot" aria-hidden />
+      <div className="case-linkage">
+        <div className="case-linkage__line" aria-hidden />
+        <span className="case-linkage__section-label">当前病案</span>
+        <div className="case-linkage__item case-linkage__item--current">
+          <span className="case-linkage__dot case-linkage__dot--current" aria-hidden />
           <span className="case-linkage__item-main">
-            <span className="case-linkage__case-id">{record.case_id}</span>
-            <span className="case-linkage__name">{buildDisplayName(record)}</span>
+            <span className="case-linkage__case-id">{currentRecord.case_id ?? "未填写病案编号"}</span>
+            <span className="case-linkage__name">{buildDisplayName(currentRecord)}</span>
           </span>
-        </button>
-      ))}
-    </div>
+        </div>
+
+        <span className="case-linkage__section-label">关联病案</span>
+        {linkedRecords.map((record) => (
+          <button
+            key={`linked-${record.id}`}
+            type="button"
+            className="case-linkage__item"
+            onClick={() => onSelect(record.id)}
+          >
+            <span className="case-linkage__dot" aria-hidden />
+            <span className="case-linkage__item-main">
+              <span className="case-linkage__case-id">{record.case_id ?? "未填写病案编号"}</span>
+              <span className="case-linkage__name">{buildDisplayName(record)}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+    </aside>
   );
 });
 
@@ -699,22 +680,33 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
   const relatedCaseIdDirty = normalizedRelatedCaseId !== savedRelatedCaseId;
   const feedbackDirty = feedback !== savedFeedback;
   const hasUnsavedChanges = saveStatus === "unsaved" || caseIdDirty || relatedCaseIdDirty || feedbackDirty;
-  const relatedTimeline = useMemo<RelatedTimeline | null>(() => {
-    if (!activeId || !normalizedCaseId || !isNumericCaseId(normalizedCaseId)) return null;
-    const previousId = buildAdjacentCaseId(normalizedCaseId, -1);
-    const nextId = buildAdjacentCaseId(normalizedCaseId, 1);
-    if (!previousId && !nextId) return null;
+  const linkedCaseRail = useMemo<LinkedCaseRail | null>(() => {
+    if (!activeId) return null;
 
-    const previous = previousId
-      ? consultations.filter((item) => item.id !== activeId && normalizeCaseId(item.case_id ?? "") === previousId)
+    const currentRecord = consultations.find((item) => item.id === activeId);
+    if (!currentRecord) return null;
+
+    const currentCase = normalizeCaseId(currentRecord.case_id ?? "");
+    const currentRelated = normalizeCaseId(currentRecord.related_case_id ?? "");
+
+    const directMatches = currentRelated
+      ? consultations.filter(
+          (item) => item.id !== activeId && normalizeCaseId(item.case_id ?? "") === currentRelated,
+        )
       : [];
-    const next = nextId
-      ? consultations.filter((item) => item.id !== activeId && normalizeCaseId(item.case_id ?? "") === nextId)
+    const reverseMatches = currentCase
+      ? consultations.filter(
+          (item) => item.id !== activeId && normalizeCaseId(item.related_case_id ?? "") === currentCase,
+        )
       : [];
 
-    if (!previous.length && !next.length) return null;
-    return { previous, next };
-  }, [activeId, consultations, normalizedCaseId]);
+    const linkedRecords = [...directMatches, ...reverseMatches].filter(
+      (item, index, items) => items.findIndex((candidate) => candidate.id === item.id) === index,
+    );
+
+    if (!linkedRecords.length) return null;
+    return { linkedRecords };
+  }, [activeId, consultations]);
 
   const showToast = useCallback((message: string, tone: ToastState["tone"] = "info") => {
     setToast({ message, tone });
@@ -775,8 +767,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
     setSaveStatus((prev) => prev === "saving" ? prev : "unsaved");
   }, []);
 
-  function handleNew() {
-    if (!confirmDiscardChanges()) return;
+  const resetWorkbenchToNew = useCallback(() => {
     setForm(EMPTY_FORM);
     setTouched(new Set());
     setResult(null);
@@ -795,6 +786,11 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
     setSaveStatus("new");
     setSavedAt(null);
     router.replace("/", { scroll: false });
+  }, [router]);
+
+  function handleNew() {
+    if (!confirmDiscardChanges()) return;
+    resetWorkbenchToNew();
   }
 
   async function handleSelectHistory(id: string) {
@@ -848,7 +844,9 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
     try {
       await apiDeleteConsultation(id);
       setConsultations((prev) => prev.filter((c) => c.id !== id));
-      if (activeId === id) handleNew();
+      if (activeId === id) {
+        resetWorkbenchToNew();
+      }
       showToast("已删除。", "success");
     } catch {
       showToast("删除失败，请稍后重试。", "error");
@@ -1090,6 +1088,8 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
 
       {/* Form */}
       <main className="workbench__main">
+        <div className="workbench__body">
+        <div className="workbench__content">
         <section className="form-section">
           <div className="form-card">
             {/* Clone provenance banner — shown when a consultation was cloned from another doctor */}
@@ -1317,13 +1317,6 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
               form={form}
             />
 
-            {relatedTimeline && normalizedCaseId ? (
-              <CaseLinkTimeline
-                currentCaseId={normalizedCaseId}
-                related={relatedTimeline}
-                onSelect={(id) => void handleSelectHistory(id)}
-              />
-            ) : null}
           </div>
         </section>
 
@@ -1420,6 +1413,29 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
             updatedAt={feedbackUpdatedAt}
           />
         )}
+        </div>
+        {linkedCaseRail && activeId ? (
+          <CaseLinkTimeline
+            currentRecord={
+              consultations.find((item) => item.id === activeId) ?? {
+                id: activeId,
+                consultation_name: null,
+                case_id: normalizeCaseId(caseId),
+                case_id_updated_at: null,
+                related_case_id: normalizeCaseId(relatedCaseId),
+                related_case_id_updated_at: null,
+                form_data: form,
+                analysis_status: recordLocked ? "analyzed" : "draft",
+                created_at: "",
+                updated_at: "",
+                analyzed_at: null,
+              }
+            }
+            linkedRecords={linkedCaseRail.linkedRecords}
+            onSelect={(id) => void handleSelectHistory(id)}
+          />
+        ) : null}
+        </div>
       </main>
 
       {/* Footer */}

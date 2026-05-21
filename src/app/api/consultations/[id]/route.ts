@@ -9,12 +9,20 @@ type RouteContext = {
   params: Promise<{ id: string }>;
 };
 
+const CASE_ID_MAX_LENGTH = 64;
+
 function normalizeName(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
 function normalizeCaseId(value: unknown) {
-  return typeof value === "string" && value.trim() ? value.trim() : null;
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (trimmed.length > CASE_ID_MAX_LENGTH) {
+    throw new Error("CASE_ID_TOO_LONG");
+  }
+  return trimmed;
 }
 
 function isUnauthorized(error: unknown) {
@@ -39,6 +47,9 @@ export async function GET(_request: Request, context: RouteContext) {
       return apiError(401, "UNAUTHORIZED", "请先登录。");
     }
 
+    if (error instanceof Error && error.message === "CASE_ID_TOO_LONG") {
+      return apiError(400, "CASE_ID_TOO_LONG", "病案编号与关联病案编号不能超过64个字符。");
+    }
     await logServerEvent({
       source: "api/consultations/[id]",
       message: "读取病案记录失败。",
