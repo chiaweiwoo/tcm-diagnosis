@@ -471,9 +471,9 @@ const CaseLinkTimeline = memo(function CaseLinkTimeline({
   if (!timelineRecords.length) return null;
 
   return (
-    <aside className="case-linkage-rail" aria-label="\u5173\u8054\u75c5\u6848">
+    <aside className="case-linkage-rail" aria-label="随访记录">
       <div className="case-linkage-rail__header">
-        <span className="case-linkage-rail__title">\u5173\u8054\u75c5\u6848</span>
+        <span className="case-linkage-rail__title">随访记录</span>
       </div>
       <div className="case-linkage">
         <div className="case-linkage__line" aria-hidden />
@@ -486,8 +486,8 @@ const CaseLinkTimeline = memo(function CaseLinkTimeline({
                 <span className="case-linkage__dot case-linkage__dot--current" aria-hidden />
                 <span className="case-linkage__item-main">
                   <span className="case-linkage__item-head">
-                    <span className="case-linkage__case-id">{record.case_id ?? "\u672a\u586b\u5199\u75c5\u6848\u7f16\u53f7"}</span>
-                    <span className="case-linkage__status">\u5f53\u524d\u75c5\u6848</span>
+                    <span className="case-linkage__case-id">{record.case_id ?? "未填写病案编号"}</span>
+                    <span className="case-linkage__status">当前病案</span>
                   </span>
                   <span className="case-linkage__name">{buildDisplayName(record)}</span>
                   <span className="case-linkage__time">{formatDate(record.updated_at)}</span>
@@ -505,7 +505,7 @@ const CaseLinkTimeline = memo(function CaseLinkTimeline({
             >
               <span className="case-linkage__dot" aria-hidden />
               <span className="case-linkage__item-main">
-                <span className="case-linkage__case-id">{record.case_id ?? "\u672a\u586b\u5199\u75c5\u6848\u7f16\u53f7"}</span>
+                <span className="case-linkage__case-id">{record.case_id ?? "未填写病案编号"}</span>
                 <span className="case-linkage__name">{buildDisplayName(record)}</span>
                 <span className="case-linkage__time">{formatDate(record.updated_at)}</span>
               </span>
@@ -604,7 +604,7 @@ const HistoryPanel = memo(function HistoryPanel({
         <div className="history-table-head" aria-hidden>
           <span className="history-table-head__name">病案</span>
           <span className="history-table-head__case">病案编号</span>
-          <span className="history-table-head__related">关联编号</span>
+          <span className="history-table-head__related">随访编号</span>
           <span className="history-table-head__time">更新时间</span>
         </div>
 
@@ -1215,7 +1215,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
                 />
               </div>
               <div className="form-group">
-                <label className="form-label" htmlFor="related-case-id-input">关联病案编号 Related Case ID</label>
+                <label className="form-label" htmlFor="related-case-id-input">随访记录编号 Follow-up Record ID</label>
                 <input
                   id="related-case-id-input"
                   className="form-input form-input--sm case-id-panel__input"

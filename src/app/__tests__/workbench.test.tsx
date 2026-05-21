@@ -306,7 +306,7 @@ describe("Analyze flow", () => {
     expect(screen.getByText("注意肝功能")).toBeInTheDocument();
   });
 
-  it("shows feedback section after analyze and saves case id + related case id + feedback through header save", async () => {
+  it("shows feedback section after analyze and saves case id + follow-up record ID + feedback through header save", async () => {
     const user = userEvent.setup();
     render(<Workbench />);
     await waitFor(() => screen.getByText("开始分析"));
@@ -566,7 +566,7 @@ describe("Analyze flow", () => {
     await user.click(screen.getByText("开始分析"));
 
     await waitFor(() => screen.getByText("给AI回馈 Feedback to AI"));
-    expect(screen.queryByText("关联病案")).not.toBeInTheDocument();
+    expect(screen.queryByText("随访记录")).not.toBeInTheDocument();
   });
 
   it("deleting a dirty active record confirms once and resets cleanly", async () => {
@@ -620,7 +620,7 @@ describe("History panel", () => {
     expect(screen.getByText("暂无历史记录")).toBeInTheDocument();
   });
 
-  it("searches history by case id and related case id", async () => {
+  it("searches history by case id and follow-up record ID", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn((url: string, init?: RequestInit) => {

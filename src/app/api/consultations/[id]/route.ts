@@ -48,7 +48,7 @@ export async function GET(_request: Request, context: RouteContext) {
     }
 
     if (error instanceof Error && error.message === "CASE_ID_TOO_LONG") {
-      return apiError(400, "CASE_ID_TOO_LONG", "病案编号与关联病案编号不能超过64个字符。");
+      return apiError(400, "CASE_ID_TOO_LONG", "病案编号与随访记录编号不能超过64个字符。");
     }
     await logServerEvent({
       source: "api/consultations/[id]",
@@ -101,7 +101,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       Object.hasOwn(body, "analysisStatus");
 
     if (existing.analysis_status === "analyzed" && wantsLockedFieldChange) {
-      return apiError(409, "READ_ONLY_RECORD", "已分析病案不可修改原始内容，仅可更新病案编号、关联病案编号与给AI回馈。");
+      return apiError(409, "READ_ONLY_RECORD", "已分析病案不可修改原始内容，仅可更新病案编号、随访记录编号与给AI回馈。");
     }
 
     // Detect whether form data changed to reset analysis state
