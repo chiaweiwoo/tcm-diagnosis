@@ -1065,7 +1065,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
               </div>
             )}
 
-            {/* Row 1: Meta strip — sex / age / prescription type */}
+            {/* Row 1: Meta strip — sex / age / prescription type / case id */}
             {recordLocked && (
               <div className="readonly-banner">
                 该病案已完成分析并归档，原始字段仅供查看；如需补充意见，请使用下方“给AI回馈”。
