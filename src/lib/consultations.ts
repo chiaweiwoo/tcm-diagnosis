@@ -66,7 +66,7 @@ export async function listConsultations(
   const base = client
     .from("consultations")
     .select(LIST_COLUMNS)
-    .order("updated_at", { ascending: false });
+    .order("created_at", { ascending: false });
 
   const { data, error } = await (opts.doctorEmail
     ? base.eq("doctor_email", opts.doctorEmail)
