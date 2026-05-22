@@ -2535,13 +2535,18 @@ details[open] .sample-details__toggle::before {
   }
 
   /* Profile 4-col grid → 2-col on tablet */
-  .profile-cards-grid {
+  .profile-cards-grid,
+  .profile-cards-grid--two,
+  .profile-cards-grid--three {
     grid-template-columns: repeat(2, 1fr);
   }
 
-  /* Donut charts → stack on tablet */
+  /* Donut charts → 1 column on tablet if needed, but 3 can be tight. Let's try 1fr if very small. */
+  /* For 768px, 3 columns is usually okay if donuts are 90px. 
+     But let's make them more flexible. */
   .profile-donuts {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 16px;
   }
 
   /* Case grid — 1 column */
@@ -2551,7 +2556,7 @@ details[open] .sample-details__toggle::before {
 
   /* Profile grid — stack */
   .eval-profile-grid {
-    flex-direction: column;
+    grid-template-columns: 1fr;
   }
   .eval-profile-card {
     min-width: 0;
@@ -2576,19 +2581,21 @@ details[open] .sample-details__toggle::before {
   }
 
   /* Profile grid → 1 col on phones */
-  .profile-cards-grid {
+  .profile-cards-grid,
+  .profile-cards-grid--two,
+  .profile-cards-grid--three {
     grid-template-columns: 1fr;
   }
 
   /* Donut charts → stacked on phones */
   .profile-donuts {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
+    grid-template-columns: 1fr;
+    gap: 20px;
   }
 
   .profile-donut-svg {
-    width: 72px;
-    height: 72px;
+    width: 80px;
+    height: 80px;
   }
 
   /* Hide type column in consultation table on small phones */
@@ -2606,6 +2613,49 @@ details[open] .sample-details__toggle::before {
     font-size: 12px;
   }
 }
+
+/* ── Gap/Issue details (used in SessionReviewList and EvaluationPanel) ── */
+.eval-gap-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.eval-gap-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.eval-gap-desc {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--foreground);
+}
+
+.eval-gap-hint {
+  font-size: 13px;
+  color: var(--warn, #92400E);
+  background: var(--warn-bg, #FFFBEB);
+  border-left: 3px solid var(--warn, #B45309);
+  padding: 8px 12px;
+  border-radius: 0 4px 4px 0;
+}
+
+.eval-gap-freq {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+  background: var(--sage);
+  color: var(--muted);
+  border-radius: 4px;
+  margin-left: 8px;
+}
+
 
 /* ── Compact consultation table ── */
 .ctable-wrap {

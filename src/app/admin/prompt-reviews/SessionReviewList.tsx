@@ -57,9 +57,9 @@ function ReviewCard({ row }: { row: SessionReviewRow }) {
   const verdictClass = VERDICT_CLASS[review.verdict] ?? "eval-verdict--stable";
 
   return (
-    <div className="eval-panel" style={{ marginBottom: "1rem" }}>
+    <div className="eval-panel" style={{ marginBottom: "1.5rem" }}>
       <div className="eval-toolbar">
-        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+        <div className="eval-verdict-row">
           <span className={`eval-verdict ${verdictClass}`}>
             {VERDICT_LABEL[review.verdict] ?? review.verdict}
           </span>
@@ -85,7 +85,7 @@ function ReviewCard({ row }: { row: SessionReviewRow }) {
       </div>
 
       {expanded && (
-        <div style={{ marginTop: "0.5rem" }}>
+        <div style={{ marginTop: "1rem", display: "flex", flexDirection: "column", gap: "1.5rem" }}>
           {/* Prior improvement status */}
           {review.priorImprovementStatus && review.priorImprovementStatus.length > 0 && (
             <div className="eval-block">

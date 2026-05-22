@@ -1345,6 +1345,26 @@ button.case-linkage__item:hover {
     grid-template-columns: 1fr;
   }
 
+  .form-row--meta {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .form-fieldset--meta {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .case-id-panel__input {
+    width: 100%;
+  }
+
+  .form-input--sm {
+    width: 100%;
+  }
+
   .workbench__main {
     padding: 14px 12px 24px;
   }
@@ -1367,9 +1387,42 @@ button.case-linkage__item:hover {
     max-width: min(720px, calc(100vw - 24px));
   }
 
+  .history-table-head {
+    display: none; /* Hide table head on mobile, items will stack/adjust */
+  }
+
   .history-item {
-    grid-template-columns: minmax(0, 1fr) 100px 100px 140px;
-    column-gap: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 12px;
+  }
+
+  .history-item__name {
+    font-size: 14px;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    width: 100%;
+  }
+
+  .history-item__pills {
+    display: flex;
+    gap: 6px;
+    width: 100%;
+  }
+
+  .history-item__pill {
+    width: auto;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .history-item__meta {
+    width: 100%;
+    text-align: left;
+    font-size: 12px;
   }
 }
 
