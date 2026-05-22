@@ -2614,6 +2614,122 @@ details[open] .sample-details__toggle::before {
   }
 }
 
+/* ── Users list ── */
+
+.users-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.users-search-input {
+  flex: 1;
+  max-width: 360px;
+  height: 36px;
+  padding: 0 12px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text, #1A1A1A);
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #EAE6E2);
+  border-radius: 8px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.users-search-input:focus {
+  border-color: var(--border-focus, #9B2226);
+}
+
+.users-count {
+  font-size: 13px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.users-list {
+  border: 1px solid var(--border, #EAE6E2);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface, #fff);
+}
+
+.users-list-head {
+  display: grid;
+  grid-template-columns: 1fr 100px 140px;
+  padding: 8px 16px;
+  background: var(--bg, #FAFAF8);
+  border-bottom: 1px solid var(--border, #EAE6E2);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.users-row {
+  display: grid;
+  grid-template-columns: 1fr 100px 140px;
+  align-items: center;
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--border, #EAE6E2);
+  font-size: 14px;
+  text-decoration: none;
+  color: var(--text, #1A1A1A);
+  transition: background 0.12s;
+}
+
+.users-row:last-child {
+  border-bottom: none;
+}
+
+.users-row--link {
+  cursor: pointer;
+}
+
+.users-row--link:hover {
+  background: var(--bg, #FAFAF8);
+}
+
+.users-row--inactive {
+  opacity: 0.55;
+}
+
+.users-row__email {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.users-row__date {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.users-unregistered {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+@media (max-width: 480px) {
+  .users-list-head {
+    grid-template-columns: 1fr 100px;
+  }
+  .users-list-head span:last-child {
+    display: none;
+  }
+  .users-row {
+    grid-template-columns: 1fr 100px;
+  }
+  .users-row__date {
+    display: none;
+  }
+}
+
 /* ── AI Output Audit (v2) ── */
 
 .audit-card {
