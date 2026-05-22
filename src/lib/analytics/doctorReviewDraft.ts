@@ -140,20 +140,32 @@ function collectCautions(analysisResult: Record<string, unknown> | null): string
 }
 
 function inferCaseCategory(formData: Record<string, unknown> | null): string {
-  const text = [
+  const primaryText = [
+    formData?.chiefComplaint,
+    formData?.diagnosis,
+  ].map((value) => String(value ?? "")).join(" ");
+  const allText = [
     formData?.chiefComplaint,
     formData?.currentIllness,
     formData?.diagnosis,
     formData?.pattern,
   ].map((value) => String(value ?? "")).join(" ");
 
-  if (/痛|疼|伤筋|劳损|肩|腰|膝|腕|肘|颈|跟骨|肌|关节|筋|痹/.test(text)) return "疼痛筋伤";
-  if (/咳|感冒|鼻|咽|痰|呼吸|支气管/.test(text)) return "呼吸咳嗽";
-  if (/月经|经期|乳房|妇|孕|冲任|带下/.test(text)) return "妇科调理";
-  if (/湿疹|皮肤|瘙痒|痤疮|疱疹/.test(text)) return "皮肤问题";
-  if (/胃|腹|便秘|大便|纳呆|痞满|消化/.test(text)) return "脾胃消化";
-  if (/失眠|焦虑|情绪|多梦|睡眠|心烦/.test(text)) return "睡眠情志";
-  if (/减肥|肥胖|体重|代谢/.test(text)) return "体重代谢";
+  if (/月经|经期|乳房|妇|孕|冲任|带下/.test(primaryText)) return "妇科调理";
+  if (/湿疹|皮肤|瘙痒|痤疮|疱疹/.test(primaryText)) return "皮肤问题";
+  if (/咳|感冒|鼻|咽|痰|呼吸|支气管/.test(primaryText)) return "呼吸咳嗽";
+  if (/胃|腹|便秘|大便|纳呆|痞满|消化/.test(primaryText)) return "脾胃消化";
+  if (/失眠|焦虑|情绪|多梦|睡眠|心烦/.test(primaryText)) return "睡眠情志";
+  if (/减肥|肥胖|体重|代谢/.test(primaryText)) return "体重代谢";
+  if (/痛|疼|伤筋|劳损|肩|腰|膝|腕|肘|颈|跟骨|肌|关节|筋|痹/.test(primaryText)) return "疼痛筋伤";
+
+  if (/月经|经期|乳房|妇|孕|冲任|带下/.test(allText)) return "妇科调理";
+  if (/湿疹|皮肤|瘙痒|痤疮|疱疹/.test(allText)) return "皮肤问题";
+  if (/咳|感冒|鼻|咽|痰|呼吸|支气管/.test(allText)) return "呼吸咳嗽";
+  if (/胃|腹|便秘|大便|纳呆|痞满|消化/.test(allText)) return "脾胃消化";
+  if (/失眠|焦虑|情绪|多梦|睡眠|心烦/.test(allText)) return "睡眠情志";
+  if (/减肥|肥胖|体重|代谢/.test(allText)) return "体重代谢";
+  if (/痛|疼|伤筋|劳损|肩|腰|膝|腕|肘|颈|跟骨|肌|关节|筋|痹/.test(allText)) return "疼痛筋伤";
   return "其他";
 }
 
@@ -374,6 +386,7 @@ async function synthesizeWithPro({
           "重点是医学画像，不是行政统计，也不是审计报告。",
           "只基于给定 AGGREGATE_SIGNALS 与 CASE_CARDS，不要发明病例、比例或诊疗事实。",
           "不要评价医生临床判断对错。语气使用：可见、倾向、可讨论、可留意。",
+          "不要建议医生扩大病种范围；病例结构只作为观察背景，不作为能力评价。",
           "输出紧凑、具体、能帮助管理员与医生沟通。",
           "只输出合法 JSON，不要 markdown。",
           "字段必须为：clinicalSummary:string; mainCaseTypes:string[]; treatmentStyle:string[]; aiMedicalRiskThemes:string[]; strengths:string[]; discussionDirections:string[]; conversationReference:string[]。",
