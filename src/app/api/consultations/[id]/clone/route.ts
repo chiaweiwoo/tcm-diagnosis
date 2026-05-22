@@ -20,22 +20,33 @@ export async function POST(_req: Request, context: RouteContext) {
     // Read source consultation (service_role bypasses RLS — admin can read any doctor's record)
     const { data: source, error: readError } = await admin
       .from("consultations")
-      .select("form_data,doctor_email")
+      .select("form_data,analysis_result,analysis_raw,model_meta,analysis_status,analyzed_at,case_id,related_case_id,doctor_email")
       .eq("id", id)
       .maybeSingle();
 
     if (readError) throw readError;
     if (!source) return apiError(404, "NOT_FOUND", "找不到原始病案记录。");
 
-    // Insert new consultation under the admin's own account, form_data only
+    const now = new Date().toISOString();
+
+    // Insert new consultation under the admin's own account — full copy of inputs + outputs
     const { data: newRecord, error: insertError } = await admin
       .from("consultations")
       .insert({
         doctor_id: doctor.id,
         doctor_email: doctor.email,
         form_data: source.form_data,
-        analysis_status: "draft",
-        model_meta: { cloned_from_doctor_email: source.doctor_email },
+        analysis_result: source.analysis_result ?? null,
+        analysis_raw: source.analysis_raw ?? null,
+        analysis_status: source.analysis_status ?? "draft",
+        analyzed_at: source.analyzed_at ?? null,
+        case_id: source.case_id ?? null,
+        case_id_updated_at: source.case_id ? now : null,
+        related_case_id: source.related_case_id ?? null,
+        related_case_id_updated_at: source.related_case_id ? now : null,
+        analysis_stale: false,
+        // Preserve original model_meta and tag provenance
+        model_meta: { ...(source.model_meta as object ?? {}), cloned_from_doctor_email: source.doctor_email },
       })
       .select("id")
       .single();
