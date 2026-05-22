@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildCaseLabel,
   computeFieldCompleteness,
+  doctorReviewDraftToProfile,
   extractThemeCandidates,
   normalizeDoctorProfile,
 } from "./evaluation";
@@ -108,6 +109,33 @@ describe("Goal 2 deterministic evaluation helpers", () => {
     ]);
     expect(profile.guidancePoints).toEqual([
       { text: "可以先肯定记录的主诉清楚。", caseNumbers: [] },
+    ]);
+  });
+
+  it("maps medical draft reviews into the stored doctor profile shape", () => {
+    const profile = doctorReviewDraftToProfile({
+      clinicalSummary: "疼痛筋伤病例较多，针灸与方药并用。",
+      mainCaseTypes: ["疼痛筋伤", "呼吸咳嗽"],
+      treatmentStyle: ["针灸处理局部筋伤", "方药重视气血辨证"],
+      aiMedicalRiskThemes: ["针刺深度与解剖风险"],
+      strengths: ["体检发现能支持辨证"],
+      discussionDirections: ["可进一步统一高风险部位复核习惯"],
+      conversationReference: ["可先肯定其治疗方向清楚。"],
+    });
+
+    expect(profile.profileSummary).toBe("疼痛筋伤病例较多，针灸与方药并用。");
+    expect(profile.keyObservations).toEqual([
+      "疼痛筋伤",
+      "呼吸咳嗽",
+      "针灸处理局部筋伤",
+      "方药重视气血辨证",
+    ]);
+    expect(profile.aiRecurringThemes).toEqual([
+      { theme: "针刺深度与解剖风险", frequency: "", caseNumbers: [] },
+    ]);
+    expect(profile.gaps[0]?.evidence).toBe("可进一步统一高风险部位复核习惯");
+    expect(profile.guidancePoints).toEqual([
+      { text: "可先肯定其治疗方向清楚。" },
     ]);
   });
 });

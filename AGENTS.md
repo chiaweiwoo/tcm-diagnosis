@@ -262,7 +262,7 @@ Only `chiaweiwoo123@gmail.com` is seeded as admin.
 
 ---
 
-## Doctor Evaluation (Goal 2 — doctor profile)
+## Doctor Evaluation (Goal 2 — medical doctor review)
 
 **On-demand only.** No scheduled cron. Triggered by:
 - Admin UI button on `/admin/users/[doctorId]` → 临床画像 tab
@@ -284,11 +284,25 @@ Draft experiment route: `POST /api/cron/evaluate-doctors-draft`
 - Auth: `X-Assessment-Key` header
 - Body: `{ doctorEmail: string, windowDays?: number, mode?: "medical_profile_v2" }`
 - Read-only; never inserts into `analytics_doctor_evaluations`
-- Used by `.github/workflows/evaluate-doctor-draft.yml` to compare a medical-profile draft before replacing live Goal 2
+- Used by `.github/workflows/evaluate-doctor-draft.yml` to inspect sandbox artifacts without writing rows
 - Pipeline: all rows are seen by code; Flash compresses them into compact case cards; code aggregates case types / treatment logic / AI risk / strength signals; Pro writes the six medical sections; optional Flash cleanup if Pro is too long
 - Logs must show only sanitized summary/diagnostics; no full consultation input in GitHub logs
 
-### Two-stage pipeline (v1.3)
+### Current pipeline (medical v2)
+
+Goal 2 is now a doctor-readable clinical review, not an operational audit. The canonical stored route uses the Flash + Pro medical-review pipeline and writes into `analytics_doctor_evaluations.doctor_profile` through the existing append-only insert path.
+
+- Flash compresses each consultation into compact case cards with bounded parallelism and deterministic fallback.
+- TypeScript aggregates medical signals from the cards.
+- DeepSeek Pro synthesizes the final Chinese clinical review.
+- The result is adapted into the existing `DoctorProfile` storage shape so no DB migration is required.
+- Do not show explicit `x/y`, percentages, or visible frequency counts in the admin profile UI.
+- The visible UI is split into `描述性分析` and `复盘与沟通`.
+- Pie charts / patient distribution are no longer shown in the profile UI; time-series remains as light `近期记录背景`.
+
+The draft workflow `.github/workflows/evaluate-doctor-draft.yml` remains available for sandbox inspection and artifacts, but it is not the canonical storage path. The canonical storage workflow is `.github/workflows/evaluate-doctors.yml`.
+
+### Legacy deterministic pipeline (kept for helpers/tests)
 
 **Stage 1 — Observer** (`analyzeConsultations()`, pure TypeScript, no LLM):
 - `computeFieldCompleteness()` — pastHistory + physicalExam fill rates across ALL rows
@@ -316,12 +330,9 @@ Draft experiment route: `POST /api/cron/evaluate-doctors-draft`
 - `guidancePoints` (array of `{text}`) — Stage 2
 
 Admin UI panel (`/admin/users/[doctorId]?tab=profile`) card order:
-1. 画像摘要 + keyObservations bullets
-2. 病案分布 (patient distribution — teal card, CSS-only bars)
-3. AI关注的主题 (chip cloud, size = frequency tier)
-4. 可取之处 (strengths, no case refs)
-5. 差距识别 (gaps with dual-evidence stats + help tooltip)
-6. 对话参考 (guidance, no case refs)
+1. 画像摘要
+2. 描述性分析: 临床观察, 反复提醒的风险点, 近期记录背景
+3. 复盘与沟通: 可取之处, 可讨论方向, 沟通提示
 
 All section titles have a `(?)` help tooltip.
 

@@ -1,5 +1,5 @@
 /**
- * Bulk doctor evaluation endpoint — runs doctor profile (Goal 2)
+ * Bulk doctor evaluation endpoint — runs Goal 2 medical doctor review
  * for all active doctors or a single doctor over the requested window.
  *
  * Triggered via GH Actions workflow_dispatch (manual only — no schedule).
@@ -137,53 +137,42 @@ export async function POST(req: NextRequest) {
     }, { status: 404 });
   }
 
-  const results = await Promise.allSettled(
-    doctors.map(async (doctor) => {
-      try {
-        const { evaluation, consultationCount, model } = await evaluateDoctor(admin, doctor.doctorId, windowDays);
-        await insertDoctorEvaluation({
-          client: admin,
-          doctorId: doctor.doctorId,
-          windowDays,
-          evaluation,
-          consultationCount,
-          model,
-        });
-        return { doctor, skipped: false };
-      } catch (error) {
-        if (error instanceof NoConsultationsError) {
-          return { doctor, skipped: true };
-        }
-        throw { doctor, error };
-      }
-    }),
-  );
-
   let processed = 0;
   let skipped = 0;
   const failures: Failure[] = [];
 
-  for (const result of results) {
-    if (result.status === "fulfilled") {
-      result.value.skipped ? skipped++ : processed++;
-      continue;
-    }
+  for (const doctor of doctors) {
+    try {
+      const { evaluation, consultationCount, model } = await evaluateDoctor(admin, doctor.doctorId, windowDays);
+      await insertDoctorEvaluation({
+        client: admin,
+        doctorId: doctor.doctorId,
+        windowDays,
+        evaluation,
+        consultationCount,
+        model,
+      });
+      processed++;
+    } catch (error) {
+      if (error instanceof NoConsultationsError) {
+        skipped++;
+        continue;
+      }
 
-    const reason = result.reason as { doctor?: DoctorTarget; error?: unknown };
-    const error = reason.error ?? result.reason;
-    const message = safeErrorMessage(error);
-    const stage: Failure["stage"] = error instanceof DeepSeekError
-      ? "deepseek"
-      : message.includes("没有已分析") || message.includes("No")
-      ? "fetch_consultations"
-      : "save";
-    failures.push({
-      doctorEmail: reason.doctor?.email,
-      doctorId: reason.doctor?.doctorId,
-      stage,
-      message,
-      details: deepSeekDetails(error),
-    });
+      const message = safeErrorMessage(error);
+      const stage: Failure["stage"] = error instanceof DeepSeekError
+        ? "deepseek"
+        : message.includes("没有已分析") || message.includes("No")
+        ? "fetch_consultations"
+        : "save";
+      failures.push({
+        doctorEmail: doctor.email,
+        doctorId: doctor.doctorId,
+        stage,
+        message,
+        details: deepSeekDetails(error),
+      });
+    }
   }
 
   if (failures.length > 0) {

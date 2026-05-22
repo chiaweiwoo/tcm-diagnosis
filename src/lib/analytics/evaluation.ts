@@ -1,6 +1,11 @@
 /**
  * Doctor profile evaluation pipeline — Goal 2.
  *
+ * The canonical evaluator now uses the medical review pipeline from
+ * doctorReviewDraft.ts, then adapts that output into the existing stored
+ * DoctorProfile shape. The deterministic helpers below are kept for tests,
+ * backward compatibility, and older stored rows.
+ *
  * Two-stage pipeline:
  *   Stage 1 — Observer (analyzeConsultations): pure TypeScript, deterministic.
  *              Computes field completeness, promotes AI themes, detects gaps via
@@ -24,6 +29,11 @@ import {
 } from "./prompts";
 import { buildWindow } from "./stats";
 import { getLangfuse } from "@/lib/langfuse";
+import {
+  runDoctorReviewDraft,
+  type DoctorReviewDraft,
+  type DoctorReviewDraftRow,
+} from "./doctorReviewDraft";
 
 // ---------------------------------------------------------------------------
 // Errors
@@ -145,6 +155,8 @@ type EvalRow = {
   analysis_result: Record<string, unknown> | null;
   analyzed_at: string | null;
 };
+
+const MEDICAL_REVIEW_PROMPT_VERSION = "doctor-review-medical-v2";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -726,6 +738,41 @@ async function narrateFindings(
   return result.data;
 }
 
+export function doctorReviewDraftToProfile(draft: DoctorReviewDraft): DoctorProfile {
+  return {
+    profileSummary: stringValue(draft.clinicalSummary) || "暂无可展示的画像摘要。",
+    keyObservations: [
+      ...(draft.mainCaseTypes ?? []),
+      ...(draft.treatmentStyle ?? []),
+    ].filter((item) => stringValue(item).length > 0),
+    patientDistribution: null,
+    fieldCompleteness: [],
+    aiRecurringThemes: (draft.aiMedicalRiskThemes ?? [])
+      .filter((theme) => stringValue(theme).length > 0)
+      .map((theme) => ({
+        theme,
+        frequency: "",
+        caseNumbers: [],
+      })),
+    strengths: (draft.strengths ?? [])
+      .filter((text) => stringValue(text).length > 0)
+      .map((text) => ({ text })),
+    gaps: (draft.discussionDirections ?? [])
+      .filter((text) => stringValue(text).length > 0)
+      .map((text, index) => ({
+        field: `discussion_${index + 1}`,
+        inputRate: 0,
+        aiAskRate: 0,
+        evidence: text,
+        caseNumbers: [],
+        guidanceHint: "",
+      })),
+    guidancePoints: (draft.conversationReference ?? [])
+      .filter((text) => stringValue(text).length > 0)
+      .map((text) => ({ text })),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Backward-compat normalization (for old DB records)
 // ---------------------------------------------------------------------------
@@ -813,31 +860,17 @@ export async function evaluateDoctor(
   const rows = (data ?? []) as EvalRow[];
   if (rows.length === 0) throw new NoConsultationsError(windowDays);
 
-  // Stage 1: deterministic observer — no LLM
-  const findings = analyzeConsultations(rows);
-
-  // Stage 2: LLM narrator — prose only
-  const langfuse = getLangfuse();
-  const trace = langfuse?.trace({
-    name: "evaluate-doctor",
-    metadata: {
-      doctorId,
-      windowDays,
-      consultationCount: rows.length,
-      sampledCount: findings.sampleCases.length,
-    },
-  }) as { generation: (args: unknown) => void } | undefined;
-
-  const narrative = await narrateFindings(findings, windowDays, langfuse, trace);
-
-  // Merge structural findings + prose into final profile
-  const doctorProfile = mergeProfile(findings, narrative);
+  const review = await runDoctorReviewDraft({
+    rows: rows as DoctorReviewDraftRow[],
+    windowDays,
+  });
+  const doctorProfile = doctorReviewDraftToProfile(review.draft);
 
   return {
     evaluation: { doctorProfile },
     consultationCount: rows.length,
-    model: getDeepSeekFastModel(),
-    promptVersion: DOCTOR_EVALUATION_PROMPT_VERSION,
+    model: `${getDeepSeekFastModel()}+${process.env.DEEPSEEK_MODEL_DEEP ?? "deepseek-reasoner"}`,
+    promptVersion: MEDICAL_REVIEW_PROMPT_VERSION,
   };
 }
 

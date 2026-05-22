@@ -1857,7 +1857,7 @@ details[open] .sample-details__toggle::before {
 .profile-panel {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
 }
 
 .profile-hero {
@@ -1936,6 +1936,7 @@ details[open] .sample-details__toggle::before {
 .profile-card--mist  { border-top-color: #A0A09A; }
 .profile-card--teal  { border-top-color: var(--profile-teal); }
 .profile-card--brand { border-top-color: var(--brand, #9B2226); }
+.profile-card--subtle { border-top-color: rgba(155, 34, 38, 0.22); }
 
 .profile-card-title {
   margin: 0;
@@ -1952,6 +1953,21 @@ details[open] .sample-details__toggle::before {
 .profile-card--gold .profile-card-title { color: var(--profile-gold); }
 .profile-card--ink  .profile-card-title { color: var(--profile-ink); }
 .profile-card--teal .profile-card-title { color: var(--profile-teal); }
+.profile-card--subtle .profile-card-title { color: var(--text-muted, #6B6B6B); }
+
+.profile-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.profile-section-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text, #1A1A1A);
+  letter-spacing: 0;
+}
 
 .profile-empty {
   margin: 0;
@@ -2255,13 +2271,15 @@ details[open] .sample-details__toggle::before {
 
 .profile-theme-chip {
   display: inline-block;
-  padding: 4px 10px;
-  border-radius: 20px;
+  padding: 5px 11px;
+  border-radius: 999px;
   background: rgba(155, 123, 48, 0.1);
   color: var(--profile-gold);
   border: 1px solid rgba(155, 123, 48, 0.25);
   cursor: default;
   white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .profile-theme-chip--lg {
@@ -2370,7 +2388,7 @@ details[open] .sample-details__toggle::before {
 
 /* Bars */
 .profile-ts-bar {
-  fill: rgba(155, 34, 38, 0.55);
+  fill: rgba(155, 34, 38, 0.34);
   transition: fill 0.1s;
 }
 
@@ -2383,7 +2401,7 @@ details[open] .sample-details__toggle::before {
 }
 
 .profile-ts-bar--today {
-  fill: var(--brand, #9B2226);
+  fill: rgba(155, 34, 38, 0.62);
 }
 
 /* Baseline */
@@ -2422,9 +2440,17 @@ details[open] .sample-details__toggle::before {
 /* ── 4-column grid for bottom profile cards ── */
 .profile-cards-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
   align-items: stretch;
+}
+
+.profile-cards-grid--two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.profile-cards-grid--three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 /* ══════════════════════════════════════════════════════════════

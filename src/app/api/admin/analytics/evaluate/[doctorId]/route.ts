@@ -5,7 +5,7 @@ import { apiError } from "@/lib/apiResponses";
 import { evaluateDoctor, insertDoctorEvaluation, NoConsultationsError } from "@/lib/analytics/evaluation";
 import { logServerEvent } from "@/lib/logging";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 type RouteContext = { params: Promise<{ doctorId: string }> };
 

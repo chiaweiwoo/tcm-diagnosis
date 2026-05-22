@@ -127,6 +127,25 @@ function normalizeProfile(value: unknown): DoctorProfile {
     (item): item is string => typeof item === "string" && item.trim().length > 0,
   );
 
+  const draftMainCaseTypes = array("mainCaseTypes").filter(
+    (item): item is string => typeof item === "string" && item.trim().length > 0,
+  );
+  const draftTreatmentStyle = array("treatmentStyle").filter(
+    (item): item is string => typeof item === "string" && item.trim().length > 0,
+  );
+  const draftRiskThemes = array("aiMedicalRiskThemes").filter(
+    (item): item is string => typeof item === "string" && item.trim().length > 0,
+  );
+  const draftStrengths = array("strengths").filter(
+    (item): item is string => typeof item === "string" && item.trim().length > 0,
+  );
+  const draftDiscussion = array("discussionDirections").filter(
+    (item): item is string => typeof item === "string" && item.trim().length > 0,
+  );
+  const draftConversation = array("conversationReference").filter(
+    (item): item is string => typeof item === "string" && item.trim().length > 0,
+  );
+
   // patientDistribution — only present in v1.3+
   const pdRaw = raw.patientDistribution;
   let patientDistribution: PatientDistribution | null = null;
@@ -158,14 +177,25 @@ function normalizeProfile(value: unknown): DoctorProfile {
   }
 
   return {
-    profileSummary: asString(raw.profileSummary) || "暂无可展示的画像摘要。",
-    keyObservations,
+    profileSummary: asString(raw.profileSummary) || asString(raw.clinicalSummary) || "暂无可展示的画像摘要。",
+    keyObservations: keyObservations.length ? keyObservations : [...draftMainCaseTypes, ...draftTreatmentStyle],
     patientDistribution,
     fieldCompleteness,
-    aiRecurringThemes,
-    strengths,
-    gaps,
-    guidancePoints,
+    aiRecurringThemes: aiRecurringThemes.length
+      ? aiRecurringThemes
+      : draftRiskThemes.map((theme) => ({ theme, frequency: "", caseNumbers: [] })),
+    strengths: strengths.length ? strengths : draftStrengths.map((text) => ({ text })),
+    gaps: gaps.length
+      ? gaps
+      : draftDiscussion.map((text, index) => ({
+          field: `discussion_${index + 1}`,
+          inputRate: 0,
+          aiAskRate: 0,
+          evidence: text,
+          caseNumbers: [],
+          guidanceHint: "",
+        })),
+    guidancePoints: guidancePoints.length ? guidancePoints : draftConversation.map((text) => ({ text })),
   };
 }
 
@@ -302,14 +332,11 @@ function TimeSeriesCard({ doctorId }: { doctorId: string }) {
 
   const buckets = useMemo(() => buildDayBuckets(dates), [dates]);
   const maxCount = Math.max(1, ...buckets.map((b) => b.count));
-  const totalInRange = buckets.reduce((s, b) => s + b.count, 0);
-
   return (
-    <div className="profile-card profile-card--brand">
+    <div className="profile-card profile-card--subtle">
       <h3 className="profile-card-title">
-        <BarChart2 size={15} /> 病案趋势
-        <HelpTip text="近30天每日分析病案数（新加坡时区，蓝线为周一起始）" />
-        <span className="profile-ts-total">近30天共 {totalInRange} 例</span>
+        <BarChart2 size={15} /> 近期记录背景
+        <HelpTip text="近期每日记录节奏，仅作为阅读背景。" />
       </h3>
       {loading ? (
         <p className="profile-empty">加载中…</p>
@@ -367,17 +394,6 @@ function TimeSeriesCard({ doctorId }: { doctorId: string }) {
                     <title>{`${b.label}：${b.count} 例`}</title>
                   </rect>
 
-                  {/* Count label inside tall bars */}
-                  {b.count > 0 && barH >= 16 && (
-                    <text
-                      x={x + TS_BAR_W / 2}
-                      y={y + 10}
-                      textAnchor="middle"
-                      className="profile-ts-count-label"
-                    >
-                      {b.count}
-                    </text>
-                  )}
                 </g>
               );
             })}
@@ -440,6 +456,32 @@ function PatientDistributionCard({ distribution }: { distribution: PatientDistri
 }
 
 // ---------------------------------------------------------------------------
+// Clinical observations
+// ---------------------------------------------------------------------------
+
+function ClinicalObservationCard({ profile }: { profile: DoctorProfile }) {
+  return (
+    <div className="profile-card profile-card--sage">
+      <h3 className="profile-card-title">
+        <Sparkles size={15} /> 临床观察
+        <HelpTip text="根据近期病案整理出的主要病例类型与诊疗风格。" />
+      </h3>
+      {profile.keyObservations.length === 0 ? (
+        <p className="profile-empty">本期暂无明确临床观察</p>
+      ) : (
+        <div className="profile-list">
+          {profile.keyObservations.map((item, index) => (
+            <div key={index} className="profile-list-row">
+              <span className="profile-list-main">{item}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // AI themes chip cloud
 // ---------------------------------------------------------------------------
 
@@ -457,10 +499,10 @@ function AiThemesCard({ profile }: { profile: DoctorProfile }) {
     return (
       <div className="profile-card profile-card--gold">
         <h3 className="profile-card-title">
-          <Lightbulb size={15} /> AI关注的主题
-          <HelpTip text="AI 在医生病案输出中反复出现的关注点" />
+          <Lightbulb size={15} /> 反复提醒的风险点
+          <HelpTip text="系统在近期病案中反复提示、值得医生留意的医学风险。" />
         </h3>
-        <p className="profile-empty">本期暂无明显重复主题</p>
+        <p className="profile-empty">本期暂无明显重复风险点</p>
       </div>
     );
   }
@@ -468,15 +510,14 @@ function AiThemesCard({ profile }: { profile: DoctorProfile }) {
   return (
     <div className="profile-card profile-card--gold">
       <h3 className="profile-card-title">
-        <Lightbulb size={15} /> AI关注的主题
-        <HelpTip text="AI 在医生病案输出中反复出现的关注点" />
+        <Lightbulb size={15} /> 反复提醒的风险点
+        <HelpTip text="系统在近期病案中反复提示、值得医生留意的医学风险。" />
       </h3>
       <div className="profile-theme-cloud">
         {profile.aiRecurringThemes.map((item) => (
           <span
             key={item.theme}
-            className={`profile-theme-chip ${themeChipSize(item.frequency)}`}
-            title={item.frequency}
+            className="profile-theme-chip"
           >
             {item.theme}
           </span>
@@ -495,7 +536,7 @@ function StrengthsCard({ profile }: { profile: DoctorProfile }) {
     <div className="profile-card profile-card--sage">
       <h3 className="profile-card-title">
         <Sparkles size={15} /> 可取之处
-        <HelpTip text="通过确定性信号识别的记录习惯亮点" />
+        <HelpTip text="近期病案中值得肯定、可以延续的临床工作特点。" />
       </h3>
       {profile.strengths.length === 0 ? (
         <p className="profile-empty">本期暂未识别到有据可查的突出优势</p>
@@ -520,21 +561,18 @@ function GapsCard({ profile }: { profile: DoctorProfile }) {
   return (
     <div className="profile-card profile-card--tan">
       <h3 className="profile-card-title">
-        <Compass size={15} /> 差距识别
-        <HelpTip text="医生填写率 < 70% 且 AI 多次（≥30%）提醒补充的字段" />
+        <Compass size={15} /> 可讨论方向
+        <HelpTip text="适合在复盘中温和讨论的临床或记录习惯方向。" />
       </h3>
       {profile.gaps.length === 0 ? (
-        <p className="profile-empty">本期暂无符合双证据规则的差距</p>
+        <p className="profile-empty">本期暂无明确可讨论方向</p>
       ) : (
         <div className="profile-list">
           {profile.gaps.map((item, index) => (
             <div key={index} className="profile-list-row">
               <span className="profile-list-main">{item.evidence || item.field}</span>
-              <span className="profile-list-sub">
-                输入 {formatRate(item.inputRate)} · AI提醒 {formatRate(item.aiAskRate)}
-              </span>
               {item.guidanceHint && (
-                <span className="profile-list-hint">💬 {item.guidanceHint}</span>
+                <span className="profile-list-hint">{item.guidanceHint}</span>
               )}
             </div>
           ))}
@@ -552,11 +590,11 @@ function GuidanceCard({ profile }: { profile: DoctorProfile }) {
   return (
     <div className="profile-card profile-card--ink">
       <h3 className="profile-card-title">
-        <MessageSquare size={15} /> 对话参考
-        <HelpTip text="面向管理员的对话建议，可在沟通中使用" />
+        <MessageSquare size={15} /> 沟通提示
+        <HelpTip text="面向医生复盘时可直接使用的温和沟通话术。" />
       </h3>
       {profile.guidancePoints.length === 0 ? (
-        <p className="profile-empty">本期暂无具体对话建议</p>
+        <p className="profile-empty">本期暂无具体沟通提示</p>
       ) : (
         <div className="profile-list">
           {profile.guidancePoints.map((item, index) => (
@@ -610,7 +648,6 @@ export function EvaluationPanel({ doctorId }: { doctorId: string }) {
         <>
           <div className="profile-hero">
             <div className="profile-hero-chips">
-              <span className="profile-chip">{record.consultation_count} 例样本</span>
               <span className="profile-chip">
                 {formatDateSGT(record.window_start)} — {formatDateSGT(record.window_end)}
               </span>
@@ -618,27 +655,25 @@ export function EvaluationPanel({ doctorId }: { doctorId: string }) {
             </div>
             <h2 className="profile-headline">画像摘要</h2>
             <p className="profile-summary">{profile.profileSummary}</p>
-            {profile.keyObservations.length > 0 && (
-              <ul className="profile-observations">
-                {profile.keyObservations.map((obs, i) => (
-                  <li key={i}>{obs}</li>
-                ))}
-              </ul>
-            )}
           </div>
 
-          <TimeSeriesCard doctorId={doctorId} />
+          <section className="profile-section">
+            <h2 className="profile-section-title">描述性分析</h2>
+            <div className="profile-cards-grid profile-cards-grid--two">
+              <ClinicalObservationCard profile={profile} />
+              <AiThemesCard profile={profile} />
+            </div>
+            <TimeSeriesCard doctorId={doctorId} />
+          </section>
 
-          {profile.patientDistribution && profile.patientDistribution.total > 0 && (
-            <PatientDistributionCard distribution={profile.patientDistribution} />
-          )}
-
-          <div className="profile-cards-grid">
-            <AiThemesCard profile={profile} />
-            <StrengthsCard profile={profile} />
-            <GapsCard profile={profile} />
-            <GuidanceCard profile={profile} />
-          </div>
+          <section className="profile-section">
+            <h2 className="profile-section-title">复盘与沟通</h2>
+            <div className="profile-cards-grid profile-cards-grid--three">
+              <StrengthsCard profile={profile} />
+              <GapsCard profile={profile} />
+              <GuidanceCard profile={profile} />
+            </div>
+          </section>
         </>
       )}
     </div>
