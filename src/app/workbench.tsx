@@ -1129,9 +1129,14 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
       <header className="workbench__header">
         <div className="workbench__header-inner">
           <div className="workbench__brand">
-            <div className="workbench__brand-mark" aria-hidden>
+            <button
+              className="workbench__brand-mark"
+              onClick={handleNew}
+              title="回到首页 / 新建"
+              aria-label="回到首页"
+            >
               <Icon size={18} strokeWidth={2.25} />
-            </div>
+            </button>
             <div className="workbench__brand-text">
               <span className="workbench__brand-title">
                 {BRANDING.name}

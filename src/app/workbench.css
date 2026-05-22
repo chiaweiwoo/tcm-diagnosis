@@ -80,6 +80,13 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  cursor: pointer;
+  border: none;
+  padding: 0;
+  transition: opacity 0.15s;
+}
+.workbench__brand-mark:hover {
+  opacity: 0.85;
 }
 
 .workbench__brand-text {
