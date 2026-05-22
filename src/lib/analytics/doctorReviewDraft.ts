@@ -71,16 +71,14 @@ type FlashCaseCardsResponse = {
 };
 
 const MAX_RAW_CASE_CHARS = {
-  complaint: 50,
-  currentIllness: 160,
-  physicalExam: 120,
-  diagnosis: 60,
-  pattern: 60,
-  prescription: 140,
-  aiCautions: 160,
+  complaint: 36,
+  currentIllness: 96,
+  physicalExam: 72,
+  diagnosis: 36,
+  pattern: 36,
 };
 
-const CASE_CARD_BATCH_SIZE = 6;
+const CASE_CARD_BATCH_SIZE = 4;
 
 function stringValue(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
@@ -255,6 +253,7 @@ function serializeRawCaseBatch(rows: DoctorReviewDraftRow[], offset: number): st
   return rows.map((row, index) => {
     const n = offset + index + 1;
     const formData = row.form_data ?? {};
+    const riskHint = extractMedicalRiskTags(row.analysis_result).join("、");
     return [
       `#${n}`,
       `label=${buildDraftCaseLabel(formData, n)}`,
@@ -265,8 +264,7 @@ function serializeRawCaseBatch(rows: DoctorReviewDraftRow[], offset: number): st
       `exam=${compact(formData.physicalExam, MAX_RAW_CASE_CHARS.physicalExam)}`,
       `diagnosis=${compact(formData.diagnosis, MAX_RAW_CASE_CHARS.diagnosis)}`,
       `pattern=${compact(formData.pattern, MAX_RAW_CASE_CHARS.pattern)}`,
-      `treatment=${compact(formData.prescription, MAX_RAW_CASE_CHARS.prescription)}`,
-      `ai_risk_text=${compact(collectCautions(row.analysis_result), MAX_RAW_CASE_CHARS.aiCautions)}`,
+      `risk_hint=${riskHint || "无明显重复"}`,
     ].join(" | ");
   }).join("\n");
 }
@@ -374,6 +372,7 @@ async function buildFlashCaseCards(
             "你是中医病案信号压缩器，只把输入病案压缩为简短 caseCards。",
             "不要评价医生对错，不要扩写原文，不要加入输入之外的事实。",
             "每张卡只保留医学画像需要的最小信息。",
+            "优先沿用输入中的 category_hint 与 risk_hint，除非明显不合适；不要重新展开原始 AI 长文本。",
             "每个字符串字段必须极短：label不超过10字，category不超过6字，patternOrLogic不超过10字，keyEvidence不超过12字。",
             "aiRiskTags最多2个，每个不超过8字。",
             "只输出合法 JSON。",
