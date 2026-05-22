@@ -281,6 +281,7 @@ const TS_GAP     = 3;    // gap between bars
 const TS_STEP    = TS_BAR_W + TS_GAP;   // 14 px per day
 const TS_N       = 30;   // days shown
 const TS_H       = 72;   // chart area height
+const TS_TOP_H    = 16;   // extra space at the top for count annotations
 const TS_XLBL_H  = 20;   // x-axis label area
 const TS_W       = TS_N * TS_STEP - TS_GAP;  // total chart width
 
@@ -344,7 +345,7 @@ function TimeSeriesCard({ doctorId }: { doctorId: string }) {
         <div className="profile-ts-wrap">
           <svg
             className="profile-ts-svg"
-            viewBox={`0 0 ${TS_W} ${TS_H + TS_XLBL_H}`}
+            viewBox={`0 ${-TS_TOP_H} ${TS_W} ${TS_TOP_H + TS_H + TS_XLBL_H}`}
             aria-label="近30天每日病案数柱状图"
           >
             {/* Baseline */}
@@ -394,6 +395,19 @@ function TimeSeriesCard({ doctorId }: { doctorId: string }) {
                     <title>{`${b.label}：${b.count} 例`}</title>
                   </rect>
 
+                  {/* Count annotation above the bar */}
+                  {b.count > 0 && (
+                    <text
+                      x={x + TS_BAR_W / 2}
+                      y={y - 4}
+                      textAnchor="middle"
+                      fontSize={9}
+                      fill={b.isToday ? "#9B2226" : "#6B6B6B"}
+                      fontWeight={b.isToday ? 700 : 500}
+                    >
+                      {b.count}
+                    </text>
+                  )}
                 </g>
               );
             })}
