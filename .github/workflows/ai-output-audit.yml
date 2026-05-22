@@ -1,0 +1,27 @@
+name: AI Output Audit
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Trigger AI output audit
+        run: |
+          STATUS=$(curl -s --max-time 290 -o /tmp/result.json -w "%{http_code}" \
+            -X POST "${{ secrets.ASSESS_BASE_URL }}/api/cron/output-audit" \
+            -H "X-Assessment-Key: ${{ secrets.ASSESSMENT_API_KEY }}" \
+            -H "Content-Type: application/json")
+
+          cat /tmp/result.json
+          echo ""
+
+          if [ "$STATUS" -eq 200 ]; then
+            echo "AI output audit completed successfully."
+            exit 0
+          else
+            echo "HTTP $STATUS — AI output audit failed."
+            exit 1
+          fi

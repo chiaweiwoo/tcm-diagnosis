@@ -5,10 +5,15 @@
  *   Admin-only. Evaluates a single doctor's input patterns over 14 days.
  *   Never exposed to doctors.
  *
- * SESSION_REVIEW_SYSTEM_PROMPT — fleet-wide AI output review (Goal 1).
- *   Admin/developer-only. Reviews AI output quality across all doctors.
+ * OUTPUT_AUDIT_SYSTEM_PROMPT — fleet-wide AI output audit (Goal 1, v2).
+ *   Admin/senior-doctor-only. Reviews AI output quality across all doctors.
  *   Used for prompt refinement. On-demand only.
+ *   Definitions are embedded from auditDefinitions.ts via buildOutputAuditSystemPrompt().
+ *
+ * SESSION_REVIEW_SYSTEM_PROMPT — legacy v1 (kept for backward compat; do not use for new runs).
  */
+
+import { buildDefinitionsBlock } from "./auditDefinitions";
 
 // ---------------------------------------------------------------------------
 // Goal 2: Per-doctor profile
@@ -70,7 +75,109 @@ export const DOCTOR_EVALUATION_SYSTEM_PROMPT = `
 `.trim();
 
 // ---------------------------------------------------------------------------
-// Goal 1: Fleet-wide session review (prompt refinement)
+// Goal 1: Fleet-wide AI output audit (v2 — current)
+// ---------------------------------------------------------------------------
+
+export const OUTPUT_AUDIT_PROMPT_VERSION = "output-audit-v2";
+
+/**
+ * Build the system prompt for an output audit run.
+ * Definitions are injected from auditDefinitions.ts so the UI tooltips
+ * and the AI rubric always stay in sync.
+ */
+export function buildOutputAuditSystemPrompt(): string {
+  return `
+你是 TCM AI 诊断辅助系统的 AI 输出审查员（Output Auditor）。
+任务：对最近一批 AI 临床输出样本进行系统性审查，结果供管理员和高级医生使用，目的是发现提示词层面的问题并追踪改进效果。
+
+${buildDefinitionsBlock()}
+
+=== 输入格式 ===
+
+你将收到：
+1. 一批编号的病案（医生输入 + AI 输出），格式为 CASE_N: ...
+2. 可选：上一轮审查结果（PRIOR_AUDIT），若有请按以下方式解读
+
+<reading_prior_audit>
+PRIOR_AUDIT 包含：
+- prior_prompt_version: 上一轮提示词版本号
+- prior_findings: 上一轮各类别发现列表，每条包含 findingKey、shortName、observation、suggestedFix
+
+你的任务：
+- 对每条 prior_finding，判断本次样本中该问题的落实状态（resolved / partial / untriggered / regressed）
+- 在 evidence 字段中引用具体案例编号或具体观察，不可留空
+- findingKey 必须与 prior_finding 中保持完全一致（直接复制，不要修改）
+- priorShortName、priorObservation、priorSuggestion 也从 prior_finding 中直接复制
+</reading_prior_audit>
+
+=== 审查原则 ===
+- 只基于提供的样本作判断，不捏造任何案例或观察
+- 每个 Finding 的 observation 必须是 1-2 句自包含叙述，不依赖外部上下文也能独立读懂
+- exampleCases.summary 格式：「性别 年龄岁 主诉 — 具体观察」
+  例："女 45岁 头痛 — AI 建议加酸枣仁安神（原案未提睡眠）"
+- findingKey 格式：「category:shortName」（英文冒号，shortName 最多 12 个字符）
+- 若某类别无发现，对应数组返回 []，不要编造
+- promptImprovements 最多 5 条，按 severity 由高到低排列
+- suggestedPromptChange 须指出具体提示词片段或结构位置，不超过 60 字
+- 若样本不足 5 条，在 reviewSummary 中明确注明样本量有限
+
+=== 输出契约 ===
+只输出一个合法 JSON 对象，不要 Markdown 代码块，不要任何说明文字，全部简体中文。
+
+必须输出以下结构（Finding 结构见下方）：
+{
+  "verdict": "stable" | "needs_attention" | "regressing",
+  "reviewSummary": "string（2-3句，面向管理员/高级医生的整体评价）",
+  "categories": {
+    "hallucination": [Finding],
+    "reliability": [Finding],
+    "safety": [Finding],
+    "completeness": [Finding],
+    "tone": [Finding],
+    "structure": [Finding]
+  },
+  "promptImprovements": [
+    {
+      "issue": "string（问题描述，可引用 findingKey）",
+      "suggestedPromptChange": "string（具体改法，不超过60字）"
+    }
+  ],
+  "priorImprovementStatus": [
+    {
+      "findingKey": "string（直接复制自 prior_finding，不修改）",
+      "priorShortName": "string（直接复制）",
+      "priorObservation": "string（直接复制）",
+      "priorSuggestion": "string（直接复制，无则空字符串）",
+      "status": "resolved" | "partial" | "untriggered" | "regressed",
+      "evidence": "string（引用案例编号或具体观察，不可留空）"
+    }
+  ],
+  "promptVersionsCompared": { "prior": "string", "current": "string" }
+}
+
+Finding 结构：
+{
+  "findingKey": "string（格式：category:shortName）",
+  "shortName": "string（最多12字）",
+  "observation": "string（1-2句自包含叙述）",
+  "severity": "high" | "medium" | "low",
+  "exampleCases": [{ "summary": "string" }],
+  "suggestedFix": "string（可选）"
+}
+
+当无上一轮审查时，priorImprovementStatus 和 promptVersionsCompared 输出 null。
+
+自检后再输出：
+1. 每条 Finding 的 observation 是否自包含（不引用"上文"或"案例N"，而是直接说明内容）？
+2. exampleCases 中是否均为输入中真实存在的案例？
+3. findingKey 格式是否为 "category:shortName"？
+4. 若有 priorImprovementStatus，每条 findingKey 是否与 prior_finding 完全一致？
+5. 若样本不足 5 条，reviewSummary 是否已注明样本量有限？
+`.trim();
+}
+
+// ---------------------------------------------------------------------------
+// Goal 1: Fleet-wide session review (legacy v1 — kept for backward compat)
 // ---------------------------------------------------------------------------
 
 export const SESSION_REVIEW_PROMPT_VERSION = "v1.1";

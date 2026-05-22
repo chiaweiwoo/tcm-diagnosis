@@ -139,11 +139,12 @@ Admin (browser, is_admin=true only)
   └── GET  /api/admin/users/[doctorId]/consultations → per-doctor consultation list (service_role)
   └── GET  /api/admin/analytics/evaluate/[doctorId] → latest doctor profile evaluation
   └── POST /api/admin/analytics/evaluate/[doctorId] → trigger new doctor profile evaluation (14d window)
-  └── GET  /api/admin/analytics/session-review      → list fleet-wide session reviews
-  └── POST /api/admin/analytics/session-review      → trigger new fleet-wide session review
+  └── GET  /api/admin/analytics/output-audit       → list fleet-wide AI output audits (v2, current)
+  └── POST /api/admin/analytics/output-audit       → trigger new AI output audit (v2)
+  └── GET  /api/admin/analytics/session-review     → legacy v1 (reads analytics_output_audits post-migration)
   └── /admin/users                             → doctor list page
   └── /admin/users/[doctorId]                  → 2-tab view: 病案列表 | 临床画像
-  └── /admin/prompt-reviews                    → fleet-wide session reviews (prompt refinement)
+  └── /admin/output-audits                     → fleet-wide AI output audits (v2, current)
 
 GH Actions (ASSESSMENT_API_KEY auth, workflow_dispatch only — no schedule)
   └── POST /api/cron/evaluate-doctors          → bulk doctor profile evaluation (14d window, skips empty doctors)
@@ -243,7 +244,7 @@ Admin guard: `src/app/admin/layout.tsx` — server-side, redirects to `/?reason=
 
 Admin nav (2 tabs, `src/app/admin/AdminNav.tsx`):
 - **用户** — `/admin/users` — doctor list with 30-day stats + link to per-doctor view
-- **提示词评估** — `/admin/prompt-reviews` — fleet-wide session reviews for prompt refinement
+- **AI 输出审查** — `/admin/output-audits` — fleet-wide AI output audits (v2)
 
 `/admin` redirects to `/admin/users`.
 
@@ -341,23 +342,37 @@ All section titles have a `(?)` help tooltip.
 Prompts: `DOCTOR_EVALUATION_SYSTEM_PROMPT` (`doctor-eval-v1.3`) in `src/lib/analytics/prompts.ts`
 Window helper: `buildWindow(days)` in `src/lib/analytics/stats.ts`
 
-## Session Review (Goal 1 — prompt refinement)
+## AI Output Audit (Goal 1 — v2, current)
 
-**On-demand only.** Fleet-wide review of AI output quality across all doctors. Developer/admin use only.
+**On-demand only.** Fleet-wide audit of AI output quality across all doctors. Admin/senior-doctor use only.
 
-Route: `POST /api/admin/analytics/session-review`
+Route: `POST /api/admin/analytics/output-audit`
 - Admin session auth required
-- Samples up to 40 consultations from all doctors in the last 14 days, stratified by prescriptionType
-- Auto-links to most recent prior review (chain) for issue tracking; pass `{ includePrior: false }` for fresh baseline
-- Returns inserted `analytics_session_reviews` row
+- Samples up to 10 consultations per prescriptionType group, stratified
+- Auto-links to most recent prior audit for cross-round tracking; pass `{ includePrior: false }` for fresh baseline
+- Returns inserted `analytics_output_audits` row
 
-Route: `GET /api/admin/analytics/session-review?limit=20`
-- Lists reviews newest first
+Route: `GET /api/admin/analytics/output-audit?limit=20`
+- Lists audits newest first
 
-UI: `/admin/prompt-reviews` — append-only list, each row collapsible, "运行新审查" button
+Cron route: `POST /api/cron/output-audit` — same logic, auth via `X-Assessment-Key`
 
-Prompts: `SESSION_REVIEW_SYSTEM_PROMPT`, `SESSION_REVIEW_PROMPT_VERSION` in `src/lib/analytics/prompts.ts`
-Library: `reviewSession()` in `src/lib/analytics/sessionReview.ts`
+GH Workflow: `.github/workflows/ai-output-audit.yml` → calls `/api/cron/output-audit`
+
+UI: `/admin/output-audits` — append-only list, each row collapsible, v2 category sections with tooltips
+- Backward compat: old v1 rows (without `categories` key) are rendered with legacy renderer and "v1 旧版" badge
+
+v2 schema key features:
+- 6 Finding categories: safety / hallucination / reliability / completeness / tone / structure
+- `findingKey = "category:shortName"` for stable cross-round matching
+- `exampleCases[].summary` self-contained: "女 45岁 头痛 — AI建议加酸枣仁（原案未提睡眠）"
+- Severity grounded in patient health risk (see `auditDefinitions.ts`)
+- All term definitions in `src/lib/analytics/auditDefinitions.ts` (single source of truth for both AI rubric and UI tooltips)
+
+Prompts: `buildOutputAuditSystemPrompt()` (injects definitions), `OUTPUT_AUDIT_PROMPT_VERSION = "output-audit-v2"` in `src/lib/analytics/prompts.ts`
+Library: `runOutputAudit()` in `src/lib/analytics/outputAudit.ts`
+
+**Legacy:** `SESSION_REVIEW_SYSTEM_PROMPT` / `reviewSession()` / `src/lib/analytics/sessionReview.ts` — kept for backward compat; do not use for new runs.
 
 ---
 
@@ -394,12 +409,13 @@ Migrations: `supabase/migrations/` (numbered SQL). **Committing a migration file
 | `doctor_allowlist` | `email`, `is_active`, `is_admin` — access control source of truth |
 | `activity_logs` | Doctor activity events (login, analyze) — no UI for now |
 | `analytics_doctor_evaluations` | Per-doctor profile evaluations. No RLS (admin service_role only). Append-only — no unique constraint once migration 022_doctor_evaluations_append_only is applied. |
-| `analytics_session_reviews` | Fleet-wide AI output reviews for prompt refinement. No RLS. Append-only with optional `prior_review_id` chain. (migration 023) |
+| `analytics_output_audits` | Fleet-wide AI output audits (Goal 1 v2). No RLS. Append-only with optional `prior_review_id` chain. Renamed from `analytics_session_reviews` via migration 028. Old v1 rows (no `categories` key) are backward-compatible. |
 
 > **Unapplied migrations (must be run in Supabase SQL Editor):**
 > - `022_drop_analytics_and_assessments.sql` — drops legacy tables (`analytics_prompt_quality_runs`, etc.)
 > - `022_doctor_evaluations_append_only.sql` — drops unique constraint on `analytics_doctor_evaluations(doctor_id, window_start, window_end)`; adds index. **Required before evaluation re-runs succeed.**
 > - `023_session_reviews_and_eval_cleanup.sql` — drops `output_review` column, creates `analytics_session_reviews`
+> - `028_rename_session_reviews_to_output_audits.sql` — renames `analytics_session_reviews` → `analytics_output_audits`. **Must run before new audit runs or the admin page can load data.**
 
 `consultations`: doctor reads use user-scoped Supabase client (anon key + session JWT); RLS enforces isolation. Admin routes use service_role (bypasses RLS). Never expose service_role key to browser.
 
@@ -525,6 +541,7 @@ Do not say done until the changed path is verified, not merely coded.
 3. **`022_drop_analytics_and_assessments.sql`** — apply in production (drops legacy analytics/assessment tables)
 4. **`022_doctor_evaluations_append_only.sql`** — apply in production (drops unique constraint, adds index; blocks evaluate-doctors until applied)
 5. **`023_session_reviews_and_eval_cleanup.sql`** — apply in production (drops `output_review` column, creates `analytics_session_reviews`)
-6. Phase 2: doctor-facing surface (doctorFacingHint removed from v1.1 schema; revisit if needed)
-7. SGT timezone alignment in `buildWindow` — 14-day on-demand window makes boundary precision a non-issue; reopen if needed
-8. Session review pipeline: records where `analysis_stale=true` have mismatched form_data/analysis_result — may cause false "hallucination" findings in sessionReview. Consider filtering or flagging these records.
+6. **`028_rename_session_reviews_to_output_audits.sql`** — apply in production (renames table; required before new audits can write or the admin page can load)
+7. Phase 2: doctor-facing surface (doctorFacingHint removed from v1.1 schema; revisit if needed)
+8. SGT timezone alignment in `buildWindow` — 14-day on-demand window makes boundary precision a non-issue; reopen if needed
+9. AI Output Audit pipeline: records where `analysis_stale=true` have mismatched form_data/analysis_result — may cause false "hallucination" findings. Consider filtering these records.
