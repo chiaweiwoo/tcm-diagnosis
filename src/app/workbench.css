@@ -1419,6 +1419,14 @@ button.case-linkage__item:hover {
     flex: 1;
   }
 
+  /* Spacer must not take space on mobile — otherwise it consumes the full
+     flex container width (from base `width: 100%`) and squeezes the pill
+     to near-zero, showing only the middle chars of centered text. */
+  .history-item__pill-spacer {
+    width: 0;
+    flex: 0 0 0;
+  }
+
   .history-item__meta {
     width: 100%;
     text-align: left;
