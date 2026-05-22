@@ -55,6 +55,7 @@ type ConsultationRecord = ConsultationSummary & {
   analysis_result: unknown | null;
   analysis_raw: unknown | null;
   model_meta: ApiMeta | null;
+  analysis_stale: boolean | null;
 };
 
 type ToastState = { message: string; tone: "success" | "error" | "info" };
@@ -85,6 +86,12 @@ const EMPTY_FORM: StructuredCaseForm = {
   pattern: "",
   prescription: "",
 };
+
+const EMPTY_FORM_SNAPSHOT = JSON.stringify(EMPTY_FORM);
+
+function snapshotForm(form: StructuredCaseForm) {
+  return JSON.stringify(form);
+}
 
 // ---------------------------------------------------------------------------
 // API helpers
@@ -694,6 +701,10 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
   const [feedback, setFeedback] = useState("");
   const [feedbackUpdatedAt, setFeedbackUpdatedAt] = useState<Date | null>(null);
   const [savedFeedback, setSavedFeedback] = useState("");
+  const [savedFormSnapshot, setSavedFormSnapshot] = useState(EMPTY_FORM_SNAPSHOT);
+  const [analysisFormSnapshot, setAnalysisFormSnapshot] = useState<string | null>(null);
+  const [analysisSavePending, setAnalysisSavePending] = useState(false);
+  const [dbAnalysisStale, setDbAnalysisStale] = useState(false);
   const [recordLocked, setRecordLocked] = useState(false);
 
   const [analyzing, setAnalyzing] = useState(false);
@@ -709,10 +720,16 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
 
   const normalizedCaseId = normalizeCaseId(caseId);
   const normalizedRelatedCaseId = normalizeCaseId(relatedCaseId);
+  const currentFormSnapshot = snapshotForm(form);
+  const clinicalDirty = currentFormSnapshot !== savedFormSnapshot;
   const caseIdDirty = normalizedCaseId !== savedCaseId;
   const relatedCaseIdDirty = normalizedRelatedCaseId !== savedRelatedCaseId;
   const feedbackDirty = feedback !== savedFeedback;
-  const hasUnsavedChanges = saveStatus === "unsaved" || caseIdDirty || relatedCaseIdDirty || feedbackDirty;
+  const metadataDirty = caseIdDirty || relatedCaseIdDirty || feedbackDirty;
+  const hasUnsavedChanges = saveStatus === "unsaved" || clinicalDirty || metadataDirty;
+  // dbAnalysisStale: persisted via DB (survives page reload).
+  // In-memory arm: catches changes made since the last loaded/analyzed snapshot.
+  const analysisStale = dbAnalysisStale || Boolean(result && analysisFormSnapshot && analysisFormSnapshot !== currentFormSnapshot);
   const linkedCaseRail = useMemo<LinkedCaseRail | null>(() => {
     if (!activeId) return null;
 
@@ -764,8 +781,11 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
 
   const confirmDiscardChanges = useCallback(() => {
     if (!hasUnsavedChanges) return true;
-    return window.confirm("你有未保存的修改，离开后将丢失。是否继续？");
-  }, [hasUnsavedChanges]);
+    if (clinicalDirty) {
+      return window.confirm("病案输入已修改但尚未保存，离开后将丢失。建议先保存并重新分析以获取最新AI建议。是否继续？");
+    }
+    return window.confirm("病案编号、随访记录编号或给AI回馈尚未保存，离开后将丢失。是否继续？");
+  }, [clinicalDirty, hasUnsavedChanges]);
 
   useEffect(() => {
     if (!hasUnsavedChanges) return;
@@ -829,6 +849,10 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
     setFeedback("");
     setFeedbackUpdatedAt(null);
     setSavedFeedback("");
+    setSavedFormSnapshot(EMPTY_FORM_SNAPSHOT);
+    setAnalysisFormSnapshot(null);
+    setAnalysisSavePending(false);
+    setDbAnalysisStale(false);
     setRecordLocked(false);
     setActiveId(null);
     setHistoryOpen(false);
@@ -845,6 +869,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
   async function handleSelectHistory(id: string) {
     if (id !== activeId && !confirmDiscardChanges()) return;
     try {
+      let nextForm = EMPTY_FORM;
       const record = await apiGetConsultation(id);
       if (record.form_data) {
         // Backward compat: records saved before the prescriptionType array→string
@@ -858,6 +883,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
         };
         const parsed = structuredCaseSchema.safeParse(coerced);
         if (parsed.success) {
+          nextForm = parsed.data;
           setForm(parsed.data);
           setTouched(new Set(REQUIRED_FIELDS));
         }
@@ -876,6 +902,10 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
       setFeedback(record.ai_feedback ?? "");
       setFeedbackUpdatedAt(record.ai_feedback_updated_at ? new Date(record.ai_feedback_updated_at) : null);
       setSavedFeedback(record.ai_feedback ?? "");
+      setSavedFormSnapshot(snapshotForm(nextForm));
+      setAnalysisFormSnapshot(record.analysis_status === "analyzed" ? snapshotForm(nextForm) : null);
+      setAnalysisSavePending(false);
+      setDbAnalysisStale(record.analysis_stale ?? false);
       setRecordLocked(record.analysis_status === "analyzed");
       setActiveId(id);
       setHistoryOpen(false);
@@ -910,7 +940,6 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
     }
 
     setAnalyzing(true);
-    setResult(null);
     const startedAt = Date.now();
 
     try {
@@ -919,6 +948,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
       setResult(data.result);
       setRawResult(data.raw);
       setMeta({ model: data.model, repairedJson: data.repairedJson, promptVersion: data.promptVersion, durationSeconds });
+      setAnalysisSavePending(true);
       setTimeout(() => {
         if (typeof resultRef.current?.scrollIntoView === "function") {
           resultRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -933,6 +963,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
           promptVersion: data.promptVersion,
           durationSeconds,
         };
+        const nextAnalysisSnapshot = snapshotForm(form);
         setSaveStatus("saving");
         if (activeId) {
           const updated = await apiUpdateConsultation(activeId, {
@@ -970,6 +1001,10 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
           setSavedRelatedCaseId(normalizeCaseId(saved.related_case_id ?? ""));
           setSavedFeedback(saved.ai_feedback ?? "");
         }
+        setSavedFormSnapshot(nextAnalysisSnapshot);
+        setAnalysisFormSnapshot(nextAnalysisSnapshot);
+        setAnalysisSavePending(false);
+        setDbAnalysisStale(false);
         setSaveStatus("saved");
         setSavedAt(new Date());
         setRecordLocked(true);
@@ -986,17 +1021,44 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
   }
 
   async function handleSave() {
-    if (!result) return;
+    if (!activeId && !result) return;
+    if (clinicalDirty && Object.keys(liveErrors).length > 0) {
+      setTouched(new Set(REQUIRED_FIELDS));
+      setSaveStatus("unsaved");
+      showToast("请先补全必填字段。", "error");
+      return;
+    }
     setSaving(true);
     setSaveStatus("saving");
     try {
       const saveMeta: ApiMeta = meta ?? {};
-      if (activeId && recordLocked) {
-        const updated = await apiUpdateConsultation(activeId, {
-          caseId: normalizedCaseId,
-          relatedCaseId: normalizedRelatedCaseId,
-          aiFeedback: feedback,
-        });
+      if (activeId) {
+        const updatePayload = {
+          ...(clinicalDirty || analysisSavePending
+            ? {
+                formData: form,
+              }
+            : {}),
+          ...(caseIdDirty ? { caseId: normalizedCaseId } : {}),
+          ...(relatedCaseIdDirty ? { relatedCaseId: normalizedRelatedCaseId } : {}),
+          ...(feedbackDirty ? { aiFeedback: feedback } : {}),
+          ...(analysisSavePending && result
+            ? {
+                analysisResult: result,
+                analysisRaw: rawResult,
+                modelMeta: saveMeta,
+                analysisStatus: "analyzed",
+              }
+            : {}),
+        };
+
+        if (Object.keys(updatePayload).length === 0) {
+          setSaveStatus("saved");
+          setSaving(false);
+          return;
+        }
+
+        const updated = await apiUpdateConsultation(activeId, updatePayload);
         setConsultations((prev) => prev.map((c) => (c.id === activeId ? { ...c, ...updated } : c)));
         setCaseId(updated.case_id ?? "");
         setSavedCaseId(normalizeCaseId(updated.case_id ?? ""));
@@ -1005,26 +1067,21 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
         setFeedback(updated.ai_feedback ?? "");
         setFeedbackUpdatedAt(updated.ai_feedback_updated_at ? new Date(updated.ai_feedback_updated_at) : null);
         setSavedFeedback(updated.ai_feedback ?? "");
-      } else if (activeId) {
-        const updated = await apiUpdateConsultation(activeId, {
-          consultationName: form.consultationName,
-          caseId: normalizedCaseId,
-          relatedCaseId: normalizedRelatedCaseId,
-          formData: form,
-          analysisResult: result,
-          analysisRaw: rawResult,
-          modelMeta: saveMeta,
-          analysisStatus: "analyzed",
-        });
-        setConsultations((prev) => prev.map((c) => (c.id === activeId ? { ...c, ...updated } : c)));
-        setCaseId(updated.case_id ?? "");
-        setSavedCaseId(normalizeCaseId(updated.case_id ?? ""));
-        setRelatedCaseId(updated.related_case_id ?? "");
-        setSavedRelatedCaseId(normalizeCaseId(updated.related_case_id ?? ""));
-        setFeedback(updated.ai_feedback ?? "");
-        setFeedbackUpdatedAt(updated.ai_feedback_updated_at ? new Date(updated.ai_feedback_updated_at) : null);
-        setSavedFeedback(updated.ai_feedback ?? "");
+        setSavedFormSnapshot(snapshotForm(form));
+        if (analysisSavePending) {
+          setAnalysisFormSnapshot(snapshotForm(form));
+          setAnalysisSavePending(false);
+          setDbAnalysisStale(false);
+        } else if (clinicalDirty && recordLocked) {
+          // Clinical edits saved without re-analysis on an analyzed record → stale
+          setDbAnalysisStale(true);
+        }
       } else {
+        if (!result) {
+          setSaveStatus("unsaved");
+          setSaving(false);
+          return;
+        }
         const saved = await apiSaveNew({
           consultationName: form.consultationName || "",
           caseId: normalizedCaseId,
@@ -1041,6 +1098,11 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
         setRelatedCaseId(saved.related_case_id ?? "");
         setSavedRelatedCaseId(normalizeCaseId(saved.related_case_id ?? ""));
         setSavedFeedback(saved.ai_feedback ?? "");
+        const nextAnalysisSnapshot = snapshotForm(form);
+        setSavedFormSnapshot(nextAnalysisSnapshot);
+        setAnalysisFormSnapshot(nextAnalysisSnapshot);
+        setAnalysisSavePending(false);
+        setDbAnalysisStale(false);
       }
       const now = new Date();
       setSaveStatus("saved");
@@ -1100,7 +1162,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
               <Plus size={15} />
               <span>新建</span>
             </button>
-            {result && (!recordLocked || hasUnsavedChanges) && (
+            {((activeId && hasUnsavedChanges) || (!activeId && result && hasUnsavedChanges)) && (
               <button
                 className="btn btn--ghost btn--sm"
                 onClick={() => void handleSave()}
@@ -1150,12 +1212,14 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
             {/* Row 1: Meta strip — sex / age / prescription type / case id */}
             {recordLocked && (
               <div className="readonly-banner">
-                该病案已完成分析并归档，原始字段仅供查看；如需补充意见，请使用下方“给AI回馈”。
+                {analysisStale
+                  ? "病案输入已修改，现有AI分析可能不完全对应当前内容。如需要，请重新分析。"
+                  : "该病案已完成分析并归档，你仍可以继续修改原始输入并保存；如有需要，可重新分析更新结果。"}
               </div>
             )}
 
             <div className="form-row--meta">
-              <fieldset className="form-fieldset form-fieldset--meta" disabled={recordLocked}>
+              <fieldset className="form-fieldset form-fieldset--meta">
                 <div className="form-group">
                   <label className="form-label">性别 Gender</label>
                   <div className="segmented-control">
@@ -1228,7 +1292,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
               </div>
             </div>
 
-            <fieldset className="form-fieldset" disabled={recordLocked}>
+            <fieldset className="form-fieldset">
 
             {/* Row 2: Chief complaint */}
             <div className="form-group">
@@ -1346,14 +1410,14 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
               <button
                 className="btn btn--primary btn--lg"
                 onClick={() => void handleAnalyze()}
-                disabled={recordLocked || analyzing || Object.keys(liveErrors).length > 0}
+                disabled={analyzing || Object.keys(liveErrors).length > 0}
               >
                 {analyzing ? (
                   <>
                     <LoaderCircle size={18} className="spin" />
                     分析中…
                   </>
-                ) : recordLocked ? "已归档" : "开始分析"}
+                ) : result ? "重新分析" : "开始分析"}
               </button>
             </div>
 

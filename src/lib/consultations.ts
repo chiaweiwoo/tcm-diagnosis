@@ -16,6 +16,7 @@ export type ConsultationRecord = {
   analysis_raw: unknown | null;
   model_meta: unknown | null;
   analysis_status: "draft" | "analyzed";
+  analysis_stale: boolean | null;
   created_at: string;
   updated_at: string;
   analyzed_at: string | null;
@@ -36,6 +37,7 @@ type ConsultationPatch = Partial<
     | "analysis_raw"
     | "model_meta"
     | "analysis_status"
+    | "analysis_stale"
     | "analyzed_at"
   >
 >;
@@ -55,7 +57,7 @@ function dbError(error: { message?: string } | null) {
 }
 
 const LIST_COLUMNS =
-  "id,doctor_id,doctor_email,consultation_name,case_id,case_id_updated_at,related_case_id,related_case_id_updated_at,ai_feedback,ai_feedback_updated_at,form_data,analysis_status,created_at,updated_at,analyzed_at";
+  "id,doctor_id,doctor_email,consultation_name,case_id,case_id_updated_at,related_case_id,related_case_id_updated_at,ai_feedback,ai_feedback_updated_at,form_data,analysis_status,analysis_stale,created_at,updated_at,analyzed_at";
 
 export async function listConsultations(
   client: SupabaseClient,

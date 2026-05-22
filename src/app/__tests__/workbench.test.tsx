@@ -337,7 +337,7 @@ describe("Analyze flow", () => {
     });
   });
 
-  it("keeps analyzed form fields read-only while Case ID remains editable", async () => {
+  it("keeps analyzed form fields editable after analysis", async () => {
     const user = userEvent.setup();
     render(<Workbench />);
     await waitFor(() => screen.getByText("开始分析"));
@@ -346,10 +346,12 @@ describe("Analyze flow", () => {
     await user.click(screen.getByText("开始分析"));
 
     await waitFor(() => screen.getByText("给AI回馈 Feedback to AI"));
-    expect(screen.getByPlaceholderText(/头痛眩晕反复发作/)).toBeDisabled();
+    expect(screen.getByPlaceholderText(/头痛眩晕反复发作/)).not.toBeDisabled();
     expect(screen.getByPlaceholderText("例：0004222")).not.toBeDisabled();
     expect(screen.getByPlaceholderText("例：0004221")).not.toBeDisabled();
+    expect(screen.getByText("重新分析")).toBeInTheDocument();
   });
+
 
   it("asks before discarding unsaved post-analysis Case ID changes", async () => {
     const user = userEvent.setup();
@@ -367,6 +369,197 @@ describe("Analyze flow", () => {
     expect(confirmSpy).toHaveBeenCalled();
     expect(screen.getByPlaceholderText("例：0004222")).toHaveValue("0004222");
     confirmSpy.mockRestore();
+  });
+
+
+  it("saves analyzed clinical edits and keeps the stale-analysis warning until reanalysis", async () => {
+    const user = userEvent.setup();
+    render(<Workbench />);
+    await waitFor(() => screen.getByText("开始分析"));
+
+    await fillRequiredFields(user);
+    await user.click(screen.getByText("开始分析"));
+
+    await waitFor(() => screen.getByText("给AI回馈 Feedback to AI"));
+    const complaintInput = screen.getByPlaceholderText(/头痛眩晕反复发作/);
+    await user.clear(complaintInput);
+    await user.type(complaintInput, "复诊后头痛无眩晕");
+    await user.click(screen.getByTitle("保存"));
+
+    const fetchMock = vi.mocked(global.fetch);
+    await waitFor(() => {
+      const saveCall = fetchMock.mock.calls.findLast(
+        ([url, options]) => String(url).includes("/api/consultations/") && options?.method === "PATCH",
+      );
+      expect(saveCall).toBeDefined();
+      expect(String(saveCall?.[1]?.body)).toContain("formData");
+      expect(String(saveCall?.[1]?.body)).not.toContain("analysisResult");
+    });
+
+    expect(screen.getByText("病案输入已修改，现有AI分析可能不完全对应当前内容。如需要，请重新分析。")).toBeInTheDocument();
+
+    await user.click(screen.getByText("重新分析"));
+    await waitFor(() => {
+      expect(screen.queryByText("病案输入已修改，现有AI分析可能不完全对应当前内容。如需要，请重新分析。")).not.toBeInTheDocument();
+    });
+  });
+
+  it("asks with the clinical warning when analyzed inputs changed", async () => {
+    const user = userEvent.setup();
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+    render(<Workbench />);
+    await waitFor(() => screen.getByText("开始分析"));
+
+    await fillRequiredFields(user);
+    await user.click(screen.getByText("开始分析"));
+
+    await waitFor(() => screen.getByText("给AI回馈 Feedback to AI"));
+    const complaintInput = screen.getByPlaceholderText(/头痛眩晕反复发作/);
+    await user.clear(complaintInput);
+    await user.type(complaintInput, "复诊后头痛无眩晕");
+    await user.click(screen.getByText("新建"));
+
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(confirmSpy.mock.calls[0]?.[0]).toContain("建议先保存并重新分析");
+    expect(complaintInput).toHaveValue("复诊后头痛无眩晕");
+    confirmSpy.mockRestore();
+  });
+
+  it("blocks analyzed clinical saves in the UI when required fields become invalid", async () => {
+    const user = userEvent.setup();
+    render(<Workbench />);
+    await waitFor(() => screen.getByText("开始分析"));
+
+    await fillRequiredFields(user);
+    await user.click(screen.getByText("开始分析"));
+    await waitFor(() => screen.getByText("给AI回馈 Feedback to AI"));
+
+    const diagnosisInput = screen.getByPlaceholderText(/头痛 \/ 眩晕/);
+    await user.clear(diagnosisInput);
+
+    const fetchMock = vi.mocked(global.fetch);
+    const patchCallsBeforeSave = fetchMock.mock.calls.filter(
+      ([url, options]) => String(url).includes("/api/consultations/") && options?.method === "PATCH",
+    ).length;
+
+    await user.click(screen.getByTitle("保存"));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert").textContent).toContain("请先补全必填字段。");
+    });
+    const patchCallsAfterSave = fetchMock.mock.calls.filter(
+      ([url, options]) => String(url).includes("/api/consultations/") && options?.method === "PATCH",
+    ).length;
+    expect(patchCallsAfterSave).toBe(patchCallsBeforeSave);
+  });
+
+  it("persists fresh analysis payload through header save after reanalysis auto-save fails", async () => {
+    let analyzeCount = 0;
+    let patchCount = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string, init?: RequestInit) => {
+        const method = init?.method ?? "GET";
+        if (url === "/api/consultations" && method === "GET") {
+          return makeOkJson({ records: [] });
+        }
+        if (url === "/api/analyze") {
+          analyzeCount += 1;
+          return makeOkJson({
+            result: {
+              ...MOCK_RESULT,
+              keyPoints: analyzeCount === 1 ? MOCK_RESULT.keyPoints : ["重新分析已更新"],
+            },
+            raw: { analyzeCount },
+            model: "deepseek-flash",
+            promptVersion: "tcm-analysis-v0.8",
+            repairedJson: false,
+          });
+        }
+        if (String(url).includes("/api/consultations/") && method === "PATCH") {
+          patchCount += 1;
+          if (patchCount === 1) {
+            return makeErrJson(500, "auto-save failed");
+          }
+          const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+          return makeOkJson({
+            record: {
+              id: "new-123",
+              form_data: body.formData ?? null,
+              analysis_result: body.analysisResult ?? MOCK_RESULT,
+              analysis_raw: body.analysisRaw ?? null,
+              model_meta: body.modelMeta ?? null,
+              analysis_status: body.analysisStatus === "analyzed" ? "analyzed" : "draft",
+              analysis_stale: false,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              analyzed_at: body.analysisStatus === "analyzed" ? new Date().toISOString() : null,
+              consultation_name: null,
+              case_id: body.caseId ?? null,
+              case_id_updated_at: body.caseId ? new Date().toISOString() : null,
+              related_case_id: body.relatedCaseId ?? null,
+              related_case_id_updated_at: body.relatedCaseId ? new Date().toISOString() : null,
+              ai_feedback: body.aiFeedback ?? null,
+              ai_feedback_updated_at: body.aiFeedback ? new Date().toISOString() : null,
+            },
+          });
+        }
+        if (url === "/api/consultations" && method === "POST") {
+          const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+          return makeOkJson({
+            record: {
+              id: "new-123",
+              form_data: body.formData ?? null,
+              analysis_result: body.analysisResult ?? MOCK_RESULT,
+              analysis_raw: body.analysisRaw ?? null,
+              model_meta: body.modelMeta ?? null,
+              analysis_status: "analyzed",
+              analysis_stale: false,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              analyzed_at: new Date().toISOString(),
+              consultation_name: null,
+              case_id: body.caseId ?? null,
+              case_id_updated_at: body.caseId ? new Date().toISOString() : null,
+              related_case_id: body.relatedCaseId ?? null,
+              related_case_id_updated_at: body.relatedCaseId ? new Date().toISOString() : null,
+              ai_feedback: body.aiFeedback ?? null,
+              ai_feedback_updated_at: body.aiFeedback ? new Date().toISOString() : null,
+            },
+          });
+        }
+        return makeErrJson(404, "not found");
+      }),
+    );
+
+    const user = userEvent.setup();
+    render(<Workbench />);
+    await waitFor(() => screen.getByText("开始分析"));
+
+    await fillRequiredFields(user);
+    await user.click(screen.getByText("开始分析"));
+    await waitFor(() => screen.getByText("给AI回馈 Feedback to AI"));
+
+    const complaintInput = screen.getByPlaceholderText(/例：头痛眩晕反复发作/);
+    await user.clear(complaintInput);
+    await user.type(complaintInput, "复诊后头痛加重");
+    await user.click(screen.getByText("重新分析"));
+
+    await waitFor(() => {
+      expect(document.body.textContent).toContain("自动保存失败");
+    });
+
+    await user.click(screen.getByTitle("保存"));
+
+    const fetchMock = vi.mocked(global.fetch);
+    await waitFor(() => {
+      const saveCall = fetchMock.mock.calls.filter(
+        ([url, options]) => String(url).includes("/api/consultations/") && options?.method === "PATCH",
+      ).at(-1);
+      expect(saveCall).toBeDefined();
+      expect(String(saveCall?.[1]?.body)).toContain("analysisResult");
+      expect(String(saveCall?.[1]?.body)).toContain("analysisStatus");
+    });
   });
 
   it("shows a manual linkage rail from direct and reverse matches, sorted newest first, and loads the linked record", async () => {

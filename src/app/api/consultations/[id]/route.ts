@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { apiError } from "@/lib/apiResponses";
 import { deleteConsultation, getConsultation, updateConsultation } from "@/lib/consultations";
+import { structuredCaseSchema } from "@/lib/forms/caseSchema";
 import { getCurrentDoctor } from "@/lib/currentDoctor";
 import { createServerSupabaseClient, getServiceRoleClient } from "@/lib/supabase/server";
 import { logServerEvent } from "@/lib/logging";
@@ -92,23 +93,31 @@ export async function PATCH(request: Request, context: RouteContext) {
     const feedbackValue = Object.hasOwn(body, "aiFeedback")
       ? (typeof body.aiFeedback === "string" ? body.aiFeedback.trim() : "")
       : undefined;
-    const wantsLockedFieldChange =
-      Object.hasOwn(body, "consultationName") ||
-      Object.hasOwn(body, "formData") ||
+    const newFormData = Object.hasOwn(body, "formData")
+      ? structuredCaseSchema.safeParse(body.formData)
+      : undefined;
+    const hasAnalysisPayload =
       Object.hasOwn(body, "analysisResult") ||
       Object.hasOwn(body, "analysisRaw") ||
       Object.hasOwn(body, "modelMeta") ||
       Object.hasOwn(body, "analysisStatus");
+    const hasCompleteAnalysisPayload =
+      hasAnalysisPayload &&
+      newFormData !== undefined &&
+      newFormData.success &&
+      Object.hasOwn(body, "analysisResult") &&
+      Object.hasOwn(body, "analysisRaw") &&
+      Object.hasOwn(body, "modelMeta") &&
+      body.analysisStatus === "analyzed";
 
-    if (existing.analysis_status === "analyzed" && wantsLockedFieldChange) {
-      return apiError(409, "READ_ONLY_RECORD", "已分析病案不可修改原始内容，仅可更新病案编号、随访记录编号与给AI回馈。");
+    if (newFormData && !newFormData.success) {
+      const message = newFormData.error.issues[0]?.message ?? "病案字段不符合要求。";
+      return apiError(400, "INVALID_INPUT", message);
     }
 
-    // Detect whether form data changed to reset analysis state
-    const newFormData = Object.hasOwn(body, "formData") ? (body.formData ?? null) : undefined;
-    const formDataChanged =
-      newFormData !== undefined &&
-      JSON.stringify(newFormData) !== JSON.stringify(existing.form_data);
+    if (hasAnalysisPayload && !hasCompleteAnalysisPayload) {
+      return apiError(400, "INVALID_INPUT", "分析结果更新必须与完整病案表单一起保存。");
+    }
 
     const record = await updateConsultation(
       supabase,
@@ -137,23 +146,19 @@ export async function PATCH(request: Request, context: RouteContext) {
           : {}),
         ...(newFormData !== undefined
           ? {
-              form_data: newFormData,
-              analysis_status: formDataChanged ? "draft" : existing.analysis_status,
-              ...(formDataChanged
-                ? {
-                    analysis_result: null,
-                    analysis_raw: null,
-                    model_meta: null,
-                    analyzed_at: null,
-                  }
-                : {}),
+              form_data: newFormData.data,
             }
           : {}),
-        ...(Object.hasOwn(body, "analysisResult") ? { analysis_result: body.analysisResult ?? null } : {}),
-        ...(Object.hasOwn(body, "analysisRaw") ? { analysis_raw: body.analysisRaw ?? null } : {}),
-        ...(Object.hasOwn(body, "modelMeta") ? { model_meta: body.modelMeta ?? null } : {}),
-        ...(body.analysisStatus === "analyzed"
-          ? { analysis_status: "analyzed", analyzed_at: new Date().toISOString() }
+        // Mark analysis as stale when form_data is edited without a paired re-analysis.
+        // Cleared when a full analysis payload is saved. This persists across page reloads.
+        ...(newFormData !== undefined && !hasCompleteAnalysisPayload && existing.analysis_status === "analyzed"
+          ? { analysis_stale: true }
+          : {}),
+        ...(hasCompleteAnalysisPayload ? { analysis_result: body.analysisResult ?? null } : {}),
+        ...(hasCompleteAnalysisPayload ? { analysis_raw: body.analysisRaw ?? null } : {}),
+        ...(hasCompleteAnalysisPayload ? { model_meta: body.modelMeta ?? null } : {}),
+        ...(hasCompleteAnalysisPayload
+          ? { analysis_status: "analyzed", analyzed_at: new Date().toISOString(), analysis_stale: false }
           : {}),
       },
       dbOpts,

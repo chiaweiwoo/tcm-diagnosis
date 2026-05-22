@@ -171,7 +171,9 @@ Never define a token only in `workbench.css` — admin pages won't see it. Add i
 
 - Single-step pipeline: doctor fills structured form → POST /api/analyze → result. No organize step.
 - Analyze always uses `DEEPSEEK_MODEL_FAST` (flash). No mode selector exposed to doctors.
-- Once a consultation is saved as `analysis_status="analyzed"`, its clinical fields become read-only in the workbench. Doctors may still edit `病案编号 Case ID`, `随访记录编号 Follow-up Record ID`, and `给AI回馈 Feedback to AI` on that record, and all three save through the header `保存` button.
+- All clinical fields remain editable at all times — including after analysis. Doctors can modify inputs and save without forcing a re-analysis. When clinical inputs differ from the snapshot at last analysis, the workbench shows a stale-analysis warning banner. The `analysis_stale` DB column persists this warning across page reloads.
+- Metadata fields (`病案编号 Case ID`, `随访记录编号 Follow-up Record ID`, `给AI回馈 Feedback to AI`) save through the header `保存` button.
+- Two-level unsaved-changes warning on navigation: clinical inputs changed → "建议先保存并重新分析" (re-analyze prompt); metadata-only changed → generic save reminder.
 - Core analysis sections must be structurally stable — all sections always present, even if empty with a fallback string.
 - Analyze output reading order: 重点结论 → 当前思路 → 建议优化 → 可选思路 → 风险与提醒 → 随访监测 → 证据状态.
 - UI result layout: 3 columns — 判断 (当前思路) / 方案 (建议优化+可选) / 随访监测. Plus 重点结论 banner and 风险与提醒 warning box at top.
@@ -223,7 +225,7 @@ Errors show once field is touched (`touched` set). Submit button disabled when `
 | Trigger | Transition |
 |---|---|
 | `handleNew()` | → `"new"`, `savedAt = null` |
-| `setField(...)` | → `"unsaved"` (unless currently `"saving"` or record is read-only) |
+| `setField(...)` | → `"unsaved"` (unless currently `"saving"`) |
 | `handleSelectHistory` success | → `"saved"`, `savedAt = record.updated_at` |
 | `handleAnalyze` / `handleSave` start | → `"saving"` |
 | save success | → `"saved"`, `savedAt = new Date()` |
@@ -386,7 +388,8 @@ Migrations: `supabase/migrations/` (numbered SQL). **Committing a migration file
 
 | Table | Purpose |
 |---|---|
-| `consultations` | Doctor history — form_data JSONB, analysis JSON, model meta, optional `case_id` and `ai_feedback`. Has `doctor_id` UUID FK (migration 016) with RLS (migration 017). |
+| `consultations` | Doctor history — form_data JSONB, analysis JSON, model meta, optional `case_id` and `ai_feedback`. Has `doctor_id` UUID FK (migration 016) with RLS (migration 017). `analysis_stale` boolean (migration 027) persists stale-analysis state across reloads. |
+| `consultation_change_events` | Append-only audit log of every `consultations` UPDATE. Written by Postgres trigger (migration 026). RLS: authenticated users see only their own rows. |
 | `error_logs` | Pipeline errors (no form field values) |
 | `doctor_allowlist` | `email`, `is_active`, `is_admin` — access control source of truth |
 | `activity_logs` | Doctor activity events (login, analyze) — no UI for now |
@@ -397,6 +400,8 @@ Migrations: `supabase/migrations/` (numbered SQL). **Committing a migration file
 > - `022_drop_analytics_and_assessments.sql` — drops legacy tables (`analytics_prompt_quality_runs`, etc.)
 > - `022_doctor_evaluations_append_only.sql` — drops unique constraint on `analytics_doctor_evaluations(doctor_id, window_start, window_end)`; adds index. **Required before evaluation re-runs succeed.**
 > - `023_session_reviews_and_eval_cleanup.sql` — drops `output_review` column, creates `analytics_session_reviews`
+> - `026_consultation_change_events.sql` — creates `consultation_change_events` audit table + trigger
+> - `027_analysis_stale_flag.sql` — adds `analysis_stale boolean` to `consultations`. **Required for stale-analysis banner to persist across page reloads.**
 
 `consultations`: doctor reads use user-scoped Supabase client (anon key + session JWT); RLS enforces isolation. Admin routes use service_role (bypasses RLS). Never expose service_role key to browser.
 
@@ -522,5 +527,8 @@ Do not say done until the changed path is verified, not merely coded.
 3. **`022_drop_analytics_and_assessments.sql`** — apply in production (drops legacy analytics/assessment tables)
 4. **`022_doctor_evaluations_append_only.sql`** — apply in production (drops unique constraint, adds index; blocks evaluate-doctors until applied)
 5. **`023_session_reviews_and_eval_cleanup.sql`** — apply in production (drops `output_review` column, creates `analytics_session_reviews`)
-6. Phase 2: doctor-facing surface (doctorFacingHint removed from v1.1 schema; revisit if needed)
-7. SGT timezone alignment in `buildWindow` — 14-day on-demand window makes boundary precision a non-issue; reopen if needed
+6. **`026_consultation_change_events.sql`** — apply in production (creates audit table + trigger)
+7. **`027_analysis_stale_flag.sql`** — apply in production (adds `analysis_stale` column; stale-analysis banner won't persist across reloads until applied)
+8. Phase 2: doctor-facing surface (doctorFacingHint removed from v1.1 schema; revisit if needed)
+9. SGT timezone alignment in `buildWindow` — 14-day on-demand window makes boundary precision a non-issue; reopen if needed
+10. Session review pipeline: records where `analysis_stale=true` have mismatched form_data/analysis_result — may cause false "hallucination" findings in sessionReview. Consider filtering or flagging these records.
