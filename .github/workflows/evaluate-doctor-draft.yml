@@ -1,0 +1,128 @@
+name: Evaluate Doctor Draft
+
+on:
+  workflow_dispatch:
+    inputs:
+      doctor_email:
+        description: "Doctor email to evaluate."
+        required: true
+        default: "ardytcm@gmail.com"
+        type: string
+      window_days:
+        description: "Evaluation window in days."
+        required: false
+        default: "14"
+        type: string
+      upload_artifact:
+        description: "Upload full draft JSON artifact."
+        required: false
+        default: true
+        type: boolean
+
+jobs:
+  evaluate-doctor-draft:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Trigger draft doctor review
+        shell: bash
+        env:
+          BASE_URL: ${{ secrets.ASSESS_BASE_URL }}
+          ASSESSMENT_API_KEY: ${{ secrets.ASSESSMENT_API_KEY }}
+          DOCTOR_EMAIL: ${{ inputs.doctor_email }}
+          WINDOW_DAYS: ${{ inputs.window_days }}
+        run: |
+          set -euo pipefail
+
+          BODY=$(node -e '
+            const body = {
+              doctorEmail: process.env.DOCTOR_EMAIL.trim(),
+              windowDays: Number(process.env.WINDOW_DAYS || "14"),
+              mode: "medical_profile_v2"
+            };
+            process.stdout.write(JSON.stringify(body));
+          ')
+
+          STATUS=$(curl -s -o /tmp/evaluate-doctor-draft-response.json -w "%{http_code}" \
+            -X POST "$BASE_URL/api/cron/evaluate-doctors-draft" \
+            -H "X-Assessment-Key: $ASSESSMENT_API_KEY" \
+            -H "Content-Type: application/json" \
+            --data "$BODY")
+
+          export STATUS
+          node - <<'NODE'
+            const fs = require("fs");
+            const status = Number(process.env.STATUS);
+            const path = "/tmp/evaluate-doctor-draft-response.json";
+            let body;
+            try {
+              body = JSON.parse(fs.readFileSync(path, "utf8"));
+            } catch (error) {
+              console.error("Invalid JSON response");
+              process.exit(1);
+            }
+
+            if (status < 200 || status >= 300) {
+              console.error(`HTTP ${status}`);
+              console.error(JSON.stringify({
+                ok: body.ok,
+                stage: body.stage,
+                message: body.message,
+                details: body.details,
+              }, null, 2));
+              process.exit(1);
+            }
+
+            if (body.ok !== true || body.mode !== "medical_profile_v2") {
+              console.error("Draft response did not report success.");
+              console.error(JSON.stringify({
+                ok: body.ok,
+                mode: body.mode,
+                stage: body.stage,
+                message: body.message,
+              }, null, 2));
+              process.exit(1);
+            }
+
+            const draft = body.draft || {};
+            const preview = {
+              doctorEmail: body.doctorEmail,
+              windowDays: body.windowDays,
+              recordCount: body.recordCount,
+              calls: (body.diagnostics?.calls || []).map((call) => ({
+                stage: call.stage,
+                model: call.model,
+                promptTokens: call.usage?.prompt_tokens ?? 0,
+                completionTokens: call.usage?.completion_tokens ?? 0,
+                totalTokens: call.usage?.total_tokens ?? 0,
+                finishReason: call.finishReason ?? null,
+                repairedJson: call.repairedJson ?? false,
+              })),
+              draftPreview: {
+                clinicalSummary: draft.clinicalSummary,
+                mainCaseTypes: (draft.mainCaseTypes || []).slice(0, 3),
+                treatmentStyle: (draft.treatmentStyle || []).slice(0, 3),
+                aiMedicalRiskThemes: (draft.aiMedicalRiskThemes || []).slice(0, 3),
+                strengths: (draft.strengths || []).slice(0, 3),
+                discussionDirections: (draft.discussionDirections || []).slice(0, 3),
+                conversationReference: (draft.conversationReference || []).slice(0, 3),
+              },
+            };
+
+            console.log(JSON.stringify(preview, null, 2));
+
+            const email = String(body.doctorEmail || "doctor")
+              .replace(/[^a-zA-Z0-9_.-]+/g, "-")
+              .replace(/^-+|-+$/g, "");
+            const artifactPath = `/tmp/doctor-review-draft-${email}-${process.env.GITHUB_RUN_ID}.json`;
+            fs.writeFileSync(artifactPath, JSON.stringify(body, null, 2));
+            fs.writeFileSync("/tmp/doctor-review-draft-artifact-path.txt", artifactPath);
+          NODE
+
+      - name: Upload draft artifact
+        if: ${{ inputs.upload_artifact }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: doctor-review-draft-${{ github.run_id }}
+          path: /tmp/doctor-review-draft-*.json
+          if-no-files-found: error

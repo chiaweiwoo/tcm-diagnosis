@@ -37,6 +37,9 @@ type DeepSeekJsonResult<T> = {
   usage?: DeepSeekUsage;
   model: string;
   repairedJson?: boolean;
+  finishReason?: string | null;
+  maxTokens?: number;
+  jsonMode?: boolean;
 };
 
 type DeepSeekErrorDetails = Record<string, unknown>;
@@ -273,7 +276,14 @@ export async function callDeepSeekJson<T>({
 
   try {
     const data = parseJson<T>(first.content, "first_parse");
-    return { data, usage: first.usage, model };
+    return {
+      data,
+      usage: first.usage,
+      model,
+      finishReason: first.finishReason,
+      maxTokens: first.maxTokens,
+      jsonMode: first.jsonMode,
+    };
   } catch (error) {
     if (!repairJson) {
       throw error;
@@ -292,7 +302,15 @@ export async function callDeepSeekJson<T>({
 
     const data = parseJson<T>(fastRepair.content, "fast_repair_parse");
     const usage = combineUsage(first.usage, fastRepair.usage);
-    return { data, usage, model, repairedJson: true };
+    return {
+      data,
+      usage,
+      model,
+      repairedJson: true,
+      finishReason: first.finishReason,
+      maxTokens: first.maxTokens,
+      jsonMode: first.jsonMode,
+    };
   } catch {
     // Fall through to deep repair.
   }
@@ -307,7 +325,15 @@ export async function callDeepSeekJson<T>({
 
     const data = parseJson<T>(deepRepair.content, "deep_repair_parse");
     const usage = combineUsage(first.usage, fastRepair?.usage, deepRepair.usage);
-    return { data, usage, model, repairedJson: true };
+    return {
+      data,
+      usage,
+      model,
+      repairedJson: true,
+      finishReason: first.finishReason,
+      maxTokens: first.maxTokens,
+      jsonMode: first.jsonMode,
+    };
   } catch (error) {
     if (error instanceof DeepSeekError) {
       throw new DeepSeekError("DeepSeek returned JSON that could not be parsed.", 502, {

@@ -148,6 +148,8 @@ Admin (browser, is_admin=true only)
 GH Actions (ASSESSMENT_API_KEY auth, workflow_dispatch only — no schedule)
   └── POST /api/cron/evaluate-doctors          → bulk doctor profile evaluation (14d window, skips empty doctors)
                                                   triggerable via workflow_dispatch with optional email input
+  └── POST /api/cron/evaluate-doctors-draft    → read-only experimental doctor-review draft
+                                                  (Flash case-card compression + Pro synthesis; no DB writes)
 
 Workbench header (admin only):
   └── ⚙ Settings2 icon → /admin → redirects to /admin/users
@@ -277,6 +279,14 @@ Bulk route: `POST /api/cron/evaluate-doctors`
 - Body: `{ doctorEmail?: string }`
 - Doctors with 0 consultations in window → skipped silently (not failed)
 - 3-attempt retry with exponential backoff in the GH Actions workflow
+
+Draft experiment route: `POST /api/cron/evaluate-doctors-draft`
+- Auth: `X-Assessment-Key` header
+- Body: `{ doctorEmail: string, windowDays?: number, mode?: "medical_profile_v2" }`
+- Read-only; never inserts into `analytics_doctor_evaluations`
+- Used by `.github/workflows/evaluate-doctor-draft.yml` to compare a medical-profile draft before replacing live Goal 2
+- Pipeline: TypeScript medical signals → Flash compact case cards → Pro synthesis → optional Flash cleanup
+- Logs must show only sanitized summary/diagnostics; no full consultation input in GitHub logs
 
 ### Two-stage pipeline (v1.3)
 
