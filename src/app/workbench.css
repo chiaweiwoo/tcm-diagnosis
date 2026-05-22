@@ -93,6 +93,14 @@
   display: flex;
   align-items: center;
   line-height: 1;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.workbench__brand-text:hover {
+  opacity: 0.75;
 }
 
 .workbench__brand-title {
