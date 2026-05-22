@@ -43,22 +43,35 @@ jobs:
             process.stdout.write(JSON.stringify(body));
           ')
 
-          STATUS=$(curl -s -o /tmp/evaluate-doctor-draft-response.json -w "%{http_code}" \
-            -X POST "$BASE_URL/api/cron/evaluate-doctors-draft" \
-            -H "X-Assessment-Key: $ASSESSMENT_API_KEY" \
-            -H "Content-Type: application/json" \
-            --data "$BODY")
+          MAX_ATTEMPTS=4
+          ATTEMPT=0
+          DELAY=20
 
-          export STATUS
-          node - <<'NODE'
+          while [ "$ATTEMPT" -lt "$MAX_ATTEMPTS" ]; do
+            ATTEMPT=$((ATTEMPT + 1))
+            echo "Attempt $ATTEMPT of $MAX_ATTEMPTS..."
+
+            STATUS=$(curl -s -o /tmp/evaluate-doctor-draft-response.json -w "%{http_code}" \
+              -X POST "$BASE_URL/api/cron/evaluate-doctors-draft" \
+              -H "X-Assessment-Key: $ASSESSMENT_API_KEY" \
+              -H "Content-Type: application/json" \
+              --data "$BODY")
+
+            export STATUS
+            if node - <<'NODE'
             const fs = require("fs");
             const status = Number(process.env.STATUS);
             const path = "/tmp/evaluate-doctor-draft-response.json";
             let body;
+            const raw = fs.readFileSync(path, "utf8");
             try {
-              body = JSON.parse(fs.readFileSync(path, "utf8"));
+              body = JSON.parse(raw);
             } catch (error) {
               console.error("Invalid JSON response");
+              console.error(JSON.stringify({
+                httpStatus: status,
+                responsePreview: raw.replace(/\s+/g, " ").slice(0, 500),
+              }, null, 2));
               process.exit(1);
             }
 
@@ -118,6 +131,18 @@ jobs:
             fs.writeFileSync(artifactPath, JSON.stringify(body, null, 2));
             fs.writeFileSync("/tmp/doctor-review-draft-artifact-path.txt", artifactPath);
           NODE
+            then
+              echo "Draft evaluation succeeded."
+              exit 0
+            fi
+
+            echo "Draft evaluation failed; retrying in ${DELAY}s..."
+            sleep "$DELAY"
+            DELAY=$((DELAY * 2))
+          done
+
+          echo "Draft evaluation failed after $MAX_ATTEMPTS attempts."
+          exit 1
 
       - name: Upload draft artifact
         if: ${{ inputs.upload_artifact }}
