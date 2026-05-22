@@ -79,6 +79,7 @@ const MAX_RAW_CASE_CHARS = {
 };
 
 const CASE_CARD_BATCH_SIZE = 4;
+const FLASH_BATCH_CONCURRENCY = 3;
 
 function stringValue(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
@@ -353,11 +354,28 @@ async function buildFlashCaseCards(
 ): Promise<{ caseCards: DraftCaseCard[]; strengthSignals: string[] }> {
   const fallback = deterministicCaseCards(rows);
   const model = getDeepSeekFastModel();
-  const cards: DraftCaseCard[] = [];
   const strengthSignals = rows.flatMap((row) => deterministicStrengthTags(row.form_data, row.analysis_result));
+  const batches = Array.from({ length: Math.ceil(rows.length / CASE_CARD_BATCH_SIZE) }, (_, batchIndex) => {
+    const offset = batchIndex * CASE_CARD_BATCH_SIZE;
+    return {
+      offset,
+      batch: rows.slice(offset, offset + CASE_CARD_BATCH_SIZE),
+    };
+  });
 
-  for (let offset = 0; offset < rows.length; offset += CASE_CARD_BATCH_SIZE) {
-    const batch = rows.slice(offset, offset + CASE_CARD_BATCH_SIZE);
+  const flashResults: Array<{
+    offset: number;
+    cards: DraftCaseCard[];
+    diagnostic: {
+      model: string;
+      usage?: Usage;
+      finishReason?: string | null;
+      repairedJson?: boolean;
+      maxTokens?: number;
+    };
+  }> = [];
+
+  async function runBatch(offset: number, batch: DoctorReviewDraftRow[]) {
     const result = await callDeepSeekJson<FlashCaseCardsResponse>({
       model,
       maxTokens: 1000,
@@ -382,12 +400,37 @@ async function buildFlashCaseCards(
         { role: "user", content: serializeRawCaseBatch(batch, offset) },
       ],
     });
-    pushDiagnostic(calls, "flash_case_cards", result);
-    cards.push(...(result.data.caseCards ?? []));
+    return {
+      offset,
+      cards: result.data.caseCards ?? [],
+      diagnostic: {
+        model: result.model,
+        usage: result.usage,
+        finishReason: result.finishReason,
+        repairedJson: result.repairedJson ?? false,
+        maxTokens: result.maxTokens,
+      },
+    };
+  }
+
+  for (let index = 0; index < batches.length; index += FLASH_BATCH_CONCURRENCY) {
+    const group = batches.slice(index, index + FLASH_BATCH_CONCURRENCY);
+    const groupResults = await Promise.all(
+      group.map(({ offset, batch }) => runBatch(offset, batch)),
+    );
+    flashResults.push(...groupResults);
+  }
+
+  flashResults.sort((a, b) => a.offset - b.offset);
+  for (const result of flashResults) {
+    pushDiagnostic(calls, "flash_case_cards", result.diagnostic);
   }
 
   return {
-    caseCards: normalizeCaseCards(cards, fallback),
+    caseCards: normalizeCaseCards(
+      flashResults.flatMap((result) => result.cards),
+      fallback,
+    ),
     strengthSignals,
   };
 }
