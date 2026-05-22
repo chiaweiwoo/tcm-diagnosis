@@ -346,9 +346,7 @@ function normalizeCaseId(value: string) {
   return trimmed ? trimmed : null;
 }
 
-function getConsultationSortTime(record: Pick<ConsultationSummary, "updated_at" | "created_at">) {
-  const updated = Date.parse(record.updated_at);
-  if (!Number.isNaN(updated)) return updated;
+function getConsultationSortTime(record: Pick<ConsultationSummary, "created_at">) {
   const created = Date.parse(record.created_at);
   if (!Number.isNaN(created)) return created;
   return 0;
@@ -612,7 +610,7 @@ const HistoryPanel = memo(function HistoryPanel({
           <span className="history-table-head__name">病案</span>
           <span className="history-table-head__case">病案编号</span>
           <span className="history-table-head__related">随访编号</span>
-          <span className="history-table-head__time">更新时间</span>
+          <span className="history-table-head__time">创建时间</span>
         </div>
 
         {/* List */}
@@ -641,7 +639,7 @@ const HistoryPanel = memo(function HistoryPanel({
                 <span className="history-item__pill-spacer" aria-hidden />
               )}
               <div className="history-item__meta">
-                <span>{formatDate(c.updated_at)}</span>
+                <span>{formatDate(c.created_at)}</span>
               </div>
               <button
                 className="history-item__delete"
