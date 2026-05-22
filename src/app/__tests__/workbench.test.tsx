@@ -355,7 +355,6 @@ describe("Analyze flow", () => {
 
   it("asks before discarding unsaved post-analysis Case ID changes", async () => {
     const user = userEvent.setup();
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
     render(<Workbench />);
     await waitFor(() => screen.getByText("开始分析"));
 
@@ -366,9 +365,11 @@ describe("Analyze flow", () => {
     await user.type(screen.getByPlaceholderText("例：0004222"), "0004222");
     await user.click(screen.getByText("新建"));
 
-    expect(confirmSpy).toHaveBeenCalled();
+    // Custom dialog should appear — click 取消 to cancel navigation
+    await waitFor(() => screen.getByRole("alertdialog"));
+    await user.click(screen.getByText("取消"));
+
     expect(screen.getByPlaceholderText("例：0004222")).toHaveValue("0004222");
-    confirmSpy.mockRestore();
   });
 
 
@@ -406,7 +407,6 @@ describe("Analyze flow", () => {
 
   it("asks with the clinical warning when analyzed inputs changed", async () => {
     const user = userEvent.setup();
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
     render(<Workbench />);
     await waitFor(() => screen.getByText("开始分析"));
 
@@ -419,10 +419,13 @@ describe("Analyze flow", () => {
     await user.type(complaintInput, "复诊后头痛无眩晕");
     await user.click(screen.getByText("新建"));
 
-    expect(confirmSpy).toHaveBeenCalled();
-    expect(confirmSpy.mock.calls[0]?.[0]).toContain("建议先保存并重新分析");
+    // Custom dialog should appear with clinical-specific message
+    await waitFor(() => screen.getByRole("alertdialog"));
+    expect(screen.getByRole("alertdialog").textContent).toContain("建议先保存并重新分析");
+
+    // Click 取消 — form should remain unchanged
+    await user.click(screen.getByText("取消"));
     expect(complaintInput).toHaveValue("复诊后头痛无眩晕");
-    confirmSpy.mockRestore();
   });
 
   it("blocks analyzed clinical saves in the UI when required fields become invalid", async () => {
@@ -764,7 +767,6 @@ describe("Analyze flow", () => {
 
   it("deleting a dirty active record confirms once and resets cleanly", async () => {
     const user = userEvent.setup();
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
     render(<Workbench />);
     await waitFor(() => screen.getByText("开始分析"));
 
@@ -777,11 +779,15 @@ describe("Analyze flow", () => {
     await waitFor(() => screen.getByLabelText("删除病案"));
     await user.click(screen.getByLabelText("删除病案"));
 
+    // Custom dialog — click confirm to proceed with deletion
+    await waitFor(() => screen.getByRole("alertdialog"));
+    await user.click(screen.getByText("继续离开"));
+
     const fetchMock = vi.mocked(global.fetch);
-    expect(confirmSpy).toHaveBeenCalledTimes(1);
-    expect(fetchMock.mock.calls.some(([url, init]) => String(url).includes("/api/consultations/new-123") && init?.method === "DELETE")).toBe(true);
+    await waitFor(() =>
+      expect(fetchMock.mock.calls.some(([url, init]) => String(url).includes("/api/consultations/new-123") && init?.method === "DELETE")).toBe(true)
+    );
     expect(screen.getByPlaceholderText("例：0004222")).toHaveValue("");
-    confirmSpy.mockRestore();
   });
 
   it("shows error toast when analyze API fails", async () => {

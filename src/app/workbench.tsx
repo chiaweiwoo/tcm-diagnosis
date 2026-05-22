@@ -260,6 +260,32 @@ const Toast = memo(function Toast({ toast, onClose }: { toast: ToastState; onClo
   );
 });
 
+type ConfirmDialogState = { message: string; isClinical: boolean; resolve: (ok: boolean) => void };
+
+const ConfirmDialog = memo(function ConfirmDialog({
+  state,
+  onResolve,
+}: {
+  state: ConfirmDialogState;
+  onResolve: (ok: boolean) => void;
+}) {
+  return (
+    <div className="confirm-overlay" role="presentation">
+      <div className="confirm-dialog" role="alertdialog" aria-modal="true">
+        <p className="confirm-dialog__message">{state.message}</p>
+        <div className="confirm-dialog__actions">
+          <button className="btn btn--ghost btn--sm" onClick={() => onResolve(false)}>
+            取消
+          </button>
+          <button className="btn btn--primary btn--sm" onClick={() => onResolve(true)}>
+            {state.isClinical ? "继续（不保存）" : "继续离开"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+});
+
 function FieldError({ message }: { message?: string }) {
   if (!message) return null;
   return <span className="field-error">{message}</span>;
@@ -714,6 +740,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
   const [historyOpen, setHistoryOpen] = useState(false);
 
   const [toast, setToast] = useState<ToastState | null>(null);
+  const [confirmDialogState, setConfirmDialogState] = useState<ConfirmDialogState | null>(null);
   const resultRef = useRef<HTMLDivElement>(null);
 
   const normalizedCaseId = normalizeCaseId(caseId);
@@ -777,12 +804,17 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
   }, []);
   const dismissToast = useCallback(() => setToast(null), []);
 
-  const confirmDiscardChanges = useCallback(() => {
-    if (!hasUnsavedChanges) return true;
-    if (clinicalDirty) {
-      return window.confirm("病案输入已修改但尚未保存，离开后将丢失。建议先保存并重新分析以获取最新AI建议。是否继续？");
-    }
-    return window.confirm("病案编号、随访记录编号或给AI回馈尚未保存，离开后将丢失。是否继续？");
+  const confirmDiscardChanges = useCallback((): Promise<boolean> => {
+    if (!hasUnsavedChanges) return Promise.resolve(true);
+    return new Promise((resolve) => {
+      setConfirmDialogState({
+        isClinical: clinicalDirty,
+        message: clinicalDirty
+          ? "病案输入已修改但尚未保存，离开后将丢失。建议先保存并重新分析以获取最新AI建议。"
+          : "病案编号、随访记录编号或给AI回馈尚未保存，离开后将丢失。",
+        resolve,
+      });
+    });
   }, [clinicalDirty, hasUnsavedChanges]);
 
   useEffect(() => {
@@ -859,13 +891,13 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
     router.replace("/", { scroll: false });
   }, [router]);
 
-  function handleNew() {
-    if (!confirmDiscardChanges()) return;
+  async function handleNew() {
+    if (!await confirmDiscardChanges()) return;
     resetWorkbenchToNew();
   }
 
   async function handleSelectHistory(id: string) {
-    if (id !== activeId && !confirmDiscardChanges()) return;
+    if (id !== activeId && !await confirmDiscardChanges()) return;
     try {
       let nextForm = EMPTY_FORM;
       const record = await apiGetConsultation(id);
@@ -917,7 +949,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
   }
 
   async function handleDeleteHistory(id: string) {
-    if (!confirmDiscardChanges()) return;
+    if (!await confirmDiscardChanges()) return;
     try {
       await apiDeleteConsultation(id);
       setConsultations((prev) => prev.filter((c) => c.id !== id));
@@ -1187,19 +1219,18 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
                 <span className="sr-only">后台管理</span>
               </a>
             )}
-            <a
+            <button
               className="btn btn--ghost btn--sm"
-              href="/auth/signout"
               title="退出"
-              onClick={(event) => {
-                if (!confirmDiscardChanges()) {
-                  event.preventDefault();
-                }
+              onClick={() => {
+                void confirmDiscardChanges().then((ok) => {
+                  if (ok) window.location.href = "/auth/signout";
+                });
               }}
             >
               <LogOut size={15} />
               <span className="sr-only">退出</span>
-            </a>
+            </button>
           </div>
         </div>
       </header>
@@ -1567,6 +1598,17 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
 
       {/* Toast */}
       {toast && <Toast toast={toast} onClose={dismissToast} />}
+
+      {/* Confirm dialog */}
+      {confirmDialogState && (
+        <ConfirmDialog
+          state={confirmDialogState}
+          onResolve={(ok) => {
+            confirmDialogState.resolve(ok);
+            setConfirmDialogState(null);
+          }}
+        />
+      )}
     </div>
   );
 }
