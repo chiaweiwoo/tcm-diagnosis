@@ -35,32 +35,29 @@ describe("doctor review draft deterministic signals", () => {
   it("computes medical aggregate signals without operational metadata", () => {
     const signals = buildDraftMedicalSignals([
       {
-        analyzed_at: "2026-05-20T00:00:00.000Z",
-        form_data: {
-          patientSex: "女",
-          patientAge: "35",
-          chiefComplaint: "膝外侧疼痛多时",
-          diagnosis: "膝外侧副韧带炎",
-          pattern: "气血瘀滞",
-          prescriptionType: ["针灸"],
-        },
-        analysis_result: {
-          cautions: ["针刺时避开腓总神经走行区。"],
-        },
+        caseNumber: 1,
+        label: "女35岁膝痛",
+        category: "疼痛筋伤",
+        treatmentType: "针灸",
+        patternOrLogic: "气血瘀滞",
+        keyEvidence: "膝外侧压痛",
+        aiRiskTags: ["针刺深度/解剖风险"],
       },
       {
-        analyzed_at: "2026-05-20T00:00:00.000Z",
-        form_data: {
-          patientSex: "女",
-          patientAge: "45",
-          chiefComplaint: "湿疹反复发作",
-          diagnosis: "湿疹",
-          pattern: "风寒湿",
-          prescriptionType: ["方药"],
-        },
-        analysis_result: {
-          cautions: ["温燥药可能加重口干便秘，需观察。"],
-        },
+        caseNumber: 2,
+        label: "女45岁湿疹",
+        category: "皮肤问题",
+        treatmentType: "方药",
+        patternOrLogic: "风寒湿",
+        keyEvidence: "舌黯脉弦",
+        aiRiskTags: ["温燥/伤阴"],
+      },
+    ], [
+      {
+        caseTypeTags: ["疼痛筋伤", "皮肤问题"],
+        treatmentLogicTags: ["气血瘀滞", "风寒湿"],
+        riskThemeTags: ["针刺深度/解剖风险", "温燥/伤阴"],
+        strengthTags: ["体检支持判断", "治疗方向较清楚"],
       },
     ]);
 
@@ -69,8 +66,9 @@ describe("doctor review draft deterministic signals", () => {
     expect(signals.caseTypeCounts).toContainEqual({ label: "皮肤问题", count: 1 });
     expect(signals.treatmentMix).toContainEqual({ label: "针灸", count: 1 });
     expect(signals.treatmentMix).toContainEqual({ label: "方药", count: 1 });
-    expect(signals.patternCounts).toContainEqual({ label: "气血瘀滞", count: 1 });
+    expect(signals.treatmentLogicCounts).toContainEqual({ label: "气血瘀滞", count: 1 });
     expect(signals.riskThemeCounts).toContainEqual({ label: "针刺深度/解剖风险", count: 1 });
     expect(signals.riskThemeCounts).toContainEqual({ label: "温燥/伤阴", count: 1 });
+    expect(signals.strengthSignalCounts).toContainEqual({ label: "体检支持判断", count: 1 });
   });
 });

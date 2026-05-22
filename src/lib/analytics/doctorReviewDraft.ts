@@ -47,8 +47,9 @@ export type DraftMedicalSignals = {
   totalCases: number;
   caseTypeCounts: Array<{ label: string; count: number }>;
   treatmentMix: Array<{ label: string; count: number }>;
-  patternCounts: Array<{ label: string; count: number }>;
+  treatmentLogicCounts: Array<{ label: string; count: number }>;
   riskThemeCounts: Array<{ label: string; count: number }>;
+  strengthSignalCounts: Array<{ label: string; count: number }>;
   representativeLabels: string[];
 };
 
@@ -67,6 +68,12 @@ export type DoctorReviewDraftResult = {
 
 type FlashCaseCardsResponse = {
   caseCards: DraftCaseCard[];
+  batchSummary?: {
+    caseTypeTags: string[];
+    treatmentLogicTags: string[];
+    riskThemeTags: string[];
+    strengthTags: string[];
+  };
 };
 
 const MAX_RAW_CASE_CHARS = {
@@ -79,7 +86,14 @@ const MAX_RAW_CASE_CHARS = {
   aiCautions: 160,
 };
 
-const CASE_CARD_BATCH_SIZE = 4;
+const CASE_CARD_BATCH_SIZE = 5;
+
+type DraftBatchSummary = {
+  caseTypeTags: string[];
+  treatmentLogicTags: string[];
+  riskThemeTags: string[];
+  strengthTags: string[];
+};
 
 function stringValue(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
@@ -103,6 +117,14 @@ function topCounts(values: string[], max = 8): Array<{ label: string; count: num
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
     .slice(0, max)
     .map(([label, count]) => ({ label, count }));
+}
+
+function compactTags(values: unknown, maxItems: number, maxChars: number): string[] {
+  if (!Array.isArray(values)) return [];
+  return values
+    .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    .map((item) => compact(item, maxChars))
+    .slice(0, maxItems);
 }
 
 export function buildDraftCaseLabel(formData: Record<string, unknown> | null | undefined, index: number): string {
@@ -188,6 +210,25 @@ export function extractMedicalRiskTags(analysisResult: Record<string, unknown> |
   return tags.slice(0, 4);
 }
 
+function deterministicStrengthTags(
+  formData: Record<string, unknown> | null,
+  analysisResult: Record<string, unknown> | null,
+): string[] {
+  const tags: string[] = [];
+  const exam = stringValue(formData?.physicalExam);
+  const pastHistory = stringValue(formData?.pastHistory);
+  const prescription = stringValue(formData?.prescription);
+  const pattern = stringValue(formData?.pattern);
+  const cautions = collectCautions(analysisResult);
+
+  if (/[舌脉]/.test(exam)) tags.push("体检支持判断");
+  if (pastHistory) tags.push("慢病背景有交代");
+  if (prescription && pattern) tags.push("治疗方向较清楚");
+  if (/未发现明显用药禁忌|无明显用药禁忌/.test(cautions)) tags.push("风险提示较克制");
+
+  return tags;
+}
+
 function treatmentLogic(formData: Record<string, unknown> | null): string {
   const pattern = compact(formData?.pattern, 28);
   const diagnosis = compact(formData?.diagnosis, 24);
@@ -204,20 +245,23 @@ function keyEvidence(formData: Record<string, unknown> | null): string {
   return compact(exam, 46);
 }
 
-export function buildDraftMedicalSignals(rows: DoctorReviewDraftRow[]): DraftMedicalSignals {
-  const labels = rows.map((row, index) => buildDraftCaseLabel(row.form_data, index + 1));
-  const categories = rows.map((row) => inferCaseCategory(row.form_data));
-  const treatmentTypes = rows.map((row) => prescriptionTypeLabel(row.form_data?.prescriptionType));
-  const patterns = rows.map((row) => stringValue(row.form_data?.pattern)).filter(Boolean);
-  const risks = rows.flatMap((row) => extractMedicalRiskTags(row.analysis_result));
-
+export function buildDraftMedicalSignals(
+  caseCards: DraftCaseCard[],
+  batchSummaries: DraftBatchSummary[],
+): DraftMedicalSignals {
+  const categories = caseCards.map((card) => card.category);
+  const treatmentTypes = caseCards.map((card) => card.treatmentType);
+  const treatmentLogics = caseCards.map((card) => card.patternOrLogic).filter(Boolean);
+  const risks = caseCards.flatMap((card) => card.aiRiskTags);
+  const strengths = batchSummaries.flatMap((summary) => summary.strengthTags);
   return {
-    totalCases: rows.length,
+    totalCases: caseCards.length,
     caseTypeCounts: topCounts(categories),
     treatmentMix: topCounts(treatmentTypes),
-    patternCounts: topCounts(patterns),
+    treatmentLogicCounts: topCounts(treatmentLogics),
     riskThemeCounts: topCounts(risks),
-    representativeLabels: labels.slice(0, 8),
+    strengthSignalCounts: topCounts(strengths),
+    representativeLabels: caseCards.map((card) => card.label).slice(0, 8),
   };
 }
 
@@ -246,8 +290,9 @@ function serializeSignals(signals: DraftMedicalSignals): string {
     `totalCases=${signals.totalCases}`,
     `caseTypes=${signals.caseTypeCounts.map((item) => `${item.label}${item.count}`).join(" / ") || "none"}`,
     `treatmentMix=${signals.treatmentMix.map((item) => `${item.label}${item.count}`).join(" / ") || "none"}`,
-    `patterns=${signals.patternCounts.map((item) => `${item.label}${item.count}`).join(" / ") || "none"}`,
+    `treatmentLogics=${signals.treatmentLogicCounts.map((item) => `${item.label}${item.count}`).join(" / ") || "none"}`,
     `riskThemes=${signals.riskThemeCounts.map((item) => `${item.label}${item.count}`).join(" / ") || "none"}`,
+    `strengthSignals=${signals.strengthSignalCounts.map((item) => `${item.label}${item.count}`).join(" / ") || "none"}`,
     `examples=${signals.representativeLabels.join(" / ") || "none"}`,
   ].join("\n");
 }
@@ -265,6 +310,18 @@ function deterministicCaseCards(rows: DoctorReviewDraftRow[]): DraftCaseCard[] {
       aiRiskTags: extractMedicalRiskTags(row.analysis_result),
     };
   });
+}
+
+function deterministicBatchSummary(rows: DoctorReviewDraftRow[]): DraftBatchSummary {
+  return {
+    caseTypeTags: rows.map((row) => inferCaseCategory(row.form_data)),
+    treatmentLogicTags: rows
+      .map((row) => treatmentLogic(row.form_data))
+      .filter(Boolean)
+      .slice(0, 8),
+    riskThemeTags: rows.flatMap((row) => extractMedicalRiskTags(row.analysis_result)),
+    strengthTags: rows.flatMap((row) => deterministicStrengthTags(row.form_data, row.analysis_result)),
+  };
 }
 
 function normalizeCaseCards(cards: DraftCaseCard[], fallback: DraftCaseCard[]): DraftCaseCard[] {
@@ -318,10 +375,14 @@ function pushDiagnostic(
   });
 }
 
-async function buildFlashCaseCards(rows: DoctorReviewDraftRow[], calls: DraftCallDiagnostic[]): Promise<DraftCaseCard[]> {
+async function buildFlashCaseCards(
+  rows: DoctorReviewDraftRow[],
+  calls: DraftCallDiagnostic[],
+): Promise<{ caseCards: DraftCaseCard[]; batchSummaries: DraftBatchSummary[] }> {
   const fallback = deterministicCaseCards(rows);
   const model = getDeepSeekFastModel();
   const cards: DraftCaseCard[] = [];
+  const batchSummaries: DraftBatchSummary[] = [];
 
   for (let offset = 0; offset < rows.length; offset += CASE_CARD_BATCH_SIZE) {
     const batch = rows.slice(offset, offset + CASE_CARD_BATCH_SIZE);
@@ -338,11 +399,12 @@ async function buildFlashCaseCards(rows: DoctorReviewDraftRow[], calls: DraftCal
           content: [
             "你是中医病案信号压缩器，只把输入病案压缩为简短 caseCards。",
             "不要评价医生对错，不要扩写原文，不要加入输入之外的事实。",
-            "每张卡只保留医学画像需要的最小信息。",
+            "每张卡只保留医学画像需要的最小信息，并补一份 batchSummary 作为中层聚合标签。",
             "每个字符串字段必须极短：label不超过12字，category不超过8字，patternOrLogic不超过14字，keyEvidence不超过16字。",
             "aiRiskTags最多2个，每个不超过10字。",
+            "batchSummary.caseTypeTags、treatmentLogicTags、riskThemeTags、strengthTags 都是短标签数组；每个数组最多6项，每项不超过12字。",
             "只输出合法 JSON。",
-            "结构：{\"caseCards\":[{\"caseNumber\":1,\"label\":\"女35岁咳嗽\",\"category\":\"呼吸咳嗽\",\"treatmentType\":\"方药\",\"patternOrLogic\":\"寒痰/二陈汤方向\",\"keyEvidence\":\"舌暗红苔白腻/脉滑\",\"aiRiskTags\":[\"血压/慢病监测\"]}]}",
+            "结构：{\"caseCards\":[{\"caseNumber\":1,\"label\":\"女35岁咳嗽\",\"category\":\"呼吸咳嗽\",\"treatmentType\":\"方药\",\"patternOrLogic\":\"寒痰/二陈汤方向\",\"keyEvidence\":\"舌暗红苔白腻/脉滑\",\"aiRiskTags\":[\"血压/慢病监测\"]}],\"batchSummary\":{\"caseTypeTags\":[\"呼吸咳嗽\"],\"treatmentLogicTags\":[\"寒痰/宣肺化痰\"],\"riskThemeTags\":[\"血压/慢病监测\"],\"strengthTags\":[\"体检支持判断\"]}}",
           ].join("\n"),
         },
         { role: "user", content: serializeRawCaseBatch(batch, offset) },
@@ -350,9 +412,27 @@ async function buildFlashCaseCards(rows: DoctorReviewDraftRow[], calls: DraftCal
     });
     pushDiagnostic(calls, "flash_case_cards", result);
     cards.push(...(result.data.caseCards ?? []));
+    const fallbackSummary = deterministicBatchSummary(batch);
+    batchSummaries.push({
+      caseTypeTags: compactTags(result.data.batchSummary?.caseTypeTags, 6, 12).length
+        ? compactTags(result.data.batchSummary?.caseTypeTags, 6, 12)
+        : fallbackSummary.caseTypeTags,
+      treatmentLogicTags: compactTags(result.data.batchSummary?.treatmentLogicTags, 6, 14).length
+        ? compactTags(result.data.batchSummary?.treatmentLogicTags, 6, 14)
+        : fallbackSummary.treatmentLogicTags,
+      riskThemeTags: compactTags(result.data.batchSummary?.riskThemeTags, 6, 12).length
+        ? compactTags(result.data.batchSummary?.riskThemeTags, 6, 12)
+        : fallbackSummary.riskThemeTags,
+      strengthTags: compactTags(result.data.batchSummary?.strengthTags, 6, 12).length
+        ? compactTags(result.data.batchSummary?.strengthTags, 6, 12)
+        : fallbackSummary.strengthTags,
+    });
   }
 
-  return normalizeCaseCards(cards, fallback);
+  return {
+    caseCards: normalizeCaseCards(cards, fallback),
+    batchSummaries,
+  };
 }
 
 function profileTooLong(profile: DoctorReviewDraft): boolean {
@@ -445,8 +525,8 @@ export async function runDoctorReviewDraft({
   windowDays: number;
 }): Promise<DoctorReviewDraftResult> {
   const calls: DraftCallDiagnostic[] = [];
-  const signals = buildDraftMedicalSignals(rows);
-  const caseCards = await buildFlashCaseCards(rows, calls);
+  const { caseCards, batchSummaries } = await buildFlashCaseCards(rows, calls);
+  const signals = buildDraftMedicalSignals(caseCards, batchSummaries);
   let draft = await synthesizeWithPro({ signals, caseCards, windowDays, calls });
 
   if (profileTooLong(draft)) {
