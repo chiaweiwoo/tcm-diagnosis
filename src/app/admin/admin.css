@@ -1955,6 +1955,12 @@ details[open] .sample-details__toggle::before {
 .profile-card--teal .profile-card-title { color: var(--profile-teal); }
 .profile-card--subtle .profile-card-title { color: var(--text-muted, #6B6B6B); }
 
+/* Bullet color inherits card accent */
+.profile-card--sage .profile-list-main::before { color: var(--profile-sage); opacity: 0.7; }
+.profile-card--tan  .profile-list-main::before { color: var(--profile-tan);  opacity: 0.7; }
+.profile-card--gold .profile-list-main::before { color: var(--profile-gold); opacity: 0.7; }
+.profile-card--ink  .profile-list-main::before { color: var(--profile-ink);  opacity: 0.7; }
+
 .profile-section {
   display: flex;
   flex-direction: column;
@@ -1979,7 +1985,7 @@ details[open] .sample-details__toggle::before {
 .profile-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .profile-list-row {
@@ -1989,21 +1995,35 @@ details[open] .sample-details__toggle::before {
 }
 
 .profile-list-main {
-  font-size: 14px;
+  font-size: 13.5px;
   line-height: 1.5;
   color: var(--text, #1A1A1A);
+  padding-left: 14px;
+  position: relative;
+}
+
+.profile-list-main::before {
+  content: "•";
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-size: 15px;
+  line-height: 1.45;
+  opacity: 0.4;
 }
 
 .profile-list-sub {
   font-size: 12px;
   line-height: 1.45;
   color: var(--text-muted);
+  padding-left: 14px;
 }
 
 .profile-list-hint {
   font-size: 13px;
   color: var(--profile-tan);
-  padding: 6px 10px;
+  padding: 5px 10px;
+  margin-left: 14px;
   background: rgba(176, 117, 85, 0.07);
   border-left: 3px solid var(--profile-tan);
   border-radius: 0 6px 6px 0;
