@@ -101,7 +101,7 @@ Helps registered TCM doctors:
 - Fill in a structured 9-field clinical form (no free-text draft)
 - Receive simplified-Chinese clinical review output directly
 - Save consultation history for later comparison
-- Leave optional `病案编号 Case ID`, `随访记录编号 Follow-up Record ID`, and `给AI回馈 Feedback to AI` notes on analyzed records
+- Leave optional `病案编号 Case ID`, `随访病案编号 Follow-up Case ID`, and `给AI回馈 Feedback to AI` notes on analyzed records
 
 ---
 
@@ -173,7 +173,7 @@ Never define a token only in `workbench.css` — admin pages won't see it. Add i
 - Single-step pipeline: doctor fills structured form → POST /api/analyze → result. No organize step.
 - Analyze always uses `DEEPSEEK_MODEL_FAST` (flash). No mode selector exposed to doctors.
 - All clinical fields remain editable at all times — including after analysis. Doctors can modify inputs and save without forcing a re-analysis. When clinical inputs differ from the snapshot at last analysis, the workbench shows a stale-analysis warning banner. The `analysis_stale` DB column persists this warning across page reloads.
-- Metadata fields (`病案编号 Case ID`, `随访记录编号 Follow-up Record ID`, `给AI回馈 Feedback to AI`) save through the header `保存` button.
+- Metadata fields (`病案编号 Case ID`, `随访病案编号 Follow-up Case ID`, `给AI回馈 Feedback to AI`) save through the header `保存` button.
 - Two-level unsaved-changes warning on navigation: clinical inputs changed → "建议先保存并重新分析" (re-analyze prompt); metadata-only changed → generic save reminder.
 - Core analysis sections must be structurally stable — all sections always present, even if empty with a fallback string.
 - Analyze output reading order: 重点结论 → 当前思路 → 建议优化 → 可选思路 → 风险与提醒 → 随访监测 → 证据状态.

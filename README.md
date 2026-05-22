@@ -5,7 +5,7 @@
 
 医生填写结构化病案表单（9 个临床字段），系统即时给出中医临床复核建议，并自动保存可回顾的诊次历史。
 
-结果以三栏呈现：判断（当前思路）/ 方案（建议优化）/ 随访监测，顶部附重点结论与风险提醒。所有临床字段在分析后仍可继续编辑与保存；若表单内容与上次分析快照存在差异，工作台会显示”分析结果可能已过时”提示，提醒医师重新分析。`病案编号 Case ID`、`随访记录编号 Follow-up Record ID` 与”给AI回馈”通过右上角 `保存` 提交。
+结果以三栏呈现：判断（当前思路）/ 方案（建议优化）/ 随访监测，顶部附重点结论与风险提醒。所有临床字段在分析后仍可继续编辑与保存；若表单内容与上次分析快照存在差异，工作台会显示”分析结果可能已过时”提示，提醒医师重新分析。`病案编号 Case ID`、`随访病案编号 Follow-up Case ID` 与”给AI回馈”通过右上角 `保存` 提交。
 
 ## 技术栈
 
@@ -25,7 +25,7 @@
 | `GET /api/consultations` | 列出当前医师的历史记录 |
 | `POST /api/consultations` | 新建病案记录 |
 | `GET /api/consultations/[id]` | 读取单条病案 |
-| `PATCH /api/consultations/[id]` | 更新病案字段（临床输入、分析结果、Case ID、Follow-up Record ID、给AI回馈） |
+| `PATCH /api/consultations/[id]` | 更新病案字段（临床输入、分析结果、Case ID、Follow-up Case ID、给AI回馈） |
 | `DELETE /api/consultations/[id]` | 删除单条病案 |
 | `GET /auth/callback` | Google OAuth 回调与允许名单验证 |
 | `GET /auth/signout` | 登出并跳转登录页 |

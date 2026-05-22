@@ -90,7 +90,7 @@ export async function POST(request: Request) {
       return apiError(401, "UNAUTHORIZED", "请先登录。");
     }
     if (error instanceof Error && error.message === "CASE_ID_TOO_LONG") {
-      return apiError(400, "CASE_ID_TOO_LONG", "病案编号与随访记录编号不能超过64个字符。");
+      return apiError(400, "CASE_ID_TOO_LONG", "病案编号与随访病案编号不能超过64个字符。");
     }
 
     await logServerEvent({

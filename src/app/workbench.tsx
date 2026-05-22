@@ -813,7 +813,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
         isClinical: clinicalDirty,
         message: clinicalDirty
           ? "病案输入已修改但尚未保存，离开后将丢失。建议先保存并重新分析以获取最新AI建议。"
-          : "病案编号、随访记录编号或给AI回馈尚未保存，离开后将丢失。",
+          : "病案编号、随访病案编号或给AI回馈尚未保存，离开后将丢失。",
         resolve,
       });
     });
@@ -1320,7 +1320,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
                 />
               </div>
               <div className="form-group">
-                <label className="form-label" htmlFor="related-case-id-input">随访记录编号 Follow-up Record ID</label>
+                <label className="form-label" htmlFor="related-case-id-input">随访病案编号 Follow-up Case ID</label>
                 <input
                   id="related-case-id-input"
                   className="form-input form-input--sm case-id-panel__input"

@@ -49,7 +49,7 @@ export async function GET(_request: Request, context: RouteContext) {
     }
 
     if (error instanceof Error && error.message === "CASE_ID_TOO_LONG") {
-      return apiError(400, "CASE_ID_TOO_LONG", "病案编号与随访记录编号不能超过64个字符。");
+      return apiError(400, "CASE_ID_TOO_LONG", "病案编号与随访病案编号不能超过64个字符。");
     }
     await logServerEvent({
       source: "api/consultations/[id]",
