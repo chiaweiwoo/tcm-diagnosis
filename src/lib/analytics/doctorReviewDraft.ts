@@ -1,4 +1,4 @@
-import { callDeepSeekJson, getDeepSeekFastModel, getDeepSeekSmartModel } from "@/lib/ai/deepseek";
+import { callDeepSeekJson, DeepSeekError, getDeepSeekFastModel, getDeepSeekSmartModel } from "@/lib/ai/deepseek";
 
 type Usage = {
   prompt_tokens?: number;
@@ -66,8 +66,8 @@ export type DoctorReviewDraftResult = {
   };
 };
 
-type FlashCaseCardsResponse = {
-  caseCards: DraftCaseCard[];
+type FlashCaseCardResponse = {
+  caseCard: Omit<DraftCaseCard, "caseNumber">;
 };
 
 const MAX_RAW_CASE_CHARS = {
@@ -78,8 +78,7 @@ const MAX_RAW_CASE_CHARS = {
   pattern: 36,
 };
 
-const CASE_CARD_BATCH_SIZE = 4;
-const FLASH_BATCH_CONCURRENCY = 3;
+const FLASH_CASE_CONCURRENCY = 6;
 
 function stringValue(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
@@ -250,24 +249,21 @@ export function buildDraftMedicalSignals(
   };
 }
 
-function serializeRawCaseBatch(rows: DoctorReviewDraftRow[], offset: number): string {
-  return rows.map((row, index) => {
-    const n = offset + index + 1;
-    const formData = row.form_data ?? {};
-    const riskHint = extractMedicalRiskTags(row.analysis_result).join("、");
-    return [
-      `#${n}`,
-      `label=${buildDraftCaseLabel(formData, n)}`,
-      `type=${prescriptionTypeLabel(formData.prescriptionType)}`,
-      `category_hint=${inferCaseCategory(formData)}`,
-      `chief=${compact(formData.chiefComplaint, MAX_RAW_CASE_CHARS.complaint)}`,
-      `illness=${compact(formData.currentIllness, MAX_RAW_CASE_CHARS.currentIllness)}`,
-      `exam=${compact(formData.physicalExam, MAX_RAW_CASE_CHARS.physicalExam)}`,
-      `diagnosis=${compact(formData.diagnosis, MAX_RAW_CASE_CHARS.diagnosis)}`,
-      `pattern=${compact(formData.pattern, MAX_RAW_CASE_CHARS.pattern)}`,
-      `risk_hint=${riskHint || "无明显重复"}`,
-    ].join(" | ");
-  }).join("\n");
+function serializeRawCase(row: DoctorReviewDraftRow, caseNumber: number): string {
+  const formData = row.form_data ?? {};
+  const riskHint = extractMedicalRiskTags(row.analysis_result).join("/");
+  return [
+    `#${caseNumber}`,
+    `label=${buildDraftCaseLabel(formData, caseNumber)}`,
+    `type=${prescriptionTypeLabel(formData.prescriptionType)}`,
+    `category_hint=${inferCaseCategory(formData)}`,
+    `chief=${compact(formData.chiefComplaint, MAX_RAW_CASE_CHARS.complaint)}`,
+    `illness=${compact(formData.currentIllness, MAX_RAW_CASE_CHARS.currentIllness)}`,
+    `exam=${compact(formData.physicalExam, MAX_RAW_CASE_CHARS.physicalExam)}`,
+    `diagnosis=${compact(formData.diagnosis, MAX_RAW_CASE_CHARS.diagnosis)}`,
+    `pattern=${compact(formData.pattern, MAX_RAW_CASE_CHARS.pattern)}`,
+    `risk_hint=${riskHint || "none"}`,
+  ].join(" | ");
 }
 
 function serializeSignals(signals: DraftMedicalSignals): string {
@@ -355,17 +351,9 @@ async function buildFlashCaseCards(
   const fallback = deterministicCaseCards(rows);
   const model = getDeepSeekFastModel();
   const strengthSignals = rows.flatMap((row) => deterministicStrengthTags(row.form_data, row.analysis_result));
-  const batches = Array.from({ length: Math.ceil(rows.length / CASE_CARD_BATCH_SIZE) }, (_, batchIndex) => {
-    const offset = batchIndex * CASE_CARD_BATCH_SIZE;
-    return {
-      offset,
-      batch: rows.slice(offset, offset + CASE_CARD_BATCH_SIZE),
-    };
-  });
 
   const flashResults: Array<{
-    offset: number;
-    cards: DraftCaseCard[];
+    card: DraftCaseCard;
     diagnostic: {
       model: string;
       usage?: Usage;
@@ -375,62 +363,83 @@ async function buildFlashCaseCards(
     };
   }> = [];
 
-  async function runBatch(offset: number, batch: DoctorReviewDraftRow[]) {
-    const result = await callDeepSeekJson<FlashCaseCardsResponse>({
-      model,
-      maxTokens: 1000,
-      timeoutMs: 90_000,
-      repairJson: true,
-      retryOnEmpty: true,
-      jsonMode: false,
-      messages: [
-        {
-          role: "system",
-          content: [
-            "你是中医病案信号压缩器，只把输入病案压缩为简短 caseCards。",
-            "不要评价医生对错，不要扩写原文，不要加入输入之外的事实。",
-            "每张卡只保留医学画像需要的最小信息。",
-            "优先沿用输入中的 category_hint 与 risk_hint，除非明显不合适；不要重新展开原始 AI 长文本。",
-            "每个字符串字段必须极短：label不超过10字，category不超过6字，patternOrLogic不超过10字，keyEvidence不超过12字。",
-            "aiRiskTags最多2个，每个不超过8字。",
-            "只输出合法 JSON。",
-            "结构：{\"caseCards\":[{\"caseNumber\":1,\"label\":\"女35岁咳嗽\",\"category\":\"呼吸\",\"treatmentType\":\"方药\",\"patternOrLogic\":\"寒痰\",\"keyEvidence\":\"舌暗红苔白腻\",\"aiRiskTags\":[\"血压监测\"]}]}",
-          ].join("\n"),
+  async function runCase(row: DoctorReviewDraftRow, fallbackCard: DraftCaseCard) {
+    try {
+      const result = await callDeepSeekJson<FlashCaseCardResponse>({
+        model,
+        maxTokens: 220,
+        timeoutMs: 60_000,
+        repairJson: true,
+        retryOnEmpty: true,
+        jsonMode: false,
+        messages: [
+          {
+            role: "system",
+            content: [
+              "You compress one TCM consultation into one tiny caseCard.",
+              "Do not evaluate the doctor. Do not expand the text. Do not add facts not present in the input.",
+              "Prefer the provided category_hint and risk_hint unless they are clearly wrong.",
+              "Keep every field very short: label <= 10 chars, category <= 6 chars, patternOrLogic <= 10 chars, keyEvidence <= 12 chars.",
+              "aiRiskTags may contain at most 2 items, each <= 8 chars.",
+              "Return valid JSON only.",
+              'Shape: {"caseCard":{"label":"女35咳嗽","category":"呼吸","treatmentType":"方药","patternOrLogic":"寒痰","keyEvidence":"舌暗红苔白","aiRiskTags":["血压监测"]}}',
+            ].join("\n"),
+          },
+          { role: "user", content: serializeRawCase(row, fallbackCard.caseNumber) },
+        ],
+      });
+
+      const raw = result.data.caseCard;
+      return {
+        card: {
+          caseNumber: fallbackCard.caseNumber,
+          label: compact(raw?.label || fallbackCard.label, 28),
+          category: compact(raw?.category || fallbackCard.category, 16),
+          treatmentType: compact(raw?.treatmentType || fallbackCard.treatmentType, 16),
+          patternOrLogic: compact(raw?.patternOrLogic || fallbackCard.patternOrLogic, 36),
+          keyEvidence: compact(raw?.keyEvidence || fallbackCard.keyEvidence, 54),
+          aiRiskTags: Array.isArray(raw?.aiRiskTags) && raw.aiRiskTags.length
+            ? raw.aiRiskTags.map((tag) => compact(tag, 18)).slice(0, 4)
+            : fallbackCard.aiRiskTags,
         },
-        { role: "user", content: serializeRawCaseBatch(batch, offset) },
-      ],
-    });
-    return {
-      offset,
-      cards: result.data.caseCards ?? [],
-      diagnostic: {
-        model: result.model,
-        usage: result.usage,
-        finishReason: result.finishReason,
-        repairedJson: result.repairedJson ?? false,
-        maxTokens: result.maxTokens,
-      },
-    };
+        diagnostic: {
+          model: result.model,
+          usage: result.usage,
+          finishReason: result.finishReason,
+          repairedJson: result.repairedJson ?? false,
+          maxTokens: result.maxTokens,
+        },
+      };
+    } catch (error) {
+      const details = error instanceof DeepSeekError ? (error.details ?? {}) : {};
+      return {
+        card: fallbackCard,
+        diagnostic: {
+          model,
+          usage: typeof details === "object" && details && "usage" in details ? details.usage as Usage : undefined,
+          finishReason: typeof details === "object" && details && "finishReason" in details ? String(details.finishReason ?? "fallback") : "fallback",
+          repairedJson: false,
+          maxTokens: 220,
+        },
+      };
+    }
   }
 
-  for (let index = 0; index < batches.length; index += FLASH_BATCH_CONCURRENCY) {
-    const group = batches.slice(index, index + FLASH_BATCH_CONCURRENCY);
+  for (let index = 0; index < rows.length; index += FLASH_CASE_CONCURRENCY) {
+    const groupRows = rows.slice(index, index + FLASH_CASE_CONCURRENCY);
+    const groupFallbacks = fallback.slice(index, index + FLASH_CASE_CONCURRENCY);
     const groupResults = await Promise.all(
-      group.map(({ offset, batch }) => runBatch(offset, batch)),
+      groupRows.map((row, rowIndex) => runCase(row, groupFallbacks[rowIndex])),
     );
     flashResults.push(...groupResults);
   }
 
-  flashResults.sort((a, b) => a.offset - b.offset);
   for (const result of flashResults) {
     pushDiagnostic(calls, "flash_case_cards", result.diagnostic);
   }
 
   return {
-    caseCards: normalizeCaseCards(
-      flashResults.flatMap((result) => result.cards),
-      fallback,
-    ),
+    caseCards: flashResults.map((result) => result.card),
     strengthSignals,
   };
 }
