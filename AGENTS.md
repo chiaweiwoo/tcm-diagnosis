@@ -285,7 +285,7 @@ Draft experiment route: `POST /api/cron/evaluate-doctors-draft`
 - Body: `{ doctorEmail: string, windowDays?: number, mode?: "medical_profile_v2" }`
 - Read-only; never inserts into `analytics_doctor_evaluations`
 - Used by `.github/workflows/evaluate-doctor-draft.yml` to compare a medical-profile draft before replacing live Goal 2
-- Pipeline: TypeScript medical signals → Flash compact case cards → Pro synthesis → optional Flash cleanup
+- Pipeline: all rows are seen by code; Flash compresses them into compact case cards; code aggregates case types / treatment logic / AI risk / strength signals; Pro writes the six medical sections; optional Flash cleanup if Pro is too long
 - Logs must show only sanitized summary/diagnostics; no full consultation input in GitHub logs
 
 ### Two-stage pipeline (v1.3)

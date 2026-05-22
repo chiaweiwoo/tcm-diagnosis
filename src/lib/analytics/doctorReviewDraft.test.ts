@@ -53,12 +53,8 @@ describe("doctor review draft deterministic signals", () => {
         aiRiskTags: ["温燥/伤阴"],
       },
     ], [
-      {
-        caseTypeTags: ["疼痛筋伤", "皮肤问题"],
-        treatmentLogicTags: ["气血瘀滞", "风寒湿"],
-        riskThemeTags: ["针刺深度/解剖风险", "温燥/伤阴"],
-        strengthTags: ["体检支持判断", "治疗方向较清楚"],
-      },
+      "体检支持判断",
+      "治疗方向较清楚",
     ]);
 
     expect(signals.totalCases).toBe(2);
