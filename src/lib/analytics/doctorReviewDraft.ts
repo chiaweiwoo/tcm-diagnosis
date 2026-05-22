@@ -79,7 +79,7 @@ const MAX_RAW_CASE_CHARS = {
   aiCautions: 160,
 };
 
-const CASE_CARD_BATCH_SIZE = 8;
+const CASE_CARD_BATCH_SIZE = 4;
 
 function stringValue(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
@@ -315,7 +315,7 @@ async function buildFlashCaseCards(rows: DoctorReviewDraftRow[], calls: DraftCal
     const batch = rows.slice(offset, offset + CASE_CARD_BATCH_SIZE);
     const result = await callDeepSeekJson<FlashCaseCardsResponse>({
       model,
-      maxTokens: 1400,
+      maxTokens: 1800,
       timeoutMs: 90_000,
       repairJson: true,
       retryOnEmpty: true,
@@ -327,6 +327,8 @@ async function buildFlashCaseCards(rows: DoctorReviewDraftRow[], calls: DraftCal
             "你是中医病案信号压缩器，只把输入病案压缩为简短 caseCards。",
             "不要评价医生对错，不要扩写原文，不要加入输入之外的事实。",
             "每张卡只保留医学画像需要的最小信息。",
+            "每个字符串字段必须极短：label不超过12字，category不超过8字，patternOrLogic不超过14字，keyEvidence不超过16字。",
+            "aiRiskTags最多2个，每个不超过10字。",
             "只输出合法 JSON。",
             "结构：{\"caseCards\":[{\"caseNumber\":1,\"label\":\"女35岁咳嗽\",\"category\":\"呼吸咳嗽\",\"treatmentType\":\"方药\",\"patternOrLogic\":\"寒痰/二陈汤方向\",\"keyEvidence\":\"舌暗红苔白腻/脉滑\",\"aiRiskTags\":[\"血压/慢病监测\"]}]}",
           ].join("\n"),
@@ -359,7 +361,7 @@ async function synthesizeWithPro({
   const model = getDeepSeekSmartModel();
   const result = await callDeepSeekJson<DoctorReviewDraft>({
     model,
-    maxTokens: 2200,
+    maxTokens: 3200,
     timeoutMs: 180_000,
     repairJson: true,
     retryOnEmpty: true,
@@ -375,7 +377,8 @@ async function synthesizeWithPro({
           "输出紧凑、具体、能帮助管理员与医生沟通。",
           "只输出合法 JSON，不要 markdown。",
           "字段必须为：clinicalSummary:string; mainCaseTypes:string[]; treatmentStyle:string[]; aiMedicalRiskThemes:string[]; strengths:string[]; discussionDirections:string[]; conversationReference:string[]。",
-          "数组每项不超过 32 个汉字；clinicalSummary 最多 3 句；每个数组最多 5 项。",
+          "数组每项不超过 24 个汉字；clinicalSummary 最多 2 句；每个数组最多 4 项。",
+          "conversationReference必须给2-4条可直接对话的话术，不要留空。",
         ].join("\n"),
       },
       {
