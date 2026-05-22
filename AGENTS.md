@@ -400,8 +400,6 @@ Migrations: `supabase/migrations/` (numbered SQL). **Committing a migration file
 > - `022_drop_analytics_and_assessments.sql` — drops legacy tables (`analytics_prompt_quality_runs`, etc.)
 > - `022_doctor_evaluations_append_only.sql` — drops unique constraint on `analytics_doctor_evaluations(doctor_id, window_start, window_end)`; adds index. **Required before evaluation re-runs succeed.**
 > - `023_session_reviews_and_eval_cleanup.sql` — drops `output_review` column, creates `analytics_session_reviews`
-> - `026_consultation_change_events.sql` — creates `consultation_change_events` audit table + trigger
-> - `027_analysis_stale_flag.sql` — adds `analysis_stale boolean` to `consultations`. **Required for stale-analysis banner to persist across page reloads.**
 
 `consultations`: doctor reads use user-scoped Supabase client (anon key + session JWT); RLS enforces isolation. Admin routes use service_role (bypasses RLS). Never expose service_role key to browser.
 
@@ -527,8 +525,6 @@ Do not say done until the changed path is verified, not merely coded.
 3. **`022_drop_analytics_and_assessments.sql`** — apply in production (drops legacy analytics/assessment tables)
 4. **`022_doctor_evaluations_append_only.sql`** — apply in production (drops unique constraint, adds index; blocks evaluate-doctors until applied)
 5. **`023_session_reviews_and_eval_cleanup.sql`** — apply in production (drops `output_review` column, creates `analytics_session_reviews`)
-6. **`026_consultation_change_events.sql`** — apply in production (creates audit table + trigger)
-7. **`027_analysis_stale_flag.sql`** — apply in production (adds `analysis_stale` column; stale-analysis banner won't persist across reloads until applied)
-8. Phase 2: doctor-facing surface (doctorFacingHint removed from v1.1 schema; revisit if needed)
-9. SGT timezone alignment in `buildWindow` — 14-day on-demand window makes boundary precision a non-issue; reopen if needed
-10. Session review pipeline: records where `analysis_stale=true` have mismatched form_data/analysis_result — may cause false "hallucination" findings in sessionReview. Consider filtering or flagging these records.
+6. Phase 2: doctor-facing surface (doctorFacingHint removed from v1.1 schema; revisit if needed)
+7. SGT timezone alignment in `buildWindow` — 14-day on-demand window makes boundary precision a non-issue; reopen if needed
+8. Session review pipeline: records where `analysis_stale=true` have mismatched form_data/analysis_result — may cause false "hallucination" findings in sessionReview. Consider filtering or flagging these records.
