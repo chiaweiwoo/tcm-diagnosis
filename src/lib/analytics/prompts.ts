@@ -17,7 +17,7 @@ import { buildDefinitionsBlock } from "./auditDefinitions";
 // Goal 2: Per-doctor profile
 // ---------------------------------------------------------------------------
 
-export const DOCTOR_EVALUATION_PROMPT_VERSION = "doctor-eval-v1.4";
+export const DOCTOR_EVALUATION_PROMPT_VERSION = "doctor-eval-v1.5";
 
 export const DOCTOR_EVALUATION_SYSTEM_PROMPT = `
 你是 TCM AI 诊断辅助系统的内部画像叙述员。此内容只给管理员看，不给医生本人看。
@@ -41,6 +41,7 @@ score 字段说明（每条 keyObservations / strengths / gapsNarrative / guidan
 - 高分（≥70）：有明确案例依据、临床意义显著
 - 中分（40–69）：有部分依据或中等临床意义
 - 低分（<40）：推测性或次要观察
+- gapsNarrative 专项：已通过双证据规则（inputRate<70% 且 aiAskRate≥30%）确认的差距条目，score 起点 ≥ 60
 
 输出要求：
 - 只输出一个合法 json 对象，不要 markdown 代码块，不要任何说明文字
@@ -78,7 +79,7 @@ score 字段说明（每条 keyObservations / strengths / gapsNarrative / guidan
 自检后再输出：
 1. strengths 是否已概括最重要的优势信号，且没有逐条堆砌？
 2. gapsNarrative 的 field 是否只包含 DETERMINISTIC_GAP_CANDIDATES 中列出的字段？
-3. keyObservations 每条是否都有案例依据，没有捏造？
+3. keyObservations 每条是否能引用至少一个案例编号或统计值作为依据？（不得只写感性判断，不可捏造）
 4. 若样本不足 3 条，profileSummary 是否已注明？
 5. 每条 score 是否体现了真实差异（不全相同）？
 `.trim();
@@ -118,7 +119,7 @@ ${buildDefinitionsBlock()}
 - promptImprovements 最多 5 条，按 severity 由高到低排列
 - suggestedPromptChange 须指出具体提示词片段或结构位置，不超过 60 字
 - 若样本不足 5 条，在 reviewSummary 中明确注明样本量有限
-- consistency 类别专用规则：只报告 CONSISTENCY_GROUPS 中可观察到的跨案例矛盾；若无 CONSISTENCY_GROUPS 或各组输出一致，返回 []。不得基于单一案例推断一致性问题。
+- consistency 类别专用规则：只报告 CONSISTENCY_GROUPS 中可观察到的跨案例矛盾；若无 CONSISTENCY_GROUPS 或各组输出一致，返回 []。不得基于单一案例推断一致性问题。两条病案的对照组已足够触发一致性发现，无需等待第三条。
 - consistency 类别的 exampleCases.summary 格式：「GROUP_N（诊断/证型）— 具体矛盾描述」
   例："GROUP_2（头痛/风热证）— CASE_5 触发 criticalRisk，CASE_23 未触发，触发条件不一致"
 
@@ -168,6 +169,7 @@ Finding 结构：
 4. 若样本不足 5 条，reviewSummary 是否已注明样本量有限？
 5. 若有 DOCTOR_FEEDBACK，userFeedbackSummary 是否已填写（不可留 null）？
 6. consistency 类别的所有发现是否均来自 CONSISTENCY_GROUPS 的跨案例对比，而非对单一案例的推断？
+7. 若填写了 userFeedbackSummary，是否控制在 1-3 句以内（非长段落）？
 `.trim();
 }
 
