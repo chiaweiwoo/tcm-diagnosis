@@ -240,7 +240,7 @@ function ProfileListItem({
   return (
     <div className="profile-list-row">
       <div className={`profile-list-item-line ${cardClass}`}>
-        <span className="profile-list-main">{text}</span>
+        <span className="profile-list-main" title={text}>{text}</span>
         <span className="profile-score-track" aria-label={`AI 信号强度：${pct}`}>
           <span className="profile-score-fill" style={{ width: `${pct}%` }} />
         </span>

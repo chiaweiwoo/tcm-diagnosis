@@ -2030,21 +2030,16 @@ details[open] .sample-details__toggle::before {
   line-height: 1.5;
 }
 
-/* Score bar row — grid columns so label/bar stay aligned within a card */
+/* Score bar row — label takes remaining space, bar is a fixed short track */
 .profile-list-item-line {
   display: grid;
-  grid-template-columns: 42% 1fr;
+  grid-template-columns: 1fr 88px;
   align-items: center;
-  gap: 8px;
-}
-
-/* 沟通提示 has long sentence labels — give label column more room */
-.profile-card--ink .profile-list-item-line {
-  grid-template-columns: 62% 1fr;
+  gap: 10px;
 }
 
 .profile-list-item-line .profile-list-main {
-  min-width: 0;           /* allow grid cell to shrink below content size */
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
