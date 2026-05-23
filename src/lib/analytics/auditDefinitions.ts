@@ -68,10 +68,6 @@ export const CATEGORY: Record<string, AuditTermDef> = {
     label: "结构与格式",
     tip: "JSON 结构异常、必要章节缺失、格式持续漂移。",
   },
-  consistency: {
-    label: "输出一致性",
-    tip: "相似输入（相同诊断/证型）下，AI 核心结论是否稳定——criticalRisk 触发是否一致、治疗建议方向是否矛盾。",
-  },
 };
 
 export const CATEGORY_ORDER = [
@@ -81,7 +77,6 @@ export const CATEGORY_ORDER = [
   "completeness",
   "tone",
   "structure",
-  "consistency",
 ] as const;
 
 // ---------------------------------------------------------------------------

@@ -106,8 +106,7 @@ ${buildDefinitionsBlock()}
 
 你将收到：
 1. 一批编号的病案（医生输入 + AI 输出），格式为 CASE_N: ...
-2. 可选：一致性对照组（CONSISTENCY_GROUPS），每组为诊断/证型相同的 2-3 条病案；请在 consistency 类别中报告跨案例的输出一致性
-3. 可选：医生文字反馈（DOCTOR_FEEDBACK），若有，请在 userFeedbackSummary 中总结其主要模式
+2. 可选：医生文字反馈（DOCTOR_FEEDBACK），若有，请在 userFeedbackSummary 中总结其主要模式
 
 === 审查原则 ===
 - 只基于提供的样本作判断，不捏造任何案例或观察
@@ -119,9 +118,6 @@ ${buildDefinitionsBlock()}
 - promptImprovements 最多 5 条，按 severity 由高到低排列
 - suggestedPromptChange 须指出具体提示词片段或结构位置，不超过 60 字
 - 若样本不足 5 条，在 reviewSummary 中明确注明样本量有限
-- consistency 类别专用规则：只报告 CONSISTENCY_GROUPS 中可观察到的跨案例矛盾；若无 CONSISTENCY_GROUPS 或各组输出一致，返回 []。不得基于单一案例推断一致性问题。两条病案的对照组已足够触发一致性发现，无需等待第三条。
-- consistency 类别的 exampleCases.summary 格式：「GROUP_N（诊断/证型）— 具体矛盾描述」
-  例："GROUP_2（头痛/风热证）— CASE_5 触发 criticalRisk，CASE_23 未触发，触发条件不一致"
 
 === 输出契约 ===
 只输出一个合法 JSON 对象，不要 Markdown 代码块，不要任何说明文字，全部简体中文。
@@ -136,8 +132,7 @@ ${buildDefinitionsBlock()}
     "safety": [Finding],
     "completeness": [Finding],
     "tone": [Finding],
-    "structure": [Finding],
-    "consistency": [Finding]
+    "structure": [Finding]
   },
   "promptImprovements": [
     {
@@ -168,8 +163,7 @@ Finding 结构：
 3. findingKey 格式是否为 "category:shortName"？
 4. 若样本不足 5 条，reviewSummary 是否已注明样本量有限？
 5. 若有 DOCTOR_FEEDBACK，userFeedbackSummary 是否已填写（不可留 null）？
-6. consistency 类别的所有发现是否均来自 CONSISTENCY_GROUPS 的跨案例对比，而非对单一案例的推断？
-7. 若填写了 userFeedbackSummary，是否控制在 1-3 句以内（非长段落）？
+6. 若填写了 userFeedbackSummary，是否控制在 1-3 句以内（非长段落）？
 `.trim();
 }
 
