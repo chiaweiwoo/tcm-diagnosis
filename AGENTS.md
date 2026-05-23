@@ -144,6 +144,7 @@ Doctor (browser)
   └── POST /api/analyze                        → DeepSeek flash model → clinical review JSON (3-column layout)
   └── /api/consultations/*                     → Supabase (save / load / delete history)
   └── POST /api/consultations/[id]/clone       → clone another doctor's consultation to own account (admin only)
+  └── GET  /api/me/profile                     → descriptive profile subset (strips analytical fields, invariant 13)
 
 Admin (browser, is_admin=true only)
   └── GET  /api/admin/users                    → doctor list with 30-day stats
