@@ -420,6 +420,10 @@
   text-overflow: ellipsis;
 }
 
+.history-item__pills {
+  display: contents;
+}
+
 .history-item__pill {
   display: inline-flex;
   align-items: center;
