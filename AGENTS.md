@@ -91,6 +91,17 @@ Per-doctor tables (`consultations`) must have Row Level Security policies that r
 - **Any commit that introduces a smart model (Claude, GPT, etc.) must include a written justification in the commit body explaining why DeepSeek Pro was insufficient, with concrete examples.**
 - **No `ANTHROPIC_API_KEY` in this project.**
 
+### 13. Doctor-facing profile data — descriptive subset only
+
+The workbench (`/`) displays the doctor's own clinical profile in the left sidebar (`我的画像`).
+
+- **Endpoint:** `GET /api/me/profile` — requires valid session, uses service_role to read `analytics_doctor_evaluations`.
+- **Descriptive subset** (may be shown to the doctor): `profileSummary`, `keyObservations`, `treatmentStyle`, `aiRecurringThemes` (theme + frequency only, no caseNumbers).
+- **Analytical subset** (admin-only, must NEVER appear in doctor-facing responses): `strengths`, `gaps`, `guidancePoints`, `patientDistribution`, `fieldCompleteness`.
+- The server strips analytical fields before returning. Never return raw `doctor_profile` JSONB to a doctor session.
+- `aiRecurringThemes.caseNumbers` is also stripped — case-level granularity is admin-only.
+- Cache: `Cache-Control: private, max-age=300, stale-while-revalidate=600`. Profile only updates when admin triggers a new evaluation.
+
 ---
 
 ## Product Purpose

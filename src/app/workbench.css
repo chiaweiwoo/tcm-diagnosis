@@ -1434,21 +1434,149 @@ button.case-linkage__item:hover {
   }
 }
 
+/* ---------- Sidebars (hidden on narrow screens) ---------- */
+
+.workbench__sidebar {
+  display: none;
+}
+
+.sidebar-section-title {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding-bottom: 8px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sidebar-empty {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 28px 10px;
+  line-height: 1.6;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+/* Compact profile panel for left sidebar */
+.my-profile-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.my-profile-summary {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  line-height: 1.6;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+}
+
+.my-profile-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.my-profile-card__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.my-profile-card__list {
+  list-style: none;
+  margin: 0;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.my-profile-card__item {
+  font-size: 12.5px;
+  color: var(--text);
+  line-height: 1.5;
+  padding-left: 10px;
+  position: relative;
+}
+
+.my-profile-card__item::before {
+  content: "·";
+  position: absolute;
+  left: 0;
+  color: var(--brand-mid);
+  font-weight: 700;
+}
+
+.my-profile-card--risk .my-profile-card__item::before {
+  color: #D89B42;
+}
+
+.my-profile-card--risk .my-profile-card__item {
+  color: #713F12;
+}
+
+.my-profile-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.my-profile-eval-time {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: right;
+  padding: 4px 2px 0;
+}
+
+/* Case timeline inside sidebar — remove card wrapping */
+.workbench__sidebar--right .case-linkage-rail {
+  background: none;
+  border: none;
+  box-shadow: none;
+  padding: 0 0 0 4px;
+}
+
 @media (min-width: 1280px) {
+  .workbench__header-inner {
+    max-width: 1440px;
+  }
+
+  .workbench__main {
+    max-width: 1440px;
+  }
+
   .workbench__body {
-    flex-direction: row;
-    align-items: flex-start;
-    gap: 24px;
+    display: grid;
+    grid-template-columns: 240px 1fr 240px;
+    gap: 20px;
+    align-items: start;
   }
 
-  .workbench__content {
-    flex: 1 1 auto;
-  }
-
-  .case-linkage-rail {
-    flex: 0 0 250px;
+  .workbench__sidebar {
+    display: block;
     position: sticky;
     top: 88px;
+    max-height: calc(100vh - 108px);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
   }
 }
 

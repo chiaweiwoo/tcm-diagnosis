@@ -514,7 +514,7 @@ function ClinicalObservationCard({ profile }: { profile: DoctorProfile }) {
     <div className="profile-card profile-card--sage">
       <h3 className="profile-card-title">
         <Sparkles size={15} /> 临床观察
-        <HelpTip text="根据近期病案整理出的主要病例类型与诊疗风格。" />
+        <HelpTip text="根据近期病案整理出的主要病例类型与临床特点。" />
       </h3>
       {sorted.length === 0 ? (
         <p className="profile-empty">本期暂无明确临床观察</p>
@@ -538,11 +538,11 @@ function TreatmentStyleCard({ profile }: { profile: DoctorProfile }) {
   return (
     <div className="profile-card profile-card--teal">
       <h3 className="profile-card-title">
-        <Compass size={15} /> 诊疗风格
+        <Compass size={15} /> 治疗风格
         <HelpTip text="近期病案中体现的诊疗思路与用方特点。" />
       </h3>
       {sorted.length === 0 ? (
-        <p className="profile-empty">本期暂无诊疗风格数据</p>
+        <p className="profile-empty">本期暂无治疗风格数据</p>
       ) : (
         <div className="profile-list">
           {sorted.map((item, index) => (
@@ -572,7 +572,7 @@ function AiThemesCard({ profile }: { profile: DoctorProfile }) {
     return (
       <div className="profile-card profile-card--gold">
         <h3 className="profile-card-title">
-          <Lightbulb size={15} /> 反复提醒的风险点
+          <Lightbulb size={15} /> AI 反复提醒的风险
           <HelpTip text="系统在近期病案中反复提示、值得医生留意的医学风险。" />
         </h3>
         <p className="profile-empty">本期暂无明显重复风险点</p>

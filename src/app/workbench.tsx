@@ -21,6 +21,7 @@ import { ReactNode, memo, useCallback, useEffect, useMemo, useRef, useState } fr
 import { StructuredCaseForm, structuredCaseSchema, PRESCRIPTION_TYPES, SEX_VALUES } from "@/lib/forms/caseSchema";
 import { AnalysisResult, ensureAnalysisResult, normalizePrescriptionType } from "@/lib/ai/analysisResult";
 import { BRANDING } from "@/lib/branding";
+import MyProfilePanel from "./MyProfilePanel";
 import "./workbench.css";
 
 // ---------------------------------------------------------------------------
@@ -695,6 +696,36 @@ const HistoryPanel = memo(function HistoryPanel({
 });
 
 // ---------------------------------------------------------------------------
+// Case Timeline Panel (right sidebar)
+// ---------------------------------------------------------------------------
+
+const CaseTimelinePanel = memo(function CaseTimelinePanel({
+  activeId,
+  linkedCaseRail,
+  currentRecord,
+  onSelect,
+}: {
+  activeId: string | null;
+  linkedCaseRail: LinkedCaseRail | null;
+  currentRecord: ConsultationSummary | null;
+  onSelect: (id: string) => void;
+}) {
+  if (!activeId) {
+    return <p className="sidebar-empty">选择一条病案后查看关联记录</p>;
+  }
+  if (!linkedCaseRail || !currentRecord) {
+    return <p className="sidebar-empty">本病案为独立记录</p>;
+  }
+  return (
+    <CaseLinkTimeline
+      currentRecord={currentRecord}
+      timelineRecords={linkedCaseRail.timelineRecords}
+      onSelect={onSelect}
+    />
+  );
+});
+
+// ---------------------------------------------------------------------------
 // Main Workbench
 // ---------------------------------------------------------------------------
 
@@ -1240,7 +1271,15 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
       {/* Form */}
       <main className="workbench__main">
         <div className="workbench__body">
-        <div className="workbench__content">
+
+          {/* Left sidebar — doctor's own clinical profile (descriptive subset) */}
+          <aside className="workbench__sidebar workbench__sidebar--left">
+            <div className="sidebar-section-title">我的画像</div>
+            <MyProfilePanel />
+          </aside>
+
+          {/* Center — main form + results (unchanged) */}
+          <div className="workbench__content">
         <section className="form-section">
           <div className="form-card">
             {/* Clone provenance banner — shown when a consultation was cloned from another doctor */}
@@ -1566,28 +1605,35 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
             updatedAt={feedbackUpdatedAt}
           />
         )}
-        </div>
-        {linkedCaseRail && activeId ? (
-          <CaseLinkTimeline
-            currentRecord={
-              consultations.find((item) => item.id === activeId) ?? {
-                id: activeId,
-                consultation_name: null,
-                case_id: normalizeCaseId(caseId),
-                case_id_updated_at: null,
-                related_case_id: normalizeCaseId(relatedCaseId),
-                related_case_id_updated_at: null,
-                form_data: form,
-                analysis_status: recordLocked ? "analyzed" : "draft",
-                created_at: "",
-                updated_at: "",
-                analyzed_at: null,
+          </div>
+
+          {/* Right sidebar — case linkage timeline */}
+          <aside className="workbench__sidebar workbench__sidebar--right">
+            <div className="sidebar-section-title">病案关联</div>
+            <CaseTimelinePanel
+              activeId={activeId}
+              linkedCaseRail={linkedCaseRail}
+              currentRecord={
+                activeId
+                  ? (consultations.find((item) => item.id === activeId) ?? {
+                      id: activeId,
+                      consultation_name: null,
+                      case_id: normalizeCaseId(caseId),
+                      case_id_updated_at: null,
+                      related_case_id: normalizeCaseId(relatedCaseId),
+                      related_case_id_updated_at: null,
+                      form_data: form,
+                      analysis_status: recordLocked ? "analyzed" : "draft",
+                      created_at: "",
+                      updated_at: "",
+                      analyzed_at: null,
+                    })
+                  : null
               }
-            }
-            timelineRecords={linkedCaseRail.timelineRecords}
-            onSelect={(id) => void handleSelectHistory(id)}
-          />
-        ) : null}
+              onSelect={(id) => void handleSelectHistory(id)}
+            />
+          </aside>
+
         </div>
       </main>
 

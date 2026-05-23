@@ -122,7 +122,7 @@ export type DoctorProfile = {
   profileSummary: string;
   /** Main case types (mainCaseTypes from draft). Each item has an AI signal score. */
   keyObservations: Array<{ text: string; score: number }>;
-  /** Treatment style patterns (treatmentStyle from draft). Shown separately in 诊疗风格. */
+  /** Treatment style patterns (treatmentStyle from draft). Shown separately in 治疗风格. */
   treatmentStyle: Array<{ text: string; score: number }>;
   patientDistribution: PatientDistribution | null;
   /** Kept in DB for gap detection and backward compat; not rendered in UI. */
