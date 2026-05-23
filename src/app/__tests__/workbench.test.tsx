@@ -104,6 +104,7 @@ async function fillRequiredFields(user: ReturnType<typeof userEvent.setup>) {
     screen.getByPlaceholderText(/头痛3个月余/),
     "头痛3个月余，伴轻度眩晕，无发热，劳累后加重。",
   );
+  await user.type(screen.getByPlaceholderText(/高血压病史/), "无");
   await user.type(screen.getByPlaceholderText(/舌脉、查体重点/), "舌淡红苔薄白，脉弦细");
   await user.type(screen.getByPlaceholderText(/头痛 \/ 眩晕/), "头痛");
   await user.type(screen.getByPlaceholderText(/肝阳上亢/), "肝阳上亢");

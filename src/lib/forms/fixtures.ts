@@ -31,7 +31,7 @@ export const VALID_FIXTURES: StructuredCaseForm[] = [
     chiefComplaint: "右侧拇指弹响指，无法弯曲",
     currentIllness:
       "右侧拇指弹响指半年余，数次针刺疗法后，拇指尚无法弯曲，掌面掌指关节压痛，活动时酸楚。",
-    pastHistory: "",
+    pastHistory: "无",
     physicalExam: "掌面掌指关节压痛，活动时酸楚，拇指屈曲受限",
     diagnosis: "弹响指（屈指肌腱腱鞘炎）",
     pattern: "气血瘀滞",
@@ -78,7 +78,7 @@ export const VALID_FIXTURES: StructuredCaseForm[] = [
     chiefComplaint: "右肩疼痛，左腰部僵硬不适",
     currentIllness:
       "近年频繁锻炼划龙舟，右肩疼痛加重；左腰部僵硬不适，活动后加重。",
-    pastHistory: "",
+    pastHistory: "无",
     physicalExam: "右提肩肌压痛，左腰方肌压痛",
     diagnosis: "肌肉劳损",
     pattern: "气血瘀滞",
@@ -94,7 +94,7 @@ export const VALID_FIXTURES: StructuredCaseForm[] = [
     chiefComplaint: "腹胀，大便溏",
     currentIllness:
       "腹胀已数月，晨起腹胀为主，大便日1次、便溏，饮食尚可，伴疲乏、精神差。",
-    pastHistory: "",
+    pastHistory: "无",
     physicalExam: "舌淡红苔薄白腻，脉弦滑",
     diagnosis: "痞满",
     pattern: "脾虚湿盛",
@@ -110,7 +110,7 @@ export const VALID_FIXTURES: StructuredCaseForm[] = [
     chiefComplaint: "左腰臀部疼痛酸楚，往左下肢外侧放射性麻痹",
     currentIllness:
       "1个月前左腰臀部出现酸楚，往左下肢外侧放射性麻痹。久坐可诱发，站立后略减轻。",
-    pastHistory: "",
+    pastHistory: "无",
     physicalExam: "左侧梨状肌压痛（+），直腿抬高试验阴性",
     diagnosis: "梨状肌综合征",
     pattern: "气血瘀滞",
@@ -126,7 +126,7 @@ export const VALID_FIXTURES: StructuredCaseForm[] = [
     chiefComplaint: "腹胀，偶尔胃酸倒流，大便不净感",
     currentIllness:
       "腹胀已多时，餐前后均出现，偶尔胃酸倒流，纳可，大便不净感，咽干，口中异味，身热不扬。近次复诊：咽干、腹胀、大便不净感，自觉水肿。",
-    pastHistory: "",
+    pastHistory: "无",
     physicalExam: "舌红苔黄白腻，脉弦",
     diagnosis: "中焦湿热",
     pattern: "湿热蕴结中焦",
@@ -142,7 +142,7 @@ export const VALID_FIXTURES: StructuredCaseForm[] = [
     chiefComplaint: "入睡困难，多梦，醒后难以复睡",
     currentIllness:
       "失眠3个月余，入睡困难，多梦，醒后难以复睡，伴心悸，日间精神疲倦，纳可。",
-    pastHistory: "",
+    pastHistory: "无",
     physicalExam: "舌淡红苔薄，脉细弱",
     diagnosis: "不寐",
     pattern: "心脾两虚",
@@ -176,7 +176,7 @@ export const MINIMAL_VALID: StructuredCaseForm = {
   patientSex: "女",
   chiefComplaint: "头痛，眩晕",
   currentIllness: "头痛2周余，伴轻度眩晕，无外伤史。",
-  pastHistory: "",
+  pastHistory: "无",
   physicalExam: "舌淡红苔薄白，脉弦细",
   diagnosis: "头痛",
   pattern: "肝阳上亢",

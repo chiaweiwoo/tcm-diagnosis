@@ -203,7 +203,7 @@ Never define a token only in `workbench.css` — admin pages won't see it. Add i
 
 ## Structured Form Fields
 
-Doctor fills 8 visible fields. All validated by `structuredCaseSchema` in `src/lib/forms/caseSchema.ts`.
+Doctor fills 9 visible fields. All validated by `structuredCaseSchema` in `src/lib/forms/caseSchema.ts`.
 
 Required fields (hard-block if missing/invalid):
 - `prescriptionType`: `PrescriptionType[]` — array of "方药" | "针灸" | "综合调理", min 1 item (multi-select chip toggle)
@@ -211,12 +211,13 @@ Required fields (hard-block if missing/invalid):
 - `patientSex`: "男" | "女"
 - `chiefComplaint`: 2-200 chars
 - `currentIllness`: 5-2000 chars
+- `pastHistory`: 1-1000 chars (if no relevant history, doctor writes "无")
 - `physicalExam`: 2-1000 chars (tongue + pulse required)
 - `diagnosis`: 2-100 chars
 - `pattern`: 2-100 chars (证型)
 - `prescription`: 3-2000 chars
 
-Optional fields (in schema but not shown in form UI): `consultationName`, `pastHistory`
+Optional fields (in schema but not shown in form UI): `consultationName`
 
 > `doctorQuestion` has been removed from the schema, prompt, and all fixtures. Historical `form_data` rows may still contain the key — it is silently ignored.
 

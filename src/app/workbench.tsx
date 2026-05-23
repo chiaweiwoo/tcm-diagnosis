@@ -77,7 +77,7 @@ type ViewAsPreview = {
 
 const REQUIRED_FIELDS: (keyof StructuredCaseForm)[] = [
   "patientAge", "prescriptionType", "chiefComplaint", "currentIllness",
-  "physicalExam", "diagnosis", "pattern", "prescription",
+  "pastHistory", "physicalExam", "diagnosis", "pattern", "prescription",
 ];
 
 const EMPTY_FORM: StructuredCaseForm = {
@@ -1478,16 +1478,18 @@ export default function Workbench({
             {/* Row 5: Past history + Physical exam (2 cols) */}
             <div className="form-row form-row--2col">
               <div className="form-group">
-                <label className="form-label">既往史 Past Medical History</label>
+                <label className="form-label form-label--required">既往史 Past Medical History</label>
                 <textarea
-                  className="form-textarea"
-                  placeholder="例：高血压病史5年，规律服药"
+                  className={`form-textarea ${touched.has("pastHistory") ? (displayErrors.pastHistory ? "form-input--error" : "form-input--valid") : ""}`}
+                  placeholder="例：高血压病史5年，规律服药；如无相关病史请填写：无"
                   value={form.pastHistory}
                   onChange={(e) => setField("pastHistory", e.target.value)}
+                  onBlur={() => markTouched("pastHistory")}
                   disabled={isReadOnly}
                   rows={3}
                   maxLength={1000}
                 />
+                <FieldError message={touched.has("pastHistory") ? displayErrors.pastHistory : undefined} />
               </div>
               <div className="form-group">
                 <label className="form-label form-label--required">体格检查 Medical Examination</label>

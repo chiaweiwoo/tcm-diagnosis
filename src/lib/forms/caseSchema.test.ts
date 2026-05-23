@@ -71,15 +71,26 @@ describe("structuredCaseSchema", () => {
     expect(parse({ ...MINIMAL_VALID, pattern: "虚" }).success).toBe(true);
   });
 
-  it("defaults optional fields to empty string when omitted", () => {
-    const { consultationName, pastHistory, ...required } = MINIMAL_VALID;
-    void consultationName; void pastHistory;
-    const result = parse(required);
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.consultationName).toBe("");
-      expect(result.data.pastHistory).toBe("");
+  it("defaults consultationName to empty string when omitted; rejects missing pastHistory", () => {
+    // consultationName is optional — omitting it should still parse
+    const { consultationName, ...withoutName } = MINIMAL_VALID;
+    void consultationName;
+    const nameResult = parse(withoutName);
+    expect(nameResult.success).toBe(true);
+    if (nameResult.success) {
+      expect(nameResult.data.consultationName).toBe("");
     }
+
+    // pastHistory is now required — omitting it must fail
+    const { pastHistory, ...withoutHistory } = MINIMAL_VALID;
+    void pastHistory;
+    expect(parse(withoutHistory).success).toBe(false);
+  });
+
+  it("requires pastHistory non-empty", () => {
+    expect(parse({ ...MINIMAL_VALID, pastHistory: "" }).success).toBe(false);
+    expect(parse({ ...MINIMAL_VALID, pastHistory: "   " }).success).toBe(false);
+    expect(parse({ ...MINIMAL_VALID, pastHistory: "无" }).success).toBe(true);
   });
 
   it("blocks guaranteed-cure language and patient self-use phrases", () => {

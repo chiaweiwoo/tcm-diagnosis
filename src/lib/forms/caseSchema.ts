@@ -66,9 +66,9 @@ export const structuredCaseSchema = z
 
     pastHistory: z
       .string()
-      .max(FIELD_LIMITS.pastHistory, `不超过${FIELD_LIMITS.pastHistory}字`)
-      .optional()
-      .default(""),
+      .trim()
+      .min(1, MSG.REQUIRED)
+      .max(FIELD_LIMITS.pastHistory, `不超过${FIELD_LIMITS.pastHistory}字`),
 
     physicalExam: z
       .string()
