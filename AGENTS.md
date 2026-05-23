@@ -188,11 +188,20 @@ Never define a token only in `workbench.css` — admin pages won't see it. Add i
 - Metadata fields (`病案编号 Case ID`, `随访病案编号 Follow-up Case ID`, `给AI回馈 Feedback to AI`) save through the header `保存` button.
 - Two-level unsaved-changes warning on navigation: clinical inputs changed → "建议先保存并重新分析" (re-analyze prompt); metadata-only changed → generic save reminder.
 - Core analysis sections must be structurally stable — all sections always present, even if empty with a fallback string.
-- Analyze output reading order: 重点结论 → 当前思路 → 建议优化 → 可选思路 → 风险与提醒 → 随访监测 → 证据状态.
-- UI result layout: 3 columns — 判断 (当前思路) / 方案 (建议优化+可选) / 随访监测. Plus 重点结论 banner and 风险与提醒 warning box at top.
+- Analyze output reading order: 辨证警示 (if triggered) → 重点结论 → 当前思路 → 建议优化 → 可选思路 → 风险与提醒 → 随访监测 → 证据状态.
+- UI result layout: 3 columns — 判断 (当前思路) / 方案 (建议优化+可选) / 随访监测. Plus optional 辨证警示 red banner (top, above 重点结论), 重点结论 green banner, and 风险与提醒 warning box.
 - Saved history must pass through the same normalization path as fresh analysis (`ensureAnalysisResult` in `src/lib/ai/analysisResult.ts`).
 
+### 辨证警示 Diagnostic Alert
+- AI field: `criticalRisk: { summary: string; highlights: string[] } | null` — present in `AnalysisJson` and `AnalysisResult`.
+- Fires when AI detects a critical diagnostic inconsistency: diagnosis↔symptoms mismatch, pattern↔prescription寒热矛盾, or missed red-flag symptom.
+- Prompt instructs no false alarms and requires echoing the critical point in `重点结论` as well.
+- UI: `<DiagnosticAlertBanner>` renders above 重点结论 when `criticalRisk` is non-null. `<HighlightedText>` wraps matched phrases in `<mark class="critical-highlight">`.
+- Normalization: missing or malformed field defaults to `null` (backward compat).
+- Prompt version bumped to `tcm-analysis-v1.2` with this change.
+
 ### Result color coding
+- `辨证警示` banner: red (`#FEF2F2` bg, `#DC2626` border, 6px left border)
 - `重点结论` banner: green (`#F0FDF4` bg, `#16A34A` border)
 - `风险与提醒` banner: yellow (`#FEFCE8` bg, `#CA8A04` border)
 - 判断 column: green header (`result-column--green`)

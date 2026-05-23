@@ -1087,6 +1087,52 @@ button.case-linkage__item:hover {
   top: 3px;
 }
 
+/* ---- 辨证警示 Diagnostic Alert banner ---- */
+
+.diagnostic-alert-banner {
+  background: #FEF2F2;
+  border: 2px solid #DC2626;
+  border-left-width: 6px;
+  border-radius: var(--radius-lg);
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.diagnostic-alert-banner__header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #991B1B;
+  letter-spacing: 0.01em;
+}
+
+.diagnostic-alert-banner__icon {
+  font-size: 16px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.diagnostic-alert-banner__summary {
+  font-size: 14px;
+  color: #7F1D1D;
+  line-height: 1.6;
+  margin: 0;
+}
+
+mark.critical-highlight {
+  background: #FECACA;
+  color: #7F1D1D;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-weight: 600;
+  font-style: normal;
+}
+
 .result-column__body {
   padding: 8px 14px;
   display: flex;

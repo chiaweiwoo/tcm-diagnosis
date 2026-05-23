@@ -342,6 +342,40 @@ const ResultColumn = memo(function ResultColumn({ title, icon, colorVariant, chi
   );
 });
 
+/** Wraps matched phrases in <mark> within a text string. */
+function HighlightedText({ text, highlights }: { text: string; highlights: string[] }) {
+  if (!highlights.length) return <>{text}</>;
+  // Build a regex that matches any of the highlight phrases (longest first to avoid partial overlaps)
+  const sorted = [...highlights].sort((a, b) => b.length - a.length);
+  const pattern = new RegExp(`(${sorted.map((h) => h.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`, "g");
+  const parts = text.split(pattern);
+  return (
+    <>
+      {parts.map((part, i) =>
+        highlights.includes(part) ? (
+          <mark key={i} className="critical-highlight">{part}</mark>
+        ) : (
+          <span key={i}>{part}</span>
+        )
+      )}
+    </>
+  );
+}
+
+function DiagnosticAlertBanner({ summary, highlights }: { summary: string; highlights: string[] }) {
+  return (
+    <div className="diagnostic-alert-banner" role="alert">
+      <div className="diagnostic-alert-banner__header">
+        <span className="diagnostic-alert-banner__icon">⚠</span>
+        辨证警示 Diagnostic Alert
+      </div>
+      <p className="diagnostic-alert-banner__summary">
+        <HighlightedText text={summary} highlights={highlights} />
+      </p>
+    </div>
+  );
+}
+
 function ShimmerCard() {
   return (
     <div className="shimmer-card" aria-hidden="true">
@@ -1613,6 +1647,14 @@ export default function Workbench({
         {!analyzing && result && (
           <section className="result-section-wrap" ref={resultRef}>
             <div className="result-layout">
+
+              {/* 辨证警示 — critical diagnostic alert, shown above 重点结论 */}
+              {result.criticalRisk && (
+                <DiagnosticAlertBanner
+                  summary={result.criticalRisk.summary}
+                  highlights={result.criticalRisk.highlights}
+                />
+              )}
 
               {/* 重点结论 — full width conclusion card */}
               {result.keyPoints.length > 0 && (

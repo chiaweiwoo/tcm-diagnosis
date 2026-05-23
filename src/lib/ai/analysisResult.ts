@@ -7,7 +7,13 @@ export function normalizePrescriptionType(value: unknown): PrescriptionType {
   return "方药";
 }
 
+export type CriticalRisk = {
+  summary: string;
+  highlights: string[];
+};
+
 export type AnalysisJson = {
+  criticalRisk?: { summary?: unknown; highlights?: unknown } | null;
   重点结论?: unknown;
   当前思路?: {
     可取之处?: unknown;
@@ -37,6 +43,7 @@ export type ResultGroup = {
 export type AnalysisResult = {
   title: string;
   keyPoints: string[];  // 重点结论
+  criticalRisk: CriticalRisk | null;  // 辨证警示 — null when no alert
   groups: ResultGroup[];
   cautions: string[];   // 风险与提醒
   evidence: string[];   // 证据状态
@@ -74,6 +81,16 @@ export function normalizeStringList(value: unknown): string[] {
   }
   const single = normalizeText(value);
   return single ? [single] : [];
+}
+
+function normalizeCriticalRisk(value: unknown): CriticalRisk | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const obj = value as { summary?: unknown; highlights?: unknown };
+  const summary = normalizeText(obj.summary);
+  if (!summary) return null;
+  const highlights = normalizeStringList(obj.highlights);
+  if (highlights.length === 0) return null;
+  return { summary, highlights };
 }
 
 function withFallback(items: unknown, fallback: string): string[] {
@@ -135,6 +152,7 @@ function normalizeStoredGroups(groups: unknown): ResultGroup[] {
 export function buildAnalysisResult(data: AnalysisJson, prescriptionType: PrescriptionType): AnalysisResult {
   return {
     title: `${prescriptionType}研判`,
+    criticalRisk: normalizeCriticalRisk(data.criticalRisk),
     keyPoints: withFallback(
       data.重点结论,
       "当前方案仍可继续结合面诊信息复核，系统未提炼出更高优先级的结论。",
@@ -177,6 +195,7 @@ export function ensureAnalysisResult(
   const record = value as {
     title?: unknown;
     keyPoints?: unknown;
+    criticalRisk?: unknown;
     groups?: unknown;
     cautions?: unknown;
     evidence?: unknown;
@@ -185,6 +204,7 @@ export function ensureAnalysisResult(
   if (Array.isArray(record.groups)) {
     return {
       title: normalizeText(record.title) || `${prescriptionType}研判`,
+      criticalRisk: normalizeCriticalRisk(record.criticalRisk),
       keyPoints: withFallback(
         record.keyPoints,
         "当前方案仍可继续结合面诊信息复核，系统未提炼出更高优先级的结论。",

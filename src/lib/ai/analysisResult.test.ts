@@ -21,6 +21,7 @@ describe("buildAnalysisResult", () => {
 
     expect(result.title).toBe("方药研判");
     expect(result.keyPoints).toEqual(["保留原调经方向", "优先优化剂量与随访节奏"]);
+    expect(result.criticalRisk).toBeNull();
     // No summary field on new AnalysisResult
     expect("summary" in result).toBe(false);
     // 3 groups: 判断, 方案, 随访监测
@@ -67,6 +68,33 @@ describe("buildAnalysisResult", () => {
     expect(result.groups.length).toBe(3);
     expect(result.cautions.length).toBeGreaterThan(0);
     expect(result.evidence.length).toBeGreaterThan(0);
+  });
+
+  it("parses a valid criticalRisk object", () => {
+    const result = buildAnalysisResult(
+      {
+        criticalRisk: {
+          summary: "诊断头痛与主诉腰痛明显不符，请复核诊断。",
+          highlights: ["诊断头痛", "主诉腰痛", "明显不符"],
+        },
+        重点结论: ["【辨证警示】诊断与主诉不符，请复核"],
+      },
+      "方药",
+    );
+    expect(result.criticalRisk).toEqual({
+      summary: "诊断头痛与主诉腰痛明显不符，请复核诊断。",
+      highlights: ["诊断头痛", "主诉腰痛", "明显不符"],
+    });
+  });
+
+  it("returns null criticalRisk when field is null or missing", () => {
+    expect(buildAnalysisResult({ criticalRisk: null }, "针灸").criticalRisk).toBeNull();
+    expect(buildAnalysisResult({}, "针灸").criticalRisk).toBeNull();
+  });
+
+  it("returns null criticalRisk when summary or highlights are empty", () => {
+    expect(buildAnalysisResult({ criticalRisk: { summary: "", highlights: ["a"] } }, "方药").criticalRisk).toBeNull();
+    expect(buildAnalysisResult({ criticalRisk: { summary: "矛盾", highlights: [] } }, "方药").criticalRisk).toBeNull();
   });
 });
 
