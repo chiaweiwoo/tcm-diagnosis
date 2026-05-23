@@ -251,7 +251,7 @@ export function buildCaseLabel(formData: Record<string, unknown> | null | undefi
 }
 
 // ---------------------------------------------------------------------------
-// Compact case serialization — used by sessionReview.ts (Goal 1)
+// Compact case serialization — used by outputAudit.ts (Goal 1)
 // ---------------------------------------------------------------------------
 
 function cell(s: string, max: number): string {

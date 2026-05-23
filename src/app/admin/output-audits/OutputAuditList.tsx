@@ -144,6 +144,7 @@ function CategorySection({
 
 // ---------------------------------------------------------------------------
 // v1 legacy renderer — for audits without categories field
+// TODO: remove once all v1 rows are pruned from analytics_output_audits
 // ---------------------------------------------------------------------------
 
 function LegacyReview({ review }: { review: Record<string, unknown> }) {

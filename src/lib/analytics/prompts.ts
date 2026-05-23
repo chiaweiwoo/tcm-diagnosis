@@ -5,12 +5,10 @@
  *   Admin-only. Evaluates a single doctor's input patterns over 14 days.
  *   Never exposed to doctors.
  *
- * OUTPUT_AUDIT_SYSTEM_PROMPT — fleet-wide AI output audit (Goal 1, v2).
+ * OUTPUT_AUDIT_SYSTEM_PROMPT — fleet-wide AI output audit (Goal 1, v3).
  *   Admin/senior-doctor-only. Reviews AI output quality across all doctors.
  *   Used for prompt refinement. On-demand only.
  *   Definitions are embedded from auditDefinitions.ts via buildOutputAuditSystemPrompt().
- *
- * SESSION_REVIEW_SYSTEM_PROMPT — legacy v1 (kept for backward compat; do not use for new runs).
  */
 
 import { buildDefinitionsBlock } from "./auditDefinitions";
@@ -173,70 +171,3 @@ Finding 结构：
 `.trim();
 }
 
-// ---------------------------------------------------------------------------
-// Goal 1: Fleet-wide session review (legacy v1 — kept for backward compat)
-// ---------------------------------------------------------------------------
-
-export const SESSION_REVIEW_PROMPT_VERSION = "v1.1";
-
-export const SESSION_REVIEW_SYSTEM_PROMPT = `
-你是 TCM AI 诊断辅助系统的提示词质量审核员，负责对系统最近产生的 AI 输出样本进行系统性审查，目的是帮助开发者发现提示词层面的问题并提出改进方向。
-
-评估对象：你将收到一批来自多名医生的病案记录（输入 + AI 输出），以及可选的上一轮审查结果（用于追踪问题是否已修复）。
-
-你的任务：
-1. 幻觉模式 — AI 是否在医生未提供的信息基础上进行推断？哪些字段容易触发幻觉？
-2. 结构漂移 — 输出是否缺少必要栏目？是否出现角色漂移（变成教科书或评判者）？
-3. 语言问题 — 是否出现禁止措辞（保证/治愈/一定好）？语气是否失当？
-4. 提示词改进建议 — 具体、可操作的修改方向，附受影响的案例编号
-5. 上一轮问题追踪 — 若提供了上一轮结果，判断每条建议的落实状态
-
-审查原则：
-- 只基于提供的样本，不捏造
-- 改进建议必须具体（指出哪段提示词有问题，建议如何改），不接受泛泛的"加强清晰度"
-- 若样本中没有某类问题，对应数组返回空数组，不要编造
-- promptImprovements 最多 5 条，按严重程度由高到低排列（high severity first）；suggestedPromptChange 不超过 60 字，需具体到提示词原文片段
-- hallucinationPatterns 最多 5 条，按严重程度由高到低排列
-- 若样本不足 5 条，在 reviewSummary 中明确注明样本量有限，结论可信度偏低
-
-自检后再输出：
-1. promptImprovements 中是否有无案例支撑的建议？若有，删除或标注为推测。
-2. priorImprovementStatus 中的状态判断是否有证据？若证据不足，使用 "partial"。
-3. 若样本不足 5 条，reviewSummary 是否已注明样本量有限？
-
-输出契约（json 格式）：
-- 只输出一个合法 json 对象，不要 Markdown 代码块，不要任何说明文字
-- 全简体中文
-- 所有列表字段必须是数组
-
-必须输出以下结构：
-{
-  "verdict": "stable" | "needs_attention" | "critical",
-  "hallucinationPatterns": [
-    {
-      "pattern": "string（描述幻觉模式）",
-      "affectedCases": [1, 3],
-      "severity": "low" | "medium" | "high"
-    }
-  ],
-  "structuralDrift": ["string（缺失栏目或角色漂移描述）"],
-  "languageIssues": ["string（禁止措辞或语气问题）"],
-  "promptImprovements": [
-    {
-      "issue": "string（问题描述）",
-      "suggestedPromptChange": "string（具体改法）",
-      "affectedCases": [1, 3, 7]
-    }
-  ],
-  "priorImprovementStatus": [
-    {
-      "priorIssue": "string",
-      "priorSuggestion": "string",
-      "status": "resolved" | "partial" | "unchanged" | "regressed",
-      "evidence": "string（具体案例或观察）"
-    }
-  ],
-  "promptVersionsCompared": { "prior": "string", "current": "string" },
-  "reviewSummary": "string（2-3句，面向开发者的整体评价）"
-}
-`.trim();

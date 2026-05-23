@@ -5,12 +5,9 @@
  * to the fleet's most recent analyzed_at timestamp.
  * On-demand only. Stored in analytics_output_audits. Never shown to doctors.
  *
- * v3 changes vs v2:
- *  - Window anchored to MAX(analyzed_at) fleet-wide, not wall-clock "now"
- *  - Simple newest-first sampling, cap 100 (no stratification)
- *  - Prior-audit chaining removed — no priorImprovementStatus tracking
- *  - Doctor feedback corpus included (cap 50, anonymised)
- *  - New output field: userFeedbackSummary
+ * v3: window anchored to MAX(analyzed_at) fleet-wide; newest-first cap-100
+ * sampling; doctor feedback corpus (cap 50, anonymised); consistency groups;
+ * no prior-audit chaining.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -45,16 +42,6 @@ export type AuditCategories = {
   consistency: Finding[];
 };
 
-// Kept for backward-compat rendering of v2 rows stored in the DB.
-export type PriorStatus = {
-  findingKey: string;
-  priorShortName: string;
-  priorObservation: string;
-  priorSuggestion: string;
-  status: "resolved" | "partial" | "untriggered" | "regressed";
-  evidence: string;
-};
-
 export type PromptImprovement = {
   issue: string;
   suggestedPromptChange: string;
@@ -66,9 +53,6 @@ export type OutputAuditResult = {
   categories: AuditCategories;
   promptImprovements: PromptImprovement[];
   userFeedbackSummary: string | null;
-  // v2 legacy fields — present on old DB rows, absent on v3+
-  priorImprovementStatus?: PriorStatus[] | null;
-  promptVersionsCompared?: { prior: string; current: string } | null;
 };
 
 export type OutputAuditRow = {
@@ -331,9 +315,6 @@ export async function runOutputAudit({
     ...result.data,
     categories,
     userFeedbackSummary: result.data.userFeedbackSummary ?? null,
-    // v3 removes these fields; null them explicitly so no stale v2 data leaks
-    priorImprovementStatus: null,
-    promptVersionsCompared: null,
   };
 
   const { data: inserted, error: insertError } = await client

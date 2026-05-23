@@ -84,25 +84,6 @@ export const CATEGORY_ORDER = [
   "consistency",
 ] as const;
 
-export const PRIOR_STATUS: Record<string, AuditTermDef> = {
-  resolved: {
-    label: "已落实",
-    tip: "本次样本中可观察到改进已生效。",
-  },
-  partial: {
-    label: "部分落实",
-    tip: "仅在部分场景中改进，或本次样本量不足以充分验证。",
-  },
-  untriggered: {
-    label: "未触发",
-    tip: "本次样本中未出现相关场景，无法验证。",
-  },
-  regressed: {
-    label: "未落实",
-    tip: "本次仍出现该问题，未改善或退步。",
-  },
-};
-
 // ---------------------------------------------------------------------------
 // Helper: build the definitions block to embed verbatim in the system prompt
 // ---------------------------------------------------------------------------
@@ -123,11 +104,6 @@ export function buildDefinitionsBlock(): string {
   lines.push("", "【发现类别（category）】");
   for (const key of CATEGORY_ORDER) {
     const def = CATEGORY[key];
-    lines.push(`- ${key}（${def.label}）：${def.tip}`);
-  }
-
-  lines.push("", "【上一轮落实状态（prior status）】");
-  for (const [key, def] of Object.entries(PRIOR_STATUS)) {
     lines.push(`- ${key}（${def.label}）：${def.tip}`);
   }
 
