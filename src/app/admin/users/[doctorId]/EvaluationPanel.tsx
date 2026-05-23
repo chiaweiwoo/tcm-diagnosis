@@ -221,22 +221,8 @@ function HelpTip({ text }: { text: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// Score bar — thin horizontal bar showing AI signal strength (0–100)
+// Score bar row — full-width proportional bar (label · bar · number)
 // ---------------------------------------------------------------------------
-
-function ProfileScoreBar({ score, cardClass }: { score: number; cardClass: string }) {
-  const pct = Math.max(0, Math.min(100, score));
-  const tooltip = `AI 信号强度：${pct}`;
-  return (
-    <span
-      className={`profile-score-bar ${cardClass}`}
-      data-tooltip={tooltip}
-      aria-label={tooltip}
-    >
-      <span className="profile-score-bar__fill" style={{ width: `${pct}%` }} />
-    </span>
-  );
-}
 
 function ProfileListItem({
   text,
@@ -249,11 +235,15 @@ function ProfileListItem({
   cardClass: string;
   hint?: string;
 }) {
+  const pct = Math.max(0, Math.min(100, score));
   return (
     <div className="profile-list-row">
-      <div className="profile-list-item-line">
+      <div className={`profile-list-item-line ${cardClass}`}>
         <span className="profile-list-main">{text}</span>
-        <ProfileScoreBar score={score} cardClass={cardClass} />
+        <span className="profile-score-track" aria-label={`AI 信号强度：${pct}`}>
+          <span className="profile-score-fill" style={{ width: `${pct}%` }} />
+        </span>
+        <span className="profile-score-value">{pct}</span>
       </div>
       {hint && <span className="profile-list-hint">{hint}</span>}
     </div>

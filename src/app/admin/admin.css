@@ -2030,64 +2030,49 @@ details[open] .sample-details__toggle::before {
   line-height: 1.5;
 }
 
-/* Score bar — inline signal strength indicator */
+/* Score bar row — full-width proportional (label · bar · number) */
 .profile-list-item-line {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 10px;
 }
 
 .profile-list-item-line .profile-list-main {
-  flex: 1;
-  min-width: 0;
-}
-
-.profile-score-bar {
   flex-shrink: 0;
-  width: 64px;
-  height: 4px;
+  min-width: 0;
+  max-width: 50%;
+}
+
+.profile-score-track {
+  flex: 1;
+  height: 6px;
   background: var(--border, #EAE6E2);
-  border-radius: 2px;
-  position: relative;
-  top: -1px;
-  cursor: default;
+  border-radius: 3px;
+  overflow: hidden;
+  min-width: 40px;
 }
 
-.profile-score-bar__fill {
+.profile-score-fill {
+  display: block;
   height: 100%;
-  border-radius: 2px;
+  border-radius: 3px;
   background: var(--border-strong, #C8C4BE);
-  transition: width 0.3s ease;
+  transition: width 0.4s ease;
 }
 
-.profile-score-bar--sage .profile-score-bar__fill { background: var(--profile-sage); }
-.profile-score-bar--tan  .profile-score-bar__fill { background: var(--profile-tan); }
-.profile-score-bar--ink  .profile-score-bar__fill { background: var(--profile-ink); }
-
-/* Tooltip for score bar */
-.profile-score-bar[data-tooltip] {
-  position: relative;
-}
-.profile-score-bar[data-tooltip]::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  bottom: calc(100% + 6px);
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(26, 26, 26, 0.88);
-  color: #fff;
+.profile-score-value {
+  flex-shrink: 0;
   font-size: 11px;
-  white-space: nowrap;
-  padding: 3px 7px;
-  border-radius: 4px;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.15s ease;
-  z-index: 10;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  min-width: 22px;
+  text-align: right;
 }
-.profile-score-bar[data-tooltip]:hover::after {
-  opacity: 1;
-}
+
+/* Per-card accent fill colors */
+.profile-list-item-line.profile-score-bar--sage .profile-score-fill { background: var(--profile-sage); }
+.profile-list-item-line.profile-score-bar--tan  .profile-score-fill { background: var(--profile-tan); }
+.profile-list-item-line.profile-score-bar--ink  .profile-score-fill { background: var(--profile-ink); }
 
 /* Strengths */
 .profile-strength-list {
