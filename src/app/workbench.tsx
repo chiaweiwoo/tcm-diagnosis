@@ -22,6 +22,7 @@ import { StructuredCaseForm, structuredCaseSchema, PRESCRIPTION_TYPES, SEX_VALUE
 import { AnalysisResult, ensureAnalysisResult, normalizePrescriptionType } from "@/lib/ai/analysisResult";
 import { BRANDING } from "@/lib/branding";
 import MyProfilePanel from "./MyProfilePanel";
+import { ViewAsBanner } from "./ViewAsBanner";
 import "./workbench.css";
 
 // ---------------------------------------------------------------------------
@@ -64,6 +65,11 @@ type ToastState = { message: string; tone: "success" | "error" | "info" };
 type FormErrors = Partial<Record<keyof StructuredCaseForm, string>>;
 
 type SaveStatus = "new" | "unsaved" | "saving" | "saved";
+
+type ViewAsPreview = {
+  doctorId: string;
+  email: string;
+};
 
 // ---------------------------------------------------------------------------
 // Defaults
@@ -112,7 +118,15 @@ async function readApiError(response: Response): Promise<string> {
   }
 }
 
-async function apiAnalyze(form: StructuredCaseForm): Promise<{
+function buildRequestHeaders(viewAsDoctorId?: string, init?: HeadersInit) {
+  const headers = new Headers(init);
+  if (viewAsDoctorId) {
+    headers.set("X-View-As", viewAsDoctorId);
+  }
+  return headers;
+}
+
+async function apiAnalyze(form: StructuredCaseForm, viewAsDoctorId?: string): Promise<{
   result: AnalysisResult;
   raw: unknown;
   model: string;
@@ -121,7 +135,7 @@ async function apiAnalyze(form: StructuredCaseForm): Promise<{
 }> {
   const response = await fetch("/api/analyze", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: buildRequestHeaders(viewAsDoctorId, { "Content-Type": "application/json" }),
     body: JSON.stringify({ form }),
   });
   if (!response.ok) {
@@ -138,15 +152,21 @@ async function apiAnalyze(form: StructuredCaseForm): Promise<{
   }>;
 }
 
-async function apiListConsultations(): Promise<ConsultationSummary[]> {
-  const response = await fetch("/api/consultations", { cache: "no-store" });
+async function apiListConsultations(viewAsDoctorId?: string): Promise<ConsultationSummary[]> {
+  const response = await fetch("/api/consultations", {
+    cache: "no-store",
+    headers: buildRequestHeaders(viewAsDoctorId),
+  });
   if (!response.ok) throw new Error(await readApiError(response));
   const data = (await response.json()) as { records: ConsultationSummary[] };
   return data.records;
 }
 
-async function apiGetConsultation(id: string): Promise<ConsultationRecord> {
-  const response = await fetch(`/api/consultations/${id}`, { cache: "no-store" });
+async function apiGetConsultation(id: string, viewAsDoctorId?: string): Promise<ConsultationRecord> {
+  const response = await fetch(`/api/consultations/${id}`, {
+    cache: "no-store",
+    headers: buildRequestHeaders(viewAsDoctorId),
+  });
   if (!response.ok) throw new Error(await readApiError(response));
   const data = (await response.json()) as { record: ConsultationRecord };
   return data.record;
@@ -160,10 +180,10 @@ async function apiSaveNew(payload: {
   analysisResult: AnalysisResult;
   analysisRaw: unknown;
   modelMeta: ApiMeta;
-}): Promise<ConsultationRecord> {
+}, viewAsDoctorId?: string): Promise<ConsultationRecord> {
   const response = await fetch("/api/consultations", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: buildRequestHeaders(viewAsDoctorId, { "Content-Type": "application/json" }),
     body: JSON.stringify({
       consultationName: payload.consultationName || null,
       caseId: payload.caseId ?? null,
@@ -193,10 +213,11 @@ async function apiUpdateConsultation(
     modelMeta?: ApiMeta;
     analysisStatus?: string;
   },
+  viewAsDoctorId?: string,
 ): Promise<ConsultationRecord> {
   const response = await fetch(`/api/consultations/${id}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: buildRequestHeaders(viewAsDoctorId, { "Content-Type": "application/json" }),
     body: JSON.stringify({
       ...(payload.consultationName !== undefined ? { consultationName: payload.consultationName } : {}),
       ...(payload.caseId !== undefined ? { caseId: payload.caseId } : {}),
@@ -214,8 +235,11 @@ async function apiUpdateConsultation(
   return data.record;
 }
 
-async function apiDeleteConsultation(id: string): Promise<void> {
-  const response = await fetch(`/api/consultations/${id}`, { method: "DELETE" });
+async function apiDeleteConsultation(id: string, viewAsDoctorId?: string): Promise<void> {
+  const response = await fetch(`/api/consultations/${id}`, {
+    method: "DELETE",
+    headers: buildRequestHeaders(viewAsDoctorId),
+  });
   if (!response.ok) throw new Error(await readApiError(response));
 }
 
@@ -392,11 +416,13 @@ const StatusBar = memo(function StatusBar({
   savedAt,
   analyzing,
   form,
+  readOnly = false,
 }: {
   saveStatus: SaveStatus;
   savedAt: Date | null;
   analyzing: boolean;
   form: StructuredCaseForm;
+  readOnly?: boolean;
 }) {
   const hasIdentity = !!(form.patientAge || form.chiefComplaint);
   const parts = [
@@ -407,7 +433,14 @@ const StatusBar = memo(function StatusBar({
   const displayName = parts.length ? parts.join(" · ") : null;
 
   let indicator: ReactNode;
-  if (analyzing) {
+  if (readOnly) {
+    indicator = (
+      <span className="status-bar__state status-bar__state--saved">
+        <CheckCircle2 size={11} />
+        只读预览
+      </span>
+    );
+  } else if (analyzing) {
     indicator = (
       <span className="status-bar__state status-bar__state--analyzing">
         <LoaderCircle size={11} className="spin" />
@@ -458,10 +491,12 @@ const FeedbackCard = memo(function FeedbackCard({
   value,
   onChange,
   updatedAt,
+  disabled = false,
 }: {
   value: string;
   onChange: (value: string) => void;
   updatedAt: Date | null;
+  disabled?: boolean;
 }) {
   return (
     <section className="feedback-section">
@@ -483,6 +518,7 @@ const FeedbackCard = memo(function FeedbackCard({
           placeholder="例：整体方向有帮助，但方药剂量建议偏保守；希望下次更强调药物相互作用。"
           value={value}
           onChange={(event) => onChange(event.target.value)}
+          disabled={disabled}
           rows={4}
           maxLength={1000}
         />
@@ -560,6 +596,7 @@ const HistoryPanel = memo(function HistoryPanel({
   onDelete,
   onClose,
   loading,
+  readOnly = false,
 }: {
   consultations: ConsultationSummary[];
   activeId: string | null;
@@ -567,6 +604,7 @@ const HistoryPanel = memo(function HistoryPanel({
   onDelete: (id: string) => void;
   onClose: () => void;
   loading: boolean;
+  readOnly?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
@@ -670,17 +708,19 @@ const HistoryPanel = memo(function HistoryPanel({
               <div className="history-item__meta">
                 <span>{formatDate(c.created_at)}</span>
               </div>
-              <button
-                className="history-item__delete"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete(c.id);
-                }}
-                title="删除"
-                aria-label="删除病案"
-              >
-                <Trash2 size={12} />
-              </button>
+              {!readOnly ? (
+                <button
+                  className="history-item__delete"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete(c.id);
+                  }}
+                  title="删除"
+                  aria-label="删除病案"
+                >
+                  <Trash2 size={12} />
+                </button>
+              ) : null}
             </div>
           ))}
         </div>
@@ -729,9 +769,16 @@ const CaseTimelinePanel = memo(function CaseTimelinePanel({
 // Main Workbench
 // ---------------------------------------------------------------------------
 
-export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
+export default function Workbench({
+  isAdmin = false,
+  viewAs,
+}: {
+  isAdmin?: boolean;
+  viewAs?: ViewAsPreview;
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const isReadOnly = Boolean(viewAs);
 
   const [form, setForm] = useState<StructuredCaseForm>(EMPTY_FORM);
   const [touched, setTouched] = useState<Set<keyof StructuredCaseForm>>(new Set());
@@ -862,11 +909,11 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
 
   // Load consultation list on mount
   useEffect(() => {
-    apiListConsultations()
+    apiListConsultations(viewAs?.doctorId)
       .then((records) => setConsultations(records))
       .catch(() => showToast("读取历史记录失败。", "error"))
       .finally(() => setHistoryLoading(false));
-  }, [showToast]);
+  }, [showToast, viewAs?.doctorId]);
 
   // Restore consultation from ?id= on page load / refresh
   const initialId = useRef(searchParams.get("id"));
@@ -933,7 +980,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
     if (id !== activeId && !await confirmDiscardChanges()) return;
     try {
       let nextForm = EMPTY_FORM;
-      const record = await apiGetConsultation(id);
+      const record = await apiGetConsultation(id, viewAs?.doctorId);
       if (record.form_data) {
         // Backward compat: records saved before the prescriptionType array→string
         // migration store the value as e.g. ["方药"]. Normalize before parsing.
@@ -984,7 +1031,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
   async function handleDeleteHistory(id: string) {
     if (!await confirmDiscardChanges()) return;
     try {
-      await apiDeleteConsultation(id);
+      await apiDeleteConsultation(id, viewAs?.doctorId);
       setConsultations((prev) => prev.filter((c) => c.id !== id));
       if (activeId === id) {
         resetWorkbenchToNew();
@@ -1006,7 +1053,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
     const startedAt = Date.now();
 
     try {
-      const data = await apiAnalyze(form);
+      const data = await apiAnalyze(form, viewAs?.doctorId);
       const durationSeconds = (Date.now() - startedAt) / 1000;
       setResult(data.result);
       setRawResult(data.raw);
@@ -1037,7 +1084,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
             analysisRaw: data.raw,
             modelMeta: newMeta,
             analysisStatus: "analyzed",
-          });
+          }, viewAs?.doctorId);
           setConsultations((prev) => prev.map((c) => (c.id === activeId ? { ...c, ...updated } : c)));
           setCaseId(updated.case_id ?? "");
           setSavedCaseId(normalizeCaseId(updated.case_id ?? ""));
@@ -1055,7 +1102,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
             analysisResult: data.result,
             analysisRaw: data.raw,
             modelMeta: newMeta,
-          });
+          }, viewAs?.doctorId);
           setActiveId(saved.id);
           setConsultations((prev) => [saved, ...prev]);
           setCaseId(saved.case_id ?? "");
@@ -1121,7 +1168,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
           return;
         }
 
-        const updated = await apiUpdateConsultation(activeId, updatePayload);
+        const updated = await apiUpdateConsultation(activeId, updatePayload, viewAs?.doctorId);
         setConsultations((prev) => prev.map((c) => (c.id === activeId ? { ...c, ...updated } : c)));
         setCaseId(updated.case_id ?? "");
         setSavedCaseId(normalizeCaseId(updated.case_id ?? ""));
@@ -1153,7 +1200,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
           analysisResult: result,
           analysisRaw: rawResult,
           modelMeta: saveMeta,
-        });
+        }, viewAs?.doctorId);
         setActiveId(saved.id);
         setConsultations((prev) => [saved, ...prev]);
         setCaseId(saved.case_id ?? "");
@@ -1194,17 +1241,19 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
           <div className="workbench__brand">
             <button
               className="workbench__brand-mark"
-              onClick={handleNew}
+              onClick={isReadOnly ? undefined : handleNew}
               title="回到首页 / 新建"
               aria-label="回到首页"
+            disabled={isReadOnly}
             >
               <Icon size={18} strokeWidth={2.25} />
             </button>
             <button
               className="workbench__brand-text"
-              onClick={handleNew}
+              onClick={isReadOnly ? undefined : handleNew}
               title="回到首页 / 新建"
               aria-label="回到首页"
+            disabled={isReadOnly}
             >
               <span className="workbench__brand-title">
                 {BRANDING.name}
@@ -1229,13 +1278,16 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
                 onDelete={(id) => void handleDeleteHistory(id)}
                 onClose={() => setHistoryOpen(false)}
                 loading={historyLoading}
+                readOnly={isReadOnly}
               />
             )}
-            <button className="btn btn--ghost btn--sm" onClick={handleNew} title="新建">
-              <Plus size={15} />
-              <span>新建</span>
-            </button>
-            {((activeId && hasUnsavedChanges) || (!activeId && result && hasUnsavedChanges)) && (
+            {!isReadOnly && (
+              <button className="btn btn--ghost btn--sm" onClick={handleNew} title="新建">
+                <Plus size={15} />
+                <span>新建</span>
+              </button>
+            )}
+            {!isReadOnly && ((activeId && hasUnsavedChanges) || (!activeId && result && hasUnsavedChanges)) && (
               <button
                 className="btn btn--ghost btn--sm"
                 onClick={() => void handleSave()}
@@ -1269,13 +1321,15 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
       </header>
 
       {/* Form */}
+      {viewAs ? <ViewAsBanner doctorId={viewAs.doctorId} email={viewAs.email} /> : null}
+
       <main className="workbench__main">
         <div className="workbench__body">
 
           {/* Left sidebar — doctor's own clinical profile (descriptive subset) */}
           <aside className="workbench__sidebar workbench__sidebar--left">
             <div className="sidebar-section-title">我的画像</div>
-            <MyProfilePanel />
+            <MyProfilePanel viewAsDoctorId={viewAs?.doctorId} />
           </aside>
 
           {/* Center — main form + results (unchanged) */}
@@ -1290,7 +1344,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
             )}
 
             {/* Row 1: Meta strip — sex / age / prescription type / case id */}
-            {recordLocked && (
+            {!isReadOnly && recordLocked && (
               <div className="readonly-banner">
                 {analysisStale
                   ? "病案输入已修改，现有AI分析可能不完全对应当前内容。如需要，请重新分析。"
@@ -1308,7 +1362,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
                         key={sex}
                         className={`segmented-btn ${form.patientSex === sex ? "segmented-btn--active" : ""}`}
                         onClick={() => setField("patientSex", sex)}
-                        type="button"
+                        type="button" disabled={isReadOnly}
                       >
                         {sex}
                       </button>
@@ -1324,6 +1378,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
                     value={form.patientAge}
                     onChange={(e) => setField("patientAge", e.target.value)}
                     onBlur={() => markTouched("patientAge")}
+                    disabled={isReadOnly}
                     min={1}
                     max={120}
                   />
@@ -1337,7 +1392,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
                         key={pt}
                         className={`segmented-btn ${form.prescriptionType === pt ? "segmented-btn--active" : ""}`}
                         onClick={() => setField("prescriptionType", pt)}
-                        type="button"
+                        type="button" disabled={isReadOnly}
                       >
                         {pt}
                       </button>
@@ -1355,6 +1410,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
                   placeholder="例：0004222"
                   value={caseId}
                   onChange={(event) => handleCaseIdChange(event.target.value)}
+                  disabled={isReadOnly}
                   maxLength={64}
                 />
               </div>
@@ -1367,6 +1423,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
                   placeholder="例：0004221"
                   value={relatedCaseId}
                   onChange={(event) => handleRelatedCaseIdChange(event.target.value)}
+                  disabled={isReadOnly}
                   maxLength={64}
                 />
               </div>
@@ -1384,6 +1441,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
                 value={form.chiefComplaint}
                 onChange={(e) => setField("chiefComplaint", e.target.value)}
                 onBlur={() => markTouched("chiefComplaint")}
+                disabled={isReadOnly}
                 maxLength={200}
               />
               <FieldError message={touched.has("chiefComplaint") ? displayErrors.chiefComplaint : undefined} />
@@ -1398,6 +1456,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
                 value={form.currentIllness}
                 onChange={(e) => setField("currentIllness", e.target.value)}
                 onBlur={() => markTouched("currentIllness")}
+                disabled={isReadOnly}
                 rows={4}
                 maxLength={2000}
               />
@@ -1413,6 +1472,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
                   placeholder="例：高血压病史5年，规律服药"
                   value={form.pastHistory}
                   onChange={(e) => setField("pastHistory", e.target.value)}
+                  disabled={isReadOnly}
                   rows={3}
                   maxLength={1000}
                 />
@@ -1425,6 +1485,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
                   value={form.physicalExam}
                   onChange={(e) => setField("physicalExam", e.target.value)}
                   onBlur={() => markTouched("physicalExam")}
+                  disabled={isReadOnly}
                   rows={3}
                   maxLength={1000}
                 />
@@ -1443,6 +1504,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
                   value={form.diagnosis}
                   onChange={(e) => setField("diagnosis", e.target.value)}
                   onBlur={() => markTouched("diagnosis")}
+                  disabled={isReadOnly}
                   maxLength={100}
                 />
                 <FieldError message={touched.has("diagnosis") ? displayErrors.diagnosis : undefined} />
@@ -1456,6 +1518,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
                   value={form.pattern}
                   onChange={(e) => setField("pattern", e.target.value)}
                   onBlur={() => markTouched("pattern")}
+                  disabled={isReadOnly}
                   maxLength={100}
                 />
                 <FieldError message={touched.has("pattern") ? displayErrors.pattern : undefined} />
@@ -1477,6 +1540,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
                 value={form.prescription}
                 onChange={(e) => setField("prescription", e.target.value)}
                 onBlur={() => markTouched("prescription")}
+                disabled={isReadOnly}
                 rows={5}
                 maxLength={2000}
               />
@@ -1486,20 +1550,22 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
             </fieldset>
 
             {/* Submit */}
-            <div className="form-submit">
-              <button
-                className="btn btn--primary btn--lg"
-                onClick={() => void handleAnalyze()}
-                disabled={analyzing || Object.keys(liveErrors).length > 0}
-              >
-                {analyzing ? (
-                  <>
-                    <LoaderCircle size={18} className="spin" />
-                    分析中…
-                  </>
-                ) : result ? "重新分析" : "开始分析"}
-              </button>
-            </div>
+            {!isReadOnly && (
+              <div className="form-submit">
+                <button
+                  className="btn btn--primary btn--lg"
+                  onClick={() => void handleAnalyze()}
+                  disabled={analyzing || Object.keys(liveErrors).length > 0}
+                >
+                  {analyzing ? (
+                    <>
+                      <LoaderCircle size={18} className="spin" />
+                      分析中…
+                    </>
+                  ) : result ? "重新分析" : "开始分析"}
+                </button>
+              </div>
+            )}
 
             {/* Status bar */}
             <StatusBar
@@ -1507,6 +1573,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
               savedAt={savedAt}
               analyzing={analyzing}
               form={form}
+              readOnly={isReadOnly}
             />
 
           </div>
@@ -1603,6 +1670,7 @@ export default function Workbench({ isAdmin = false }: { isAdmin?: boolean }) {
             value={feedback}
             onChange={handleFeedbackChange}
             updatedAt={feedbackUpdatedAt}
+            disabled={isReadOnly}
           />
         )}
           </div>

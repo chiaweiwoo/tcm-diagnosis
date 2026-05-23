@@ -1,23 +1,25 @@
 import { NextResponse } from "next/server";
 import { apiError } from "@/lib/apiResponses";
-import { getCurrentDoctor } from "@/lib/currentDoctor";
 import { getServiceRoleClient } from "@/lib/supabase/server";
 import { isAdminDoctorEmail } from "@/lib/auth";
 import { logServerEvent } from "@/lib/logging";
+import { assertWritable, getViewAsContext, ViewAsError } from "@/lib/viewAs";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-export async function POST(_req: Request, context: RouteContext) {
+export async function POST(request: Request, context: RouteContext) {
   try {
-    const doctor = await getCurrentDoctor();
-    if (!(await isAdminDoctorEmail(doctor.email))) {
+    const viewAs = await getViewAsContext(request);
+    const blocked = assertWritable(viewAs);
+    if (blocked) return blocked;
+
+    if (!(await isAdminDoctorEmail(viewAs.actualDoctor.email))) {
       return apiError(403, "UNAUTHORIZED", "仅管理员可拷贝病案。");
     }
 
     const { id } = await context.params;
     const admin = getServiceRoleClient();
 
-    // Read source consultation (service_role bypasses RLS — admin can read any doctor's record)
     const { data: source, error: readError } = await admin
       .from("consultations")
       .select("form_data,analysis_result,analysis_raw,model_meta,analysis_status,analyzed_at,case_id,related_case_id,doctor_email")
@@ -29,12 +31,11 @@ export async function POST(_req: Request, context: RouteContext) {
 
     const now = new Date().toISOString();
 
-    // Insert new consultation under the admin's own account — full copy of inputs + outputs
     const { data: newRecord, error: insertError } = await admin
       .from("consultations")
       .insert({
-        doctor_id: doctor.id,
-        doctor_email: doctor.email,
+        doctor_id: viewAs.actualDoctor.id,
+        doctor_email: viewAs.actualDoctor.email,
         form_data: source.form_data,
         analysis_result: source.analysis_result ?? null,
         analysis_raw: source.analysis_raw ?? null,
@@ -45,8 +46,7 @@ export async function POST(_req: Request, context: RouteContext) {
         related_case_id: source.related_case_id ?? null,
         related_case_id_updated_at: source.related_case_id ? now : null,
         analysis_stale: false,
-        // Preserve original model_meta and tag provenance
-        model_meta: { ...(source.model_meta as object ?? {}), cloned_from_doctor_email: source.doctor_email },
+        model_meta: { ...((source.model_meta as object | null) ?? {}), cloned_from_doctor_email: source.doctor_email },
       })
       .select("id")
       .single();
@@ -55,6 +55,9 @@ export async function POST(_req: Request, context: RouteContext) {
 
     return NextResponse.json({ id: newRecord.id });
   } catch (error) {
+    if (error instanceof ViewAsError) {
+      return apiError(error.status, error.code, error.message);
+    }
     if (error instanceof Error && error.message === "Unauthorized") {
       return apiError(401, "UNAUTHORIZED", "请先登录。");
     }

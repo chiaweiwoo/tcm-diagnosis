@@ -4,6 +4,7 @@ import { MINIMAL_VALID } from "@/lib/forms/fixtures";
 
 const mockGetConsultation = vi.hoisted(() => vi.fn());
 const mockUpdateConsultation = vi.hoisted(() => vi.fn());
+const mockViewAsContext = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/currentDoctor", () => ({
   getCurrentDoctor: vi.fn().mockResolvedValue({
@@ -17,6 +18,20 @@ vi.mock("@/lib/consultations", () => ({
   getConsultation: mockGetConsultation,
   updateConsultation: mockUpdateConsultation,
   deleteConsultation: vi.fn(),
+}));
+
+vi.mock("@/lib/viewAs", () => ({
+  getViewAsContext: mockViewAsContext,
+  assertWritable: vi.fn().mockReturnValue(null),
+  ViewAsError: class ViewAsError extends Error {
+    status: number;
+    code: string;
+    constructor(status: number, code: string, message: string) {
+      super(message);
+      this.status = status;
+      this.code = code;
+    }
+  },
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -42,6 +57,12 @@ describe("PATCH /api/consultations/[id]", () => {
   beforeEach(() => {
     mockGetConsultation.mockReset();
     mockUpdateConsultation.mockReset();
+    mockViewAsContext.mockReset();
+    mockViewAsContext.mockResolvedValue({
+      actualDoctor: { id: "doctor-1", email: "doctor@example.com", isDevBypass: false },
+      effectiveDoctor: { id: "doctor-1", email: "doctor@example.com", isDevBypass: false },
+      isViewAs: false,
+    });
 
     mockGetConsultation.mockResolvedValue({
       id: "abc",

@@ -75,19 +75,19 @@ export default async function DoctorPage({ params, searchParams }: RouteContext)
             </Link>
           </p>
           <h1>{email}</h1>
-          <p className="admin-meta">只读模式 · {records.length} 条病案记录</p>
+          <p className="admin-meta">{records.length} 条病案记录</p>
         </div>
-        <div className="admin-readonly-banner">
-          正在以只读模式查看 {email} 的记录
+        <div className="admin-header-actions">
+          <Link className="secondary-button" href={`/?viewAs=${doctorId}`}>
+            预览医生工作台
+          </Link>
         </div>
       </div>
 
-      {/* Tab navigation — client component needs Suspense for useSearchParams */}
       <Suspense>
         <DoctorTabs doctorId={doctorId} />
       </Suspense>
 
-      {/* Tab: 病例列表 */}
       {tab === "records" && (
         <>
           {records.length === 0 ? (
@@ -111,7 +111,6 @@ export default async function DoctorPage({ params, searchParams }: RouteContext)
         </>
       )}
 
-      {/* Tab: 临床画像 */}
       {tab === "profile" && (
         <Suspense fallback={<div className="eval-loading">加载中…</div>}>
           <EvaluationPanel doctorId={doctorId} />

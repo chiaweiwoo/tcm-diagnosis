@@ -60,6 +60,39 @@
   justify-content: space-between;
 }
 
+.view-as-banner {
+  position: sticky;
+  top: 68px;
+  z-index: 90;
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 10px 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: #fff7e6;
+  border-bottom: 1px solid #f0d8a8;
+  color: #8a5a16;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.view-as-banner__text {
+  min-width: 0;
+}
+
+.view-as-banner__exit {
+  flex-shrink: 0;
+  color: var(--brand);
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.view-as-banner__exit:hover {
+  text-decoration: underline;
+}
+
 .workbench__brand {
   display: flex;
   align-items: center;
@@ -1592,6 +1625,13 @@ button.case-linkage__item:hover {
   .workbench__header-inner {
     padding: 0 14px;
     height: 56px;
+  }
+
+  .view-as-banner {
+    top: 56px;
+    padding: 10px 14px;
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .workbench__brand-title {

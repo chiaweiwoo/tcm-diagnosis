@@ -18,18 +18,21 @@ function formatEvalDate(iso: string) {
   return `${d.getFullYear()}-${mm}-${dd}`;
 }
 
-export default function MyProfilePanel() {
+export default function MyProfilePanel({ viewAsDoctorId }: { viewAsDoctorId?: string }) {
   const [profile, setProfile] = useState<MyProfileData | null | "loading">("loading");
 
   useEffect(() => {
-    fetch("/api/me/profile", { cache: "default" })
+    fetch("/api/me/profile", {
+      cache: "default",
+      headers: viewAsDoctorId ? { "X-View-As": viewAsDoctorId } : undefined,
+    })
       .then((res) => {
         if (!res.ok) throw new Error("fetch failed");
         return res.json() as Promise<{ profile: MyProfileData | null }>;
       })
       .then((data) => setProfile(data.profile))
       .catch(() => setProfile(null));
-  }, []);
+  }, [viewAsDoctorId]);
 
   if (profile === "loading") {
     return (

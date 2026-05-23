@@ -124,6 +124,13 @@
   margin-bottom: 32px;
 }
 
+.admin-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
 .admin-header h1 {
   font-size: 24px;
   font-weight: 800;

@@ -2,9 +2,15 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { getDevBypassDoctorEmail, isAllowedDoctorEmail, isAdminDoctorEmail } from "@/lib/auth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { getPreviewDoctorById } from "@/lib/viewAs";
 import Workbench from "./workbench";
 
-export default async function Home() {
+type HomeProps = {
+  searchParams: Promise<{ viewAs?: string }>;
+};
+
+export default async function Home({ searchParams }: HomeProps) {
+  const { viewAs } = await searchParams;
   const bypassEmail = getDevBypassDoctorEmail();
   let userEmail = bypassEmail;
   let isDevBypass = false;
@@ -32,10 +38,27 @@ export default async function Home() {
   }
 
   const isAdmin = await isAdminDoctorEmail(userEmail);
+  let viewAsTarget: { doctorId: string; email: string } | undefined;
+
+  if (viewAs) {
+    if (!isAdmin) {
+      redirect("/");
+    }
+
+    const target = await getPreviewDoctorById(viewAs);
+    if (!target) {
+      redirect("/admin/users");
+    }
+
+    viewAsTarget = {
+      doctorId: target.id,
+      email: target.email,
+    };
+  }
 
   return (
     <Suspense>
-      <Workbench isAdmin={isAdmin} />
+      <Workbench isAdmin={isAdmin} viewAs={viewAsTarget} />
     </Suspense>
   );
 }
