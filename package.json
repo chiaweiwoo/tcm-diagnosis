@@ -11,7 +11,7 @@
     "check:deepseek": "node scripts/check-deepseek.mjs",
     "allowlist:add": "node --env-file=.env.local scripts/allowlist-add.mjs",
     "seed:cases": "node --env-file=.env.local scripts/seed-cases.mjs",
-    "evaluate": "node --env-file=.env.local scripts/evaluate.mjs"
+    "evaluate": "npx tsx scripts/evaluate-local.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",
@@ -35,6 +35,7 @@
     "eslint-config-next": "16.2.6",
     "jsdom": "^29.1.1",
     "playwright": "^1.60.0",
+    "tsx": "^4.19.2",
     "typescript": "^5",
     "vitest": "^4.1.6"
   }

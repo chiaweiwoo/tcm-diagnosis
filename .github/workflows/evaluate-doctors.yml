@@ -27,68 +27,30 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Trigger Goal 2 doctor evaluation
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Trigger Goal 2 doctor evaluation (Process Runner)
         shell: bash
         env:
-          BASE_URL: ${{ secrets.ASSESS_BASE_URL }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           ASSESSMENT_API_KEY: ${{ secrets.ASSESSMENT_API_KEY }}
+          LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+          LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+          LANGFUSE_BASE_URL: ${{ secrets.LANGFUSE_BASE_URL }}
           DOCTOR_EMAIL: ${{ inputs.doctor_email }}
           DOCTOR_ID: ${{ inputs.doctor_id }}
-          FORCE: ${{ inputs.force }}
           WINDOW_DAYS: ${{ inputs.window_days }}
         run: |
-          set -euo pipefail
-
-          BODY=$(node -e '
-            const body = {
-              force: process.env.FORCE === "true",
-              windowDays: Number(process.env.WINDOW_DAYS || "14")
-            };
-            if (process.env.DOCTOR_EMAIL) body.doctorEmail = process.env.DOCTOR_EMAIL.trim();
-            if (process.env.DOCTOR_ID) body.doctorId = process.env.DOCTOR_ID.trim();
-            process.stdout.write(JSON.stringify(body));
-          ')
-
-          MAX_ATTEMPTS=3
-          ATTEMPT=0
-          DELAY=10
-
-          while [ "$ATTEMPT" -lt "$MAX_ATTEMPTS" ]; do
-            ATTEMPT=$((ATTEMPT + 1))
-            echo "Attempt $ATTEMPT of $MAX_ATTEMPTS..."
-
-            STATUS=$(curl -s -o /tmp/evaluate-doctors-response.json -w "%{http_code}" \
-              -X POST "$BASE_URL/api/cron/evaluate-doctors" \
-              -H "X-Assessment-Key: $ASSESSMENT_API_KEY" \
-              -H "Content-Type: application/json" \
-              --data "$BODY")
-
-            cat /tmp/evaluate-doctors-response.json
-            echo ""
-
-            export STATUS
-            if node -e '
-              const fs = require("fs");
-              const status = Number(process.env.STATUS);
-              let body;
-              try {
-                body = JSON.parse(fs.readFileSync("/tmp/evaluate-doctors-response.json", "utf8"));
-              } catch (error) {
-                console.error("Invalid JSON response");
-                process.exit(1);
-              }
-              if (status < 200 || status >= 300) process.exit(1);
-              if (typeof body.processed !== "number" || typeof body.failed !== "number") process.exit(1);
-              if (body.failed > 0 || body.ok !== true) process.exit(1);
-            '; then
-              echo "Evaluation succeeded."
-              exit 0
-            fi
-
-            echo "Evaluation failed or returned failed doctors; retrying in ${DELAY}s..."
-            sleep "$DELAY"
-            DELAY=$((DELAY * 2))
-          done
-
-          echo "Evaluation failed after $MAX_ATTEMPTS attempts."
-          exit 1
+          npx tsx scripts/evaluate-local.ts --email "$DOCTOR_EMAIL" --doctorId "$DOCTOR_ID" --windowDays "$WINDOW_DAYS"
