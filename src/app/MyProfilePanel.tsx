@@ -23,7 +23,7 @@ export default function MyProfilePanel({ viewAsDoctorId }: { viewAsDoctorId?: st
 
   useEffect(() => {
     fetch("/api/me/profile", {
-      cache: "default",
+      cache: "no-store",
       headers: viewAsDoctorId ? { "X-View-As": viewAsDoctorId } : undefined,
     })
       .then((res) => {
