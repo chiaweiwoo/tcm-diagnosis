@@ -2030,26 +2030,31 @@ details[open] .sample-details__toggle::before {
   line-height: 1.5;
 }
 
-/* Score bar row — full-width proportional (label · bar · number) */
+/* Score bar row — grid columns so label/bar/number stay aligned within a card */
 .profile-list-item-line {
-  display: flex;
+  display: grid;
+  grid-template-columns: 42% 1fr 24px;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+}
+
+/* 沟通提示 has long sentence labels — give label column more room */
+.profile-card--ink .profile-list-item-line {
+  grid-template-columns: 62% 1fr 24px;
 }
 
 .profile-list-item-line .profile-list-main {
-  flex-shrink: 0;
-  min-width: 0;
-  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-left: 14px; /* keep bullet indent */
 }
 
 .profile-score-track {
-  flex: 1;
   height: 6px;
   background: var(--border, #EAE6E2);
   border-radius: 3px;
   overflow: hidden;
-  min-width: 40px;
 }
 
 .profile-score-fill {
@@ -2061,11 +2066,9 @@ details[open] .sample-details__toggle::before {
 }
 
 .profile-score-value {
-  flex-shrink: 0;
   font-size: 11px;
   font-variant-numeric: tabular-nums;
   color: var(--text-muted);
-  min-width: 22px;
   text-align: right;
 }
 
@@ -2073,6 +2076,11 @@ details[open] .sample-details__toggle::before {
 .profile-list-item-line.profile-score-bar--sage .profile-score-fill { background: var(--profile-sage); }
 .profile-list-item-line.profile-score-bar--tan  .profile-score-fill { background: var(--profile-tan); }
 .profile-list-item-line.profile-score-bar--ink  .profile-score-fill { background: var(--profile-ink); }
+
+/* Standalone full-width card below the two-col row */
+.profile-section > .profile-card {
+  margin-top: 16px;
+}
 
 /* Strengths */
 .profile-strength-list {

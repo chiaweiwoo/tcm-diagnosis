@@ -716,11 +716,11 @@ export function EvaluationPanel({ doctorId }: { doctorId: string }) {
 
           <section className="profile-section">
             <h2 className="profile-section-title">复盘与沟通</h2>
-            <div className="profile-cards-grid profile-cards-grid--three">
+            <div className="profile-cards-grid profile-cards-grid--two">
               <StrengthsCard profile={profile} />
               <GapsCard profile={profile} />
-              <GuidanceCard profile={profile} />
             </div>
+            <GuidanceCard profile={profile} />
           </section>
         </>
       )}
