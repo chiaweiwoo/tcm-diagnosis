@@ -99,7 +99,7 @@ Admin (is_admin = true)
   └── /admin/output-audits           → fleet-wide AI output audit results
 
 GitHub Actions (ASSESSMENT_API_KEY auth)
-  └── POST /api/cron/evaluate-doctors     → bulk per-doctor profile evaluation
+  └── npx tsx scripts/evaluate-local.ts   → per-doctor profile evaluation (process runner)
   └── POST /api/cron/output-audit         → fleet-wide AI output audit
 ```
 
@@ -157,12 +157,8 @@ Both pipelines are **on-demand only** — no automated schedule.
 Analyzes a doctor's input patterns and clinical tendencies over the last 7 days. Results are visible to admins at `/admin/users/[doctorId]` → 临床画像 tab.
 
 ```bash
-# Run for all doctors
-npm run evaluate
-
-# Run for a specific doctor
+# Run for a specific doctor (Required: --email or --doctorId)
 npm run evaluate -- --email doctor@example.com --windowDays 7
-
 ```
 
 Or trigger via **GitHub Actions → Evaluate Doctors → Run workflow**.

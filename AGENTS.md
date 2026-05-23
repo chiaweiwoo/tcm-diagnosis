@@ -37,7 +37,7 @@ Neither → 401. Enforced by `src/lib/apiAuth.ts` called at the top of both rout
 
 `/api/admin/*` routes require a valid Supabase session AND `is_admin = true` on `doctor_allowlist`. Returns 403 otherwise.
 
-`/api/cron/evaluate-doctors` uses `X-Assessment-Key` header (same `ASSESSMENT_API_KEY`). GitHub Actions secret name is `ASSESSMENT_API_KEY`; base URL secret is `ASSESS_BASE_URL`.
+The manual workflow uses the `scripts/evaluate-local.ts` process runner triggered via GitHub Actions workflow_dispatch with required doctor email/ID parameters. GitHub Actions secret name is `ASSESSMENT_API_KEY`.
 
 ### 4. DEV_AUTH_BYPASS must never reach production
 
@@ -158,8 +158,8 @@ Admin (browser, is_admin=true only)
   └── /admin/output-audits                     → fleet-wide AI output audits (v3, current)
 
 GH Actions (ASSESSMENT_API_KEY auth, workflow_dispatch only — no schedule)
-  └── POST /api/cron/evaluate-doctors          → bulk doctor profile evaluation (14d window, skips empty doctors)
-                                                  triggerable via workflow_dispatch with optional email input
+  └── npx tsx scripts/evaluate-local.ts        → per-doctor profile evaluation (7d window, skips empty doctors)
+                                                  triggerable via workflow_dispatch with required email/ID
 
 Workbench header (admin only):
   └── ⚙ Settings2 icon → /admin → redirects to /admin/users
@@ -295,8 +295,8 @@ Only `chiaweiwoo123@gmail.com` is seeded as admin.
 
 **On-demand only.** No scheduled cron. Triggered by:
 - Admin UI button on `/admin/users/[doctorId]` → 临床画像 tab
-- GH Actions `workflow_dispatch` (`.github/workflows/evaluate-doctors.yml`) for bulk runs
-- Local CLI: `npm run evaluate -- [--email doctor@example.com]`
+- GH Actions `workflow_dispatch` (`.github/workflows/evaluate-doctors.yml`) for manual per-doctor runs
+- Local CLI: `npm run evaluate -- --email doctor@example.com` (Requires email or doctorId)
 
 Route: `POST /api/admin/analytics/evaluate/[doctorId]`
 - Admin session auth required
@@ -304,11 +304,12 @@ Route: `POST /api/admin/analytics/evaluate/[doctorId]`
 - Sampling: **Hard cap at 100 cases**. If N > 100, dynamic stratified round-robin sampling is applied across case categories (妇科调理, 皮肤问题, etc.) sorted newest-first, maintaining chronological ascending order for the final selected cases.
 - Empty window → 400 `NO_CONSULTATIONS` with friendly Chinese message
 
-Bulk route: `POST /api/cron/evaluate-doctors`
-- Auth: `X-Assessment-Key` header
-- Body: `{ doctorEmail?: string, windowDays?: number }`
-- Doctors with 0 consultations in window → skipped silently (not failed)
-- 3-attempt retry with exponential backoff in the GH Actions workflow
+Process Runner: `scripts/evaluate-local.ts`
+- Initiated via GitHub Actions workflow or CLI.
+- Requires either `--email` or `--doctorId` target to be specified (fails with validation error otherwise).
+- Automatically resolves target active doctor credentials from the allowlist and auth tables.
+- Executes the full 4-stage pipeline and saves the evaluation record to `analytics_doctor_evaluations` under the doctor's UUID.
+- If the doctor has 0 consultations in the 7-day window, skips cleanly with a friendly message.
 
 ### Hardened Pipeline (medical v2.0)
 
