@@ -104,7 +104,7 @@ export function ConsultationTable({ rows }: { rows: ConsultationRow[] }) {
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="可搜索姓名格式、主诉、类型、日期"
+            placeholder="可搜索姓名格式、主诉、类型、病案编号、随访编号、日期"
             className="ctable-search__input"
           />
         </label>
