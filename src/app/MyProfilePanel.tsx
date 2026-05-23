@@ -73,11 +73,19 @@ export default function MyProfilePanel({ viewAsDoctorId }: { viewAsDoctorId?: st
             <BookOpen size={12} />
             临床观察
           </div>
-          <ul className="my-profile-card__list">
-            {sortedObs.map((item, i) => (
-              <li key={i} className="my-profile-card__item">{item.text}</li>
-            ))}
-          </ul>
+          <div className="my-profile-card__list">
+            {sortedObs.map((item, i) => {
+              const pct = Math.max(0, Math.min(100, item.score));
+              return (
+                <div key={i} className="profile-list-item-line profile-score-bar--sage">
+                  <span className="profile-list-main" title={item.text}>{item.text}</span>
+                  <span className="profile-score-track" aria-label={`AI 信号强度：${pct}`}>
+                    <span className="profile-score-fill" style={{ width: `${pct}%` }} />
+                  </span>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -87,11 +95,19 @@ export default function MyProfilePanel({ viewAsDoctorId }: { viewAsDoctorId?: st
             <Stethoscope size={12} />
             治疗风格
           </div>
-          <ul className="my-profile-card__list">
-            {sortedStyle.map((item, i) => (
-              <li key={i} className="my-profile-card__item">{item.text}</li>
-            ))}
-          </ul>
+          <div className="my-profile-card__list">
+            {sortedStyle.map((item, i) => {
+              const pct = Math.max(0, Math.min(100, item.score));
+              return (
+                <div key={i} className="profile-list-item-line profile-score-bar--teal">
+                  <span className="profile-list-main" title={item.text}>{item.text}</span>
+                  <span className="profile-score-track" aria-label={`AI 信号强度：${pct}`}>
+                    <span className="profile-score-fill" style={{ width: `${pct}%` }} />
+                  </span>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
