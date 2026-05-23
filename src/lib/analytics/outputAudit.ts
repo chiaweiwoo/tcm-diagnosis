@@ -42,6 +42,7 @@ export type AuditCategories = {
   completeness: Finding[];
   tone: Finding[];
   structure: Finding[];
+  consistency: Finding[];
 };
 
 // Kept for backward-compat rendering of v2 rows stored in the DB.
@@ -95,6 +96,90 @@ type CaseRow = {
 type FeedbackRow = {
   ai_feedback: string;
 };
+
+// ---------------------------------------------------------------------------
+// Consistency groups builder
+// ---------------------------------------------------------------------------
+
+type ConsistencyGroup = {
+  label: string;
+  caseIndices: number[]; // 0-based indices into the caseRows array, capped at 3 for display
+};
+
+function buildConsistencyGroups(caseRows: CaseRow[], maxGroups = 5): ConsistencyGroup[] {
+  const map = new Map<string, number[]>();
+
+  caseRows.forEach((row, idx) => {
+    const fd = row.form_data ?? {};
+    const diagnosis = String(fd.diagnosis ?? "").trim();
+    if (!diagnosis) return;
+    const pattern = String(fd.pattern ?? "").trim();
+    const key = pattern ? `${diagnosis}|||${pattern}` : diagnosis;
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(idx);
+  });
+
+  return [...map.entries()]
+    .filter(([, indices]) => indices.length >= 2)
+    .sort((a, b) => b[1].length - a[1].length)
+    .slice(0, maxGroups)
+    .map(([key, indices]) => {
+      const [diagnosis, pattern] = key.split("|||");
+      const label = pattern
+        ? `诊断：${diagnosis} / 证型：${pattern}`
+        : `诊断：${diagnosis}`;
+      return { label, caseIndices: indices.slice(0, 3) };
+    });
+}
+
+function extractFirstKeyPoint(ar: Record<string, unknown> | null): string {
+  if (!ar) return "";
+  // v1.2+ format: 重点结论 is a string array
+  const newPoints = ar["重点结论"];
+  if (Array.isArray(newPoints) && newPoints.length > 0) {
+    return String(newPoints[0]).slice(0, 40);
+  }
+  // Legacy format: keyPoints array
+  const oldPoints = ar.keyPoints;
+  if (Array.isArray(oldPoints) && oldPoints.length > 0) {
+    return String(oldPoints[0]).slice(0, 40);
+  }
+  return "";
+}
+
+function buildConsistencyGroupsBlock(caseRows: CaseRow[], groups: ConsistencyGroup[]): string {
+  if (groups.length === 0) return "";
+
+  const lines: string[] = [
+    "",
+    `=== 一致性对照组（CONSISTENCY_GROUPS，共 ${groups.length} 组）===`,
+    "以下各组为诊断/证型相同的病案，均来自本次审查样本。",
+    "请在 consistency 类别中指出：相似临床描述下，AI 核心结论是否一致？criticalRisk 触发是否稳定？治疗建议方向是否相互矛盾？",
+    "若各组输出高度一致、无矛盾，consistency 返回 []。",
+    "",
+  ];
+
+  groups.forEach((group, gi) => {
+    const caseNums = group.caseIndices.map((i) => i + 1).join(", ");
+    lines.push(`GROUP_${gi + 1}（${group.label}，${group.caseIndices.length} 条 → 案例 ${caseNums}）:`);
+    group.caseIndices.forEach((idx) => {
+      const row = caseRows[idx];
+      const fd = row.form_data ?? {};
+      const ar = row.analysis_result;
+      const sex = String(fd.patientSex ?? "?");
+      const age = String(fd.patientAge ?? "?");
+      const chief = String(fd.chiefComplaint ?? "").slice(0, 20);
+      const hasCritical = ar?.criticalRisk != null ? "有" : "无";
+      const keyPoint = extractFirstKeyPoint(ar);
+      lines.push(
+        `  CASE_${idx + 1}: ${sex}${age}岁 "${chief}" → 警示:[${hasCritical}] 重点:${keyPoint || "（空）"}`,
+      );
+    });
+    lines.push("");
+  });
+
+  return lines.join("\n");
+}
 
 // ---------------------------------------------------------------------------
 // Feedback block builder
@@ -164,6 +249,8 @@ export async function runOutputAudit({
 
   const serialized = serializeConsultationsCompact(caseRows);
   const feedbackBlock = buildFeedbackBlock(feedbackRows);
+  const consistencyGroups = buildConsistencyGroups(caseRows);
+  const consistencyBlock = buildConsistencyGroupsBlock(caseRows, consistencyGroups);
   const model = getDeepSeekFastModel();
   const systemPrompt = buildOutputAuditSystemPrompt();
 
@@ -171,8 +258,12 @@ export async function runOutputAudit({
     `请对以下 ${sampleSize} 条来自不同医生的病案 AI 输出进行系统审查。`,
     `窗口：${windowStart.toISOString().slice(0, 10)} — ${windowEnd.toISOString().slice(0, 10)}`,
     `当前提示词版本：${TCM_ANALYSIS_PROMPT_VERSION}`,
+    consistencyGroups.length > 0
+      ? `一致性对照组：${consistencyGroups.length} 组（共 ${consistencyGroups.reduce((s, g) => s + g.caseIndices.length, 0)} 条）`
+      : "一致性对照组：样本中无相同诊断/证型的重复组合，consistency 返回 []。",
     "",
     serialized,
+    consistencyBlock,
     feedbackBlock,
   ].join("\n");
 
@@ -233,6 +324,7 @@ export async function runOutputAudit({
     completeness: rawCategories.completeness ?? [],
     tone: rawCategories.tone ?? [],
     structure: rawCategories.structure ?? [],
+    consistency: rawCategories.consistency ?? [],
   };
 
   const audit: OutputAuditResult = {
