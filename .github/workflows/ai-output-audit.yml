@@ -1,7 +1,12 @@
 name: AI Output Audit
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      window_days:
+        description: 'Audit window in days (default: 14)'
+        required: false
+        default: '14'
 
 jobs:
   audit:
@@ -10,16 +15,20 @@ jobs:
     steps:
       - name: Trigger AI output audit
         run: |
+          WINDOW_DAYS="${{ github.event.inputs.window_days }}"
+          if [ -z "$WINDOW_DAYS" ]; then WINDOW_DAYS="14"; fi
+
           STATUS=$(curl -s --max-time 290 -o /tmp/result.json -w "%{http_code}" \
             -X POST "${{ secrets.ASSESS_BASE_URL }}/api/cron/output-audit" \
             -H "X-Assessment-Key: ${{ secrets.ASSESSMENT_API_KEY }}" \
-            -H "Content-Type: application/json")
+            -H "Content-Type: application/json" \
+            -d "{\"windowDays\": $WINDOW_DAYS}")
 
           cat /tmp/result.json
           echo ""
 
           if [ "$STATUS" -eq 200 ]; then
-            echo "AI output audit completed successfully."
+            echo "AI output audit completed successfully (window: ${WINDOW_DAYS}d)."
             exit 0
           else
             echo "HTTP $STATUS — AI output audit failed."

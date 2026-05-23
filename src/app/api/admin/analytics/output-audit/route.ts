@@ -49,14 +49,22 @@ export async function GET(req: NextRequest) {
 // POST — trigger new output audit
 // ---------------------------------------------------------------------------
 
-export async function POST(_req: NextRequest) {
+export async function POST(req: NextRequest) {
   const user = await guardAdmin();
   if (!user) return apiError(403, "UNAUTHORIZED", "仅管理员可访问。");
 
   const admin = getServiceRoleClient();
 
+  let windowDays = 14;
   try {
-    const row = await runOutputAudit({ client: admin });
+    const body = await req.json().catch(() => ({}));
+    if (typeof body.windowDays === "number" && body.windowDays > 0) {
+      windowDays = body.windowDays;
+    }
+  } catch { /* no body */ }
+
+  try {
+    const row = await runOutputAudit({ client: admin, windowDays });
 
     return NextResponse.json({ ok: true, audit: row });
   } catch (err) {
