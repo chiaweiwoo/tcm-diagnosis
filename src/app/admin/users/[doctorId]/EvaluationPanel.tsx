@@ -243,7 +243,6 @@ function ProfileListItem({
         <span className="profile-score-track" aria-label={`AI 信号强度：${pct}`}>
           <span className="profile-score-fill" style={{ width: `${pct}%` }} />
         </span>
-        <span className="profile-score-value">{pct}</span>
       </div>
       {hint && <span className="profile-list-hint">{hint}</span>}
     </div>

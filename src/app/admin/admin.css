@@ -2030,17 +2030,17 @@ details[open] .sample-details__toggle::before {
   line-height: 1.5;
 }
 
-/* Score bar row — grid columns so label/bar/number stay aligned within a card */
+/* Score bar row — grid columns so label/bar stay aligned within a card */
 .profile-list-item-line {
   display: grid;
-  grid-template-columns: 42% 1fr 24px;
+  grid-template-columns: 42% 1fr;
   align-items: center;
   gap: 8px;
 }
 
 /* 沟通提示 has long sentence labels — give label column more room */
 .profile-card--ink .profile-list-item-line {
-  grid-template-columns: 62% 1fr 24px;
+  grid-template-columns: 62% 1fr;
 }
 
 .profile-list-item-line .profile-list-main {
@@ -2063,13 +2063,6 @@ details[open] .sample-details__toggle::before {
   border-radius: 3px;
   background: var(--border-strong, #C8C4BE);
   transition: width 0.4s ease;
-}
-
-.profile-score-value {
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-  color: var(--text-muted);
-  text-align: right;
 }
 
 /* Per-card accent fill colors */
