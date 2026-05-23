@@ -41,7 +41,14 @@ export async function GET(_req: NextRequest, context: RouteContext) {
 
   if (error) return apiError(500, "INTERNAL_ERROR", "读取评估记录失败。");
 
-  return NextResponse.json({ evaluation: data ?? null });
+  return NextResponse.json(
+    { evaluation: data ?? null },
+    {
+      headers: {
+        "Cache-Control": "private, max-age=60, stale-while-revalidate=120",
+      },
+    }
+  );
 }
 
 // ---------------------------------------------------------------------------

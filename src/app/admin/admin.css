@@ -1498,10 +1498,62 @@ details[open] .sample-details__toggle::before {
 
 .doctor-tabs {
   display: flex;
+  justify-content: space-between;
+  align-items: center;
   gap: 4px;
   margin-bottom: 20px;
   border-bottom: 2px solid var(--border, #EAE6E2);
   padding-bottom: 0;
+}
+
+.doctor-tabs__left {
+  display: flex;
+  gap: 4px;
+}
+
+.doctor-tabs__right {
+  display: flex;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.refresh-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #16a34a;
+  background: #f0fdf4;
+  padding: 4px 10px;
+  border-radius: 12px;
+  border: 1px solid #bbf7d0;
+  transition: opacity 0.2s ease;
+}
+
+.refresh-indicator__dot {
+  width: 6px;
+  height: 6px;
+  background-color: #16a34a;
+  border-radius: 50%;
+  position: relative;
+  display: inline-block;
+  animation: pulse-dot 1.5s infinite ease-in-out;
+}
+
+@keyframes pulse-dot {
+  0% {
+    transform: scale(0.9);
+    box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.7);
+  }
+  70% {
+    transform: scale(1.1);
+    box-shadow: 0 0 0 5px rgba(22, 163, 74, 0);
+  }
+  100% {
+    transform: scale(0.9);
+    box-shadow: 0 0 0 0 rgba(22, 163, 74, 0);
+  }
 }
 
 .doctor-tab-btn {

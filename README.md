@@ -21,7 +21,7 @@
 
 | Route | 用途 |
 |---|---|
-| `POST /api/analyze` | 接收结构化病案表单，生成临床复核建议 |
+| `POST /api/analyze` | 接收结构化病案表单，生成临床复核建议（支持在 Request Body 中传递可选的 `maxTokens` 整数参数以防止复杂病案截断） |
 | `GET /api/consultations` | 列出当前医师的历史记录 |
 | `POST /api/consultations` | 新建病案记录 |
 | `GET /api/consultations/[id]` | 读取单条病案 |
@@ -64,3 +64,12 @@ npm run build  # 本地构建验证
 npm run evaluate
 npm run evaluate -- --email doctor@example.com --windowDays 14
 ```
+
+## 历史数据导入
+
+支持从 Odoo Excel 导出文件（如 `nova_data_may.xls`）批量清洗并导入病案历史数据。执行步骤：
+
+1. **清洗数据**：运行 `python scratch/clean_historical_data.py`，清洗、重构字段并生成 Zod 校验合规的 JSON、CSV 以及 SQL 插入脚本。
+2. **写入数据库**：运行 `node --env-file=.env.local scratch/ingest_ardy_data.mjs`，在写入前自动创建本地 JSON 备份，删除旧历史记录（保留今日测试病案），并恢复临床反馈意见（Feedback）。
+3. **批量临床分析**：运行 `node --env-file=.env.local scratch/analyze_batch_historical.mjs`，通过 `/api/analyze` 批量运行 DeepSeek 临床复核，并将分析结果与时间戳回填至对应病案行（使用 `maxTokens: 2500` 防止长内容截断）。
+4. **验证结果**：运行 `node --env-file=.env.local scratch/check_ardy_rows.mjs` 验证导入行数、今日边界及日期链完整性。

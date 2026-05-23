@@ -192,6 +192,11 @@ Never define a token only in `workbench.css` — admin pages won't see it. Add i
 - UI result layout: 3 columns — 判断 (当前思路) / 方案 (建议优化+可选) / 随访监测. Plus optional 辨证警示 red banner (top, above 重点结论), 重点结论 green banner, and 风险与提醒 warning box.
 - Saved history must pass through the same normalization path as fresh analysis (`ensureAnalysisResult` in `src/lib/ai/analysisResult.ts`).
 
+### Dynamic Token Budget
+- `/api/analyze` accepts an optional `maxTokens` parameter in the request body (e.g. `body.maxTokens || 1200`).
+- Standard doctor-facing workbench sessions use the `1200` token default to optimize latency and costs.
+- Batch ingestion workflows, CLI pipelines, or exceptionally long/complex clinical cases must pass `maxTokens: 2500` in the payload body to prevent DeepSeek completion truncation (`finish_reason: "length"`), which otherwise crashes JSON parsing with a terminal 502 error.
+
 ### 辨证警示 Diagnostic Alert
 - AI field: `criticalRisk: { summary: string; highlights: string[] } | null` — present in `AnalysisJson` and `AnalysisResult`.
 - Fires when AI detects a critical diagnostic inconsistency: diagnosis↔symptoms mismatch, pattern↔prescription寒热矛盾, or missed red-flag symptom.
@@ -272,9 +277,11 @@ Admin nav (2 tabs, `src/app/admin/AdminNav.tsx`):
 
 `AdminNav` is a client component (needs `usePathname()` for active link highlighting). Admin layout is a server component.
 
-Per-doctor read-only view (`/admin/users/[doctorId]`) — 2-tab layout via `?tab=` searchParam:
-- **病案列表** — compact paginated table (15/page) of consultation records
-- **临床画像** — `doctorProfile` from `analytics_doctor_evaluations`; includes 运行评估 button (14-day window, append-only)
+Per-doctor read-only view (`/admin/users/[doctorId]`) — 2-tab view: 病案列表 | 临床画像
+- **病案列表** — compact paginated table (15/page) of consultation records. Auto-refreshes seamlessly in the background every 10 seconds via Next.js `router.refresh()` in `DoctorTabs.tsx` to keep the list of consultations up to date.
+- **临床画像** — `doctorProfile` from `analytics_doctor_evaluations`; includes 运行评估 button (14-day window, append-only).
+  - **Caching**: The `/api/admin/analytics/evaluate/[doctorId]` endpoint returns a private browser cache header (`Cache-Control: private, max-age=60, stale-while-revalidate=120`) to cache the static review results efficiently.
+  - **Real-Time Time-Series**: The lightweight `/api/admin/analytics/evaluate/[doctorId]/timeseries` endpoint polls client-side every 10 seconds inside `TimeSeriesCard` to ensure the daily case count chart reflects active doctor submissions in real time.
 
 Each consultation row has a **拷贝此病案** button — clones `form_data` only to admin's own account.
 Clone inserts a new draft consultation under admin's UUID with `model_meta = { cloned_from_doctor_email: "..." }`.
@@ -422,6 +429,24 @@ npm run seed:cases -- --email doctor@example.com [--reset] [--yes]
 The doctor can then sign in via Google OAuth — Supabase matches the existing `auth.users` row by email.
 
 `data/seed-cases.json` is gitignored — create locally, never commit. Contains `form_data` objects matching `structuredCaseSchema`. `patientAge` must be a string (HTML form input convention). Seed script calls `/api/analyze` with `X-Assessment-Key` and writes results via service-role.
+
+---
+
+## Historical Data Ingestion Pipeline
+
+When bulk-migrating or backfilling historical consultations from clinical exports (e.g., Odoo Excel/CSV):
+
+### 1. The Processing Pipeline (Scratch Scripts)
+- **`scratch/clean_historical_data.py`**: Python script that parses raw Excel/CSV (e.g., `nova_data_may.xls`), isolates target clinical date ranges, separates diagnostic patterns from western terms, infers prescription types (`方药` | `针灸` | `综合调理`), propagates gender chronologically across visits, shifts patient visits to compute `related_case_id`, and strips billing/retail noise. Generates cleaned UTF-8 BOM CSV, JSON, and `insert_ardy_data.sql` outputs.
+- **`scratch/ingest_ardy_data.mjs`**: Database insertion runner. Securely resolves target doctor UUID via Supabase admin APIs, performs local programmatic JSON backup to `output/` prior to mutation, executes targeted deletion of old consultations for the doctor, and bulk inserts the cleaned records. Automatically restores historical clinician feedbacks and timestamps for designated cases.
+- **`scratch/analyze_batch_historical.mjs`**: Background rate-limited, sequential analyzer. Calls the server `/api/analyze` endpoint using `ASSESSMENT_API_KEY` to generate clinical reviews for imported `"draft"` consultations. **Must pass `maxTokens: 2500` in request body** to prevent completion truncation on complex inputs.
+- **`scratch/check_ardy_rows.mjs`**: Diagnostic verification script that audits active row counts, date ranges, and draft-to-analyzed state conversions.
+
+### 2. Safety Guidelines for Data Ingestion
+- **Server Backup First:** Run dashboard SQL queries to snapshot the current `consultations` table into a backup table (e.g., `consultations_bk_260523`) before starting any deletion or ingestion.
+- **Programmatic Local Backup:** Ingestion scripts must extract and store a local JSON file under `output/` (gitignored) as a fallback snapshot of target rows prior to execution.
+- **Active Today Count Boundary:** Ensure today's active workbench records are isolated and completely untouched.
+- **Backdating Analysis:** Set `analyzed_at = record.created_at` in Supabase when saving batch results so all historical cases populate correctly on their target timeline days in the workbench time-series charts.
 
 ---
 

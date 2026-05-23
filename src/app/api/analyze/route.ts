@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
   });
 
   try {
-    const body = (await request.json()) as { form?: unknown };
+    const body = (await request.json()) as { form?: unknown; maxTokens?: number };
     const parsed = structuredCaseSchema.safeParse(body.form);
 
     if (!parsed.success) {
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
         { role: "system", content: TCM_ANALYSIS_SYSTEM_PROMPT },
         { role: "user", content: buildTcmAnalysisUserPrompt(form) },
       ],
-      maxTokens: 1200,
+      maxTokens: body.maxTokens || 1200,
       model: getDeepSeekFastModel(),
       timeoutMs: 45_000,
       repairJson: true,

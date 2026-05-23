@@ -359,11 +359,26 @@ function TimeSeriesCard({ doctorId }: { doctorId: string }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`/api/admin/analytics/evaluate/${doctorId}/timeseries`)
-      .then((r) => r.ok ? r.json() as Promise<{ dates: string[] }> : Promise.reject())
-      .then((j) => setDates(j.dates))
-      .catch(() => { /* non-critical */ })
-      .finally(() => setLoading(false));
+    let active = true;
+    const fetchDates = () => {
+      fetch(`/api/admin/analytics/evaluate/${doctorId}/timeseries`)
+        .then((r) => r.ok ? r.json() as Promise<{ dates: string[] }> : Promise.reject())
+        .then((j) => {
+          if (active) setDates(j.dates);
+        })
+        .catch(() => { /* non-critical */ })
+        .finally(() => {
+          if (active) setLoading(false);
+        });
+    };
+
+    fetchDates();
+    const interval = setInterval(fetchDates, 10000); // 10s auto-refresh for real-time time-series data
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
   }, [doctorId]);
 
   const buckets = useMemo(() => buildDayBuckets(dates), [dates]);

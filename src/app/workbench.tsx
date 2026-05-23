@@ -1715,7 +1715,7 @@ export default function Workbench({
             </div>
 
             {/* Evidence footer */}
-            {result.evidence.length > 0 && (
+            {result.evidence && result.evidence.length > 0 && (
               <div className="evidence-footer">
                 {result.evidence.map((e, i) => (
                   <span key={i}>{e}</span>
@@ -1724,7 +1724,7 @@ export default function Workbench({
             )}
 
             {/* Non-clinical notes — muted footnote, only when non-empty */}
-            {result.nonClinical.length > 0 && (
+            {result.nonClinical && result.nonClinical.length > 0 && (
               <div className="non-clinical-notes">
                 <span className="non-clinical-notes__label">非临床信息（已从临床分析中分流）</span>
                 {result.nonClinical.map((note, i) => (

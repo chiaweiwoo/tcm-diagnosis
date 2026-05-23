@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 const TABS = [
@@ -12,21 +13,37 @@ export function DoctorTabs({ doctorId }: { doctorId: string }) {
   const searchParams = useSearchParams();
   const activeTab = searchParams.get("tab") ?? "profile";
 
+  // Seamless Next.js App Router background data refresh every 10 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      router.refresh();
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [router]);
+
   function goTab(key: string) {
     router.push(`/admin/users/${doctorId}?tab=${key}`);
   }
 
   return (
     <div className="doctor-tabs">
-      {TABS.map((tab) => (
-        <button
-          key={tab.key}
-          className={`doctor-tab-btn${activeTab === tab.key ? " active" : ""}`}
-          onClick={() => goTab(tab.key)}
-        >
-          {tab.label}
-        </button>
-      ))}
+      <div className="doctor-tabs__left">
+        {TABS.map((tab) => (
+          <button
+            key={tab.key}
+            className={`doctor-tab-btn${activeTab === tab.key ? " active" : ""}`}
+            onClick={() => goTab(tab.key)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+      <div className="doctor-tabs__right">
+        <span className="refresh-indicator" title="页面和病例时序图每10秒自动静默刷新">
+          <span className="refresh-indicator__dot"></span>
+          10秒自动刷新中
+        </span>
+      </div>
     </div>
   );
 }
