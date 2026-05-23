@@ -128,8 +128,9 @@ async function runOnce(formData, runIdx) {
   }
   const json = await res.json();
   return {
-    // API returns { result: AnalysisResult, raw: AnalysisJson, repairedJson, model }
-    result: json.result ?? json,
+    // Use raw (AnalysisJson, Chinese keys) for comparison — reflects actual AI output
+    // before normalization. result (AnalysisResult) restructures into groups/keyPoints/etc.
+    result: json.raw ?? json.result ?? json,
     repairedJson: json.repairedJson ?? false,
     model: json.model ?? "?",
     latency,
