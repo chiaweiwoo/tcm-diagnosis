@@ -6,6 +6,8 @@ type ConsultationRow = {
   id: string;
   displayName: string;
   prescriptionType: string;
+  caseId: string | null;
+  relatedCaseId: string | null;
   date: string;
 };
 
@@ -22,7 +24,9 @@ export function ConsultationTable({ rows }: { rows: ConsultationRow[] }) {
     const keyword = query.trim().toLowerCase();
     if (!keyword) return rows;
     return rows.filter((row) =>
-      [row.displayName, row.prescriptionType, row.date].some((value) => value.toLowerCase().includes(keyword)),
+      [row.displayName, row.prescriptionType, row.date, row.caseId ?? "", row.relatedCaseId ?? ""].some((value) =>
+        value.toLowerCase().includes(keyword),
+      ),
     );
   }, [query, rows]);
 
@@ -142,6 +146,8 @@ export function ConsultationTable({ rows }: { rows: ConsultationRow[] }) {
                   </th>
                   <th className="ctable-th ctable-th--name">病例</th>
                   <th className="ctable-th ctable-th--type">类型</th>
+                  <th className="ctable-th ctable-th--caseid">病案编号</th>
+                  <th className="ctable-th ctable-th--related">随访编号</th>
                   <th className="ctable-th ctable-th--date">更新时间</th>
                 </tr>
               </thead>
@@ -160,6 +166,16 @@ export function ConsultationTable({ rows }: { rows: ConsultationRow[] }) {
                       </td>
                       <td className="ctable-td ctable-td--name">{row.displayName}</td>
                       <td className="ctable-td ctable-td--type">{row.prescriptionType}</td>
+                      <td className="ctable-td ctable-td--caseid">
+                        {row.caseId
+                          ? <span className="ctable-pill ctable-pill--case">{row.caseId}</span>
+                          : <span className="ctable-pill-empty">—</span>}
+                      </td>
+                      <td className="ctable-td ctable-td--related">
+                        {row.relatedCaseId
+                          ? <span className="ctable-pill ctable-pill--related">{row.relatedCaseId}</span>
+                          : <span className="ctable-pill-empty">—</span>}
+                      </td>
                       <td className="ctable-td ctable-td--date">{row.date}</td>
                     </tr>
                   );
@@ -182,6 +198,12 @@ export function ConsultationTable({ rows }: { rows: ConsultationRow[] }) {
                     />
                     <span className="ctable-mobile-card__name">{row.displayName}</span>
                   </div>
+                  {(row.caseId || row.relatedCaseId) && (
+                    <div className="ctable-mobile-card__pills">
+                      {row.caseId && <span className="ctable-pill ctable-pill--case">{row.caseId}</span>}
+                      {row.relatedCaseId && <span className="ctable-pill ctable-pill--related">{row.relatedCaseId}</span>}
+                    </div>
+                  )}
                   <div className="ctable-mobile-card__meta">
                     <span>{row.prescriptionType}</span>
                     <span>{row.date}</span>

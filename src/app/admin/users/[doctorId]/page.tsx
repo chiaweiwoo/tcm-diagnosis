@@ -15,6 +15,8 @@ type ConsultationRow = {
   id: string;
   doctor_email: string;
   consultation_name: string | null;
+  case_id: string | null;
+  related_case_id: string | null;
   form_data: StructuredCaseForm | null;
   updated_at: string;
 };
@@ -26,7 +28,7 @@ async function loadData(doctorId: string): Promise<{ email: string; records: Con
     admin.auth.admin.getUserById(doctorId),
     admin
       .from("consultations")
-      .select("id,doctor_email,consultation_name,form_data,analysis_status,updated_at")
+      .select("id,doctor_email,consultation_name,case_id,related_case_id,form_data,analysis_status,updated_at")
       .eq("doctor_id", doctorId)
       .order("updated_at", { ascending: false }),
   ]);
@@ -104,6 +106,8 @@ export default async function DoctorPage({ params, searchParams }: RouteContext)
                       ? rec.form_data.prescriptionType.join("、")
                       : rec.form_data.prescriptionType)
                   : "—",
+                caseId: rec.case_id ?? null,
+                relatedCaseId: rec.related_case_id ?? null,
                 date: formatSGT(rec.updated_at),
               }))}
             />

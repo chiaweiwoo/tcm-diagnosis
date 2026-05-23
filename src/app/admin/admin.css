@@ -2667,9 +2667,13 @@ details[open] .sample-details__toggle::before {
     height: 80px;
   }
 
-  /* Hide type column in consultation table on small phones */
+  /* Hide type, case id, related id columns on small phones */
   .ctable-th--type,
-  .ctable-td--type {
+  .ctable-td--type,
+  .ctable-th--caseid,
+  .ctable-td--caseid,
+  .ctable-th--related,
+  .ctable-td--related {
     display: none;
   }
 
@@ -3163,11 +3167,13 @@ details[open] .sample-details__toggle::before {
   white-space: nowrap;
 }
 
-.ctable-th--name  { width: 45%; }
-.ctable-th--type  { width: 14%; }
-.ctable-th--status{ width: 8%;  }
-.ctable-th--date  { width: 18%; }
-.ctable-th--action{ width: 15%; }
+.ctable-th--name   { width: 34%; }
+.ctable-th--type   { width: 11%; }
+.ctable-th--caseid { width: 13%; }
+.ctable-th--related{ width: 13%; }
+.ctable-th--status { width: 8%;  }
+.ctable-th--date   { width: 16%; }
+.ctable-th--action { width: 15%; }
 
 .ctable-row {
   border-bottom: 1px solid var(--border, #EAE6E2);
@@ -3203,6 +3209,50 @@ details[open] .sample-details__toggle::before {
   white-space: nowrap;
   overflow: visible;
   max-width: none;
+}
+
+.ctable-td--caseid,
+.ctable-td--related {
+  overflow: visible;
+  max-width: none;
+  white-space: nowrap;
+}
+
+/* Pills — match workbench history-item__pill color scheme */
+.ctable-pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 2px 7px;
+  border-radius: 4px;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ctable-pill--case {
+  background: #f6efe7;
+  color: #7a5b40;
+}
+
+.ctable-pill--related {
+  background: #eef5fb;
+  color: #516d8b;
+}
+
+.ctable-pill-empty {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* Mobile card pills row */
+.ctable-mobile-card__pills {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 0 0 2px 24px;
 }
 
 .ctable-pagination {
@@ -3323,9 +3373,11 @@ details[open] .sample-details__toggle::before {
 }
 
 .ctable-th--checkbox { width: 44px; padding-left: 14px; }
-.ctable-th--name  { width: 56%; }
-.ctable-th--type  { width: 16%; }
-.ctable-th--date  { width: 28%; }
+.ctable-th--name    { width: 42%; }
+.ctable-th--type    { width: 13%; }
+.ctable-th--caseid  { width: 16%; }
+.ctable-th--related { width: 16%; }
+.ctable-th--date    { width: 20%; }
 
 .ctable-row.is-selected {
   background: #FDF6F5;
