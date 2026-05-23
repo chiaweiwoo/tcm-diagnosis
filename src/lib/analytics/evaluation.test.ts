@@ -105,10 +105,11 @@ describe("Goal 2 deterministic evaluation helpers", () => {
         evidence: "2/4",
         caseNumbers: [],
         guidanceHint: "下次可询问长期用药。",
+        score: 80,
       },
     ]);
     expect(profile.guidancePoints).toEqual([
-      { text: "可以先肯定记录的主诉清楚。", caseNumbers: [] },
+      { text: "可以先肯定记录的主诉清楚。", score: 80 },
     ]);
   });
 
@@ -125,17 +126,17 @@ describe("Goal 2 deterministic evaluation helpers", () => {
 
     expect(profile.profileSummary).toBe("疼痛筋伤病例较多，针灸与方药并用。");
     expect(profile.keyObservations).toEqual([
-      "疼痛筋伤",
-      "呼吸咳嗽",
-      "针灸处理局部筋伤",
-      "方药重视气血辨证",
+      { text: "疼痛筋伤",         score: 80 },
+      { text: "呼吸咳嗽",         score: 67 },
+      { text: "针灸处理局部筋伤", score: 53 },
+      { text: "方药重视气血辨证", score: 40 },
     ]);
     expect(profile.aiRecurringThemes).toEqual([
       { theme: "针刺深度与解剖风险", frequency: "", caseNumbers: [] },
     ]);
     expect(profile.gaps[0]?.evidence).toBe("可进一步统一高风险部位复核习惯");
     expect(profile.guidancePoints).toEqual([
-      { text: "可先肯定其治疗方向清楚。" },
+      { text: "可先肯定其治疗方向清楚。", score: 80 },
     ]);
   });
 });
