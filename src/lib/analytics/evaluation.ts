@@ -683,6 +683,7 @@ function mergeProfile(findings: EvaluationFindings, narrative: EvalNarrative): D
       text: k.text,
       score: k.score ?? 50,
     })),
+    treatmentStyle: [], // legacy Stage 1+2 pipeline doesn't produce treatmentStyle separately
     patientDistribution,
     fieldCompleteness,
     aiRecurringThemes: resolvedThemes,
