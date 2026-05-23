@@ -92,17 +92,25 @@ function normalizeProfile(value: unknown): DoctorProfile {
     })
     .filter((item) => item.theme);
 
-  const strengths = array("strengths")
-    .map((item) => {
+  function normalizeScored(key: string): Array<{ text: string; score: number }> {
+    return array(key).map((item, i, arr) => {
+      const fallback = Math.round(80 - (i / Math.max(arr.length - 1, 1)) * 40);
+      if (typeof item === "string") return { text: item, score: fallback };
       const row = asRecord(item);
-      return { text: asString(row.text) || asString(row.strength) };
-    })
-    .filter((item) => item.text);
+      return {
+        text: asString(row.text) || asString(row.strength),
+        score: typeof row.score === "number" ? row.score : fallback,
+      };
+    }).filter((item) => item.text);
+  }
+
+  const strengths = normalizeScored("strengths");
 
   const gaps = array("gaps")
-    .map((item) => {
+    .map((item, i, arr) => {
       const row = asRecord(item);
       const ratio = parseLegacyRatio(asString(row.presentIn) || asString(row.frequency));
+      const fallback = Math.round(80 - (i / Math.max(arr.length - 1, 1)) * 40);
       return {
         field: asString(row.field) || asString(row.gap),
         inputRate: asNumber(row.inputRate) || ratio.rate,
@@ -110,41 +118,35 @@ function normalizeProfile(value: unknown): DoctorProfile {
         evidence: asString(row.evidence),
         caseNumbers: asCaseNumbers(row.caseNumbers),
         guidanceHint: asString(row.guidanceHint),
+        score: typeof row.score === "number" ? row.score : fallback,
       };
     })
     .filter((item) => item.field || item.evidence || item.guidanceHint);
 
-  const rawGuidance = array("guidancePoints");
-  const guidancePoints = rawGuidance
-    .map((item) => {
-      if (typeof item === "string") return { text: item };
-      const row = asRecord(item);
-      return { text: asString(row.text) };
-    })
-    .filter((item) => item.text);
+  const guidancePoints = normalizeScored("guidancePoints");
 
-  const keyObservations = array("keyObservations").filter(
-    (item): item is string => typeof item === "string" && item.trim().length > 0,
-  );
+  const keyObservations: Array<{ text: string; score: number }> = array("keyObservations").map((item, i, arr) => {
+    const fallback = Math.round(80 - (i / Math.max(arr.length - 1, 1)) * 40);
+    if (typeof item === "string") return { text: item, score: fallback };
+    const row = asRecord(item);
+    return {
+      text: asString(row.text),
+      score: typeof row.score === "number" ? row.score : fallback,
+    };
+  }).filter((item) => item.text);
 
-  const draftMainCaseTypes = array("mainCaseTypes").filter(
-    (item): item is string => typeof item === "string" && item.trim().length > 0,
-  );
-  const draftTreatmentStyle = array("treatmentStyle").filter(
-    (item): item is string => typeof item === "string" && item.trim().length > 0,
-  );
-  const draftRiskThemes = array("aiMedicalRiskThemes").filter(
-    (item): item is string => typeof item === "string" && item.trim().length > 0,
-  );
-  const draftStrengths = array("strengths").filter(
-    (item): item is string => typeof item === "string" && item.trim().length > 0,
-  );
-  const draftDiscussion = array("discussionDirections").filter(
-    (item): item is string => typeof item === "string" && item.trim().length > 0,
-  );
-  const draftConversation = array("conversationReference").filter(
-    (item): item is string => typeof item === "string" && item.trim().length > 0,
-  );
+  function draftStrings(key: string): string[] {
+    return array(key).filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+  }
+  function draftToScored(items: string[]): Array<{ text: string; score: number }> {
+    return items.map((text, i, arr) => ({ text, score: Math.round(80 - (i / Math.max(arr.length - 1, 1)) * 40) }));
+  }
+
+  const draftMainCaseTypes = draftStrings("mainCaseTypes");
+  const draftTreatmentStyle = draftStrings("treatmentStyle");
+  const draftRiskThemes = draftStrings("aiMedicalRiskThemes");
+  const draftDiscussion = draftStrings("discussionDirections");
+  const draftConversation = draftStrings("conversationReference");
 
   // patientDistribution — only present in v1.3+
   const pdRaw = raw.patientDistribution;
@@ -178,24 +180,27 @@ function normalizeProfile(value: unknown): DoctorProfile {
 
   return {
     profileSummary: asString(raw.profileSummary) || asString(raw.clinicalSummary) || "暂无可展示的画像摘要。",
-    keyObservations: keyObservations.length ? keyObservations : [...draftMainCaseTypes, ...draftTreatmentStyle],
+    keyObservations: keyObservations.length
+      ? keyObservations
+      : draftToScored([...draftMainCaseTypes, ...draftTreatmentStyle]),
     patientDistribution,
     fieldCompleteness,
     aiRecurringThemes: aiRecurringThemes.length
       ? aiRecurringThemes
       : draftRiskThemes.map((theme) => ({ theme, frequency: "", caseNumbers: [] })),
-    strengths: strengths.length ? strengths : draftStrengths.map((text) => ({ text })),
+    strengths: strengths.length ? strengths : draftToScored(draftStrings("strengths")),
     gaps: gaps.length
       ? gaps
-      : draftDiscussion.map((text, index) => ({
+      : draftDiscussion.map((text, index, arr) => ({
           field: `discussion_${index + 1}`,
           inputRate: 0,
           aiAskRate: 0,
           evidence: text,
           caseNumbers: [],
           guidanceHint: "",
+          score: Math.round(80 - (index / Math.max(arr.length - 1, 1)) * 40),
         })),
-    guidancePoints: guidancePoints.length ? guidancePoints : draftConversation.map((text) => ({ text })),
+    guidancePoints: guidancePoints.length ? guidancePoints : draftToScored(draftConversation),
   };
 }
 
@@ -212,6 +217,46 @@ function HelpTip({ text }: { text: string }) {
     <span className="profile-help-tip" data-tooltip={text} aria-label={text}>
       ?
     </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Score bar — thin horizontal bar showing AI signal strength (0–100)
+// ---------------------------------------------------------------------------
+
+function ProfileScoreBar({ score, cardClass }: { score: number; cardClass: string }) {
+  const pct = Math.max(0, Math.min(100, score));
+  const tooltip = `AI 信号强度：${pct}`;
+  return (
+    <span
+      className={`profile-score-bar ${cardClass}`}
+      data-tooltip={tooltip}
+      aria-label={tooltip}
+    >
+      <span className="profile-score-bar__fill" style={{ width: `${pct}%` }} />
+    </span>
+  );
+}
+
+function ProfileListItem({
+  text,
+  score,
+  cardClass,
+  hint,
+}: {
+  text: string;
+  score: number;
+  cardClass: string;
+  hint?: string;
+}) {
+  return (
+    <div className="profile-list-row">
+      <div className="profile-list-item-line">
+        <span className="profile-list-main">{text}</span>
+        <ProfileScoreBar score={score} cardClass={cardClass} />
+      </div>
+      {hint && <span className="profile-list-hint">{hint}</span>}
+    </div>
   );
 }
 
@@ -474,20 +519,19 @@ function PatientDistributionCard({ distribution }: { distribution: PatientDistri
 // ---------------------------------------------------------------------------
 
 function ClinicalObservationCard({ profile }: { profile: DoctorProfile }) {
+  const sorted = [...profile.keyObservations].sort((a, b) => b.score - a.score);
   return (
     <div className="profile-card profile-card--sage">
       <h3 className="profile-card-title">
         <Sparkles size={15} /> 临床观察
         <HelpTip text="根据近期病案整理出的主要病例类型与诊疗风格。" />
       </h3>
-      {profile.keyObservations.length === 0 ? (
+      {sorted.length === 0 ? (
         <p className="profile-empty">本期暂无明确临床观察</p>
       ) : (
         <div className="profile-list">
-          {profile.keyObservations.map((item, index) => (
-            <div key={index} className="profile-list-row">
-              <span className="profile-list-main">{item}</span>
-            </div>
+          {sorted.map((item, index) => (
+            <ProfileListItem key={index} text={item.text} score={item.score} cardClass="profile-score-bar--sage" />
           ))}
         </div>
       )}
@@ -546,20 +590,19 @@ function AiThemesCard({ profile }: { profile: DoctorProfile }) {
 // ---------------------------------------------------------------------------
 
 function StrengthsCard({ profile }: { profile: DoctorProfile }) {
+  const sorted = [...profile.strengths].sort((a, b) => b.score - a.score);
   return (
     <div className="profile-card profile-card--sage">
       <h3 className="profile-card-title">
         <Sparkles size={15} /> 可取之处
         <HelpTip text="近期病案中值得肯定、可以延续的临床工作特点。" />
       </h3>
-      {profile.strengths.length === 0 ? (
+      {sorted.length === 0 ? (
         <p className="profile-empty">本期暂未识别到有据可查的突出优势</p>
       ) : (
         <div className="profile-list">
-          {profile.strengths.map((item, index) => (
-            <div key={index} className="profile-list-row">
-              <span className="profile-list-main">{item.text}</span>
-            </div>
+          {sorted.map((item, index) => (
+            <ProfileListItem key={index} text={item.text} score={item.score} cardClass="profile-score-bar--sage" />
           ))}
         </div>
       )}
@@ -572,23 +615,25 @@ function StrengthsCard({ profile }: { profile: DoctorProfile }) {
 // ---------------------------------------------------------------------------
 
 function GapsCard({ profile }: { profile: DoctorProfile }) {
+  const sorted = [...profile.gaps].sort((a, b) => b.score - a.score);
   return (
     <div className="profile-card profile-card--tan">
       <h3 className="profile-card-title">
         <Compass size={15} /> 可讨论方向
         <HelpTip text="适合在复盘中温和讨论的临床或记录习惯方向。" />
       </h3>
-      {profile.gaps.length === 0 ? (
+      {sorted.length === 0 ? (
         <p className="profile-empty">本期暂无明确可讨论方向</p>
       ) : (
         <div className="profile-list">
-          {profile.gaps.map((item, index) => (
-            <div key={index} className="profile-list-row">
-              <span className="profile-list-main">{item.evidence || item.field}</span>
-              {item.guidanceHint && (
-                <span className="profile-list-hint">{item.guidanceHint}</span>
-              )}
-            </div>
+          {sorted.map((item, index) => (
+            <ProfileListItem
+              key={index}
+              text={item.evidence || item.field}
+              score={item.score}
+              cardClass="profile-score-bar--tan"
+              hint={item.guidanceHint || undefined}
+            />
           ))}
         </div>
       )}
@@ -601,20 +646,19 @@ function GapsCard({ profile }: { profile: DoctorProfile }) {
 // ---------------------------------------------------------------------------
 
 function GuidanceCard({ profile }: { profile: DoctorProfile }) {
+  const sorted = [...profile.guidancePoints].sort((a, b) => b.score - a.score);
   return (
     <div className="profile-card profile-card--ink">
       <h3 className="profile-card-title">
         <MessageSquare size={15} /> 沟通提示
         <HelpTip text="面向医生复盘时可直接使用的温和沟通话术。" />
       </h3>
-      {profile.guidancePoints.length === 0 ? (
+      {sorted.length === 0 ? (
         <p className="profile-empty">本期暂无具体沟通提示</p>
       ) : (
         <div className="profile-list">
-          {profile.guidancePoints.map((item, index) => (
-            <div key={index} className="profile-list-row">
-              <span className="profile-list-main">{item.text}</span>
-            </div>
+          {sorted.map((item, index) => (
+            <ProfileListItem key={index} text={item.text} score={item.score} cardClass="profile-score-bar--ink" />
           ))}
         </div>
       )}

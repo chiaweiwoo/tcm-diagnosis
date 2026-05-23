@@ -107,19 +107,21 @@ export type EvaluationFindings = {
 /** Narrative output of Stage 2 — prose only, no structural decisions. */
 type EvalNarrative = {
   profileSummary: string;
-  keyObservations: string[];
-  strengths: Array<{ text: string }>;
+  keyObservations: Array<{ text: string; score: number }>;
+  strengths: Array<{ text: string; score: number }>;
   gapsNarrative: Array<{
     field: string;
     evidence: string;
     guidanceHint: string;
+    score: number;
   }>;
-  guidancePoints: Array<{ text: string }>;
+  guidancePoints: Array<{ text: string; score: number }>;
 };
 
 export type DoctorProfile = {
   profileSummary: string;
-  keyObservations: string[];
+  /** Each observation carries an AI-assigned signal strength score (0–100). */
+  keyObservations: Array<{ text: string; score: number }>;
   patientDistribution: PatientDistribution | null;
   /** Kept in DB for gap detection and backward compat; not rendered in UI. */
   fieldCompleteness: Array<{
@@ -134,7 +136,7 @@ export type DoctorProfile = {
     frequency: string;
     caseNumbers: number[];
   }>;
-  strengths: Array<{ text: string }>;
+  strengths: Array<{ text: string; score: number }>;
   gaps: Array<{
     field: string;
     inputRate: number;
@@ -142,8 +144,9 @@ export type DoctorProfile = {
     evidence: string;
     caseNumbers: number[];
     guidanceHint: string;
+    score: number;
   }>;
-  guidancePoints: Array<{ text: string }>;
+  guidancePoints: Array<{ text: string; score: number }>;
 };
 
 export type DoctorEvaluation = {
@@ -668,18 +671,22 @@ function mergeProfile(findings: EvaluationFindings, narrative: EvalNarrative): D
         `${gc.label}填写率为 ${Math.round(gc.inputRate * 100)}%，AI 在 ${Math.round(gc.aiAskRate * 100)}% 的样本中提醒补充。`,
       caseNumbers: gc.caseNumbers,
       guidanceHint: gn?.guidanceHint ?? "",
+      score: gn?.score ?? 50,
     };
   });
 
   return {
     profileSummary: narrative.profileSummary || "暂无可展示的画像摘要。",
-    keyObservations: narrative.keyObservations ?? [],
+    keyObservations: (narrative.keyObservations ?? []).map((k) => ({
+      text: k.text,
+      score: k.score ?? 50,
+    })),
     patientDistribution,
     fieldCompleteness,
     aiRecurringThemes: resolvedThemes,
-    strengths: (narrative.strengths ?? []).map((s) => ({ text: s.text })),
+    strengths: (narrative.strengths ?? []).map((s) => ({ text: s.text, score: s.score ?? 50 })),
     gaps,
-    guidancePoints: (narrative.guidancePoints ?? []).map((g) => ({ text: g.text })),
+    guidancePoints: (narrative.guidancePoints ?? []).map((g) => ({ text: g.text, score: g.score ?? 50 })),
   };
 }
 
@@ -744,7 +751,10 @@ export function doctorReviewDraftToProfile(draft: DoctorReviewDraft): DoctorProf
     keyObservations: [
       ...(draft.mainCaseTypes ?? []),
       ...(draft.treatmentStyle ?? []),
-    ].filter((item) => stringValue(item).length > 0),
+    ].filter((item) => stringValue(item).length > 0).map((text, i, arr) => ({
+      text,
+      score: Math.round(80 - (i / Math.max(arr.length - 1, 1)) * 40),
+    })),
     patientDistribution: null,
     fieldCompleteness: [],
     aiRecurringThemes: (draft.aiMedicalRiskThemes ?? [])
@@ -756,20 +766,21 @@ export function doctorReviewDraftToProfile(draft: DoctorReviewDraft): DoctorProf
       })),
     strengths: (draft.strengths ?? [])
       .filter((text) => stringValue(text).length > 0)
-      .map((text) => ({ text })),
+      .map((text, i, arr) => ({ text, score: Math.round(80 - (i / Math.max(arr.length - 1, 1)) * 40) })),
     gaps: (draft.discussionDirections ?? [])
       .filter((text) => stringValue(text).length > 0)
-      .map((text, index) => ({
+      .map((text, index, arr) => ({
         field: `discussion_${index + 1}`,
         inputRate: 0,
         aiAskRate: 0,
         evidence: text,
         caseNumbers: [],
         guidanceHint: "",
+        score: Math.round(80 - (index / Math.max(arr.length - 1, 1)) * 40),
       })),
     guidancePoints: (draft.conversationReference ?? [])
       .filter((text) => stringValue(text).length > 0)
-      .map((text) => ({ text })),
+      .map((text, i, arr) => ({ text, score: Math.round(80 - (i / Math.max(arr.length - 1, 1)) * 40) })),
   };
 }
 
@@ -787,44 +798,56 @@ export function normalizeDoctorProfile(value: unknown): DoctorProfile {
       ? (raw[key] as unknown[]).filter((item): item is string => typeof item === "string")
       : [];
 
-  const guidancePoints = Array.isArray(raw.guidancePoints)
-    ? (raw.guidancePoints as unknown[]).filter(
-        (item): item is DoctorProfile["guidancePoints"][number] =>
-          Boolean(item) &&
-          typeof item === "object" &&
-          typeof (item as Record<string, unknown>).text === "string",
-      )
-    : [];
-  const oldGuidance = textList("guidancePoints").map((text) => ({ text, caseNumbers: [] }));
+  function normalizeScored<T extends { text: string; score?: number }>(key: string): Array<{ text: string; score: number }> {
+    if (!Array.isArray(raw[key])) return [];
+    return (raw[key] as unknown[]).map((item, i, arr) => {
+      if (typeof item === "string") return { text: item, score: Math.round(80 - (i / Math.max(arr.length - 1, 1)) * 40) };
+      const r = item as Record<string, unknown>;
+      const text = typeof r.text === "string" ? r.text : "";
+      const score = typeof r.score === "number" ? r.score : Math.round(80 - (i / Math.max(arr.length - 1, 1)) * 40);
+      return { text, score };
+    }).filter((item) => item.text);
+  }
 
   const rawGaps = Array.isArray(raw.gaps) ? (raw.gaps as Array<Record<string, unknown>>) : [];
   const v11Gaps = rawGaps
     .filter((gap) => "field" in gap || "inputRate" in gap || "aiAskRate" in gap || "evidence" in gap)
-    .map((gap) => gap as DoctorProfile["gaps"][number]);
+    .map((gap, i, arr) => ({
+      field: stringValue(gap.field) || "legacy",
+      inputRate: typeof gap.inputRate === "number" ? gap.inputRate : 0,
+      aiAskRate: typeof gap.aiAskRate === "number" ? gap.aiAskRate : 0,
+      evidence: stringValue(gap.evidence),
+      caseNumbers: Array.isArray(gap.caseNumbers) ? (gap.caseNumbers as number[]) : [],
+      guidanceHint: stringValue(gap.guidanceHint),
+      score: typeof gap.score === "number" ? gap.score : Math.round(80 - (i / Math.max(arr.length - 1, 1)) * 40),
+    }));
   const oldGaps = rawGaps
     .filter(
       (gap) => !("field" in gap || "inputRate" in gap || "aiAskRate" in gap || "evidence" in gap),
     )
-    .map((gap) => ({
+    .map((gap, i, arr) => ({
       field: stringValue(gap.gap) || "legacy",
       inputRate: 0,
       aiAskRate: 0,
       evidence: stringValue(gap.frequency),
       caseNumbers: [],
       guidanceHint: stringValue(gap.guidanceHint),
+      score: Math.round(80 - (i / Math.max(arr.length - 1, 1)) * 40),
     }));
 
-  const keyObservations = Array.isArray(raw.keyObservations)
-    ? (raw.keyObservations as unknown[]).filter((item): item is string => typeof item === "string")
-    : [];
+  const guidancePoints = normalizeScored("guidancePoints");
+  const oldGuidance = textList("guidancePoints").map((text, i, arr) => ({
+    text,
+    score: Math.round(80 - (i / Math.max(arr.length - 1, 1)) * 40),
+  }));
 
   return {
     profileSummary: stringValue(raw.profileSummary) || "暂无可展示的画像摘要。",
-    keyObservations,
+    keyObservations: normalizeScored("keyObservations"),
     patientDistribution: (raw.patientDistribution as PatientDistribution | null) ?? null,
     fieldCompleteness: listObjects<DoctorProfile["fieldCompleteness"][number]>("fieldCompleteness"),
     aiRecurringThemes: listObjects<DoctorProfile["aiRecurringThemes"][number]>("aiRecurringThemes"),
-    strengths: listObjects<DoctorProfile["strengths"][number]>("strengths"),
+    strengths: normalizeScored("strengths"),
     gaps: v11Gaps.length ? v11Gaps : oldGaps,
     guidancePoints: guidancePoints.length ? guidancePoints : oldGuidance,
   };

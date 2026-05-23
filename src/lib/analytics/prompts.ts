@@ -19,7 +19,7 @@ import { buildDefinitionsBlock } from "./auditDefinitions";
 // Goal 2: Per-doctor profile
 // ---------------------------------------------------------------------------
 
-export const DOCTOR_EVALUATION_PROMPT_VERSION = "doctor-eval-v1.3";
+export const DOCTOR_EVALUATION_PROMPT_VERSION = "doctor-eval-v1.4";
 
 export const DOCTOR_EVALUATION_SYSTEM_PROMPT = `
 你是 TCM AI 诊断辅助系统的内部画像叙述员。此内容只给管理员看，不给医生本人看。
@@ -37,6 +37,13 @@ export const DOCTOR_EVALUATION_SYSTEM_PROMPT = `
 - 不要评价医生临床判断对错
 - 不要比较医生与其他医生
 
+score 字段说明（每条 keyObservations / strengths / gapsNarrative / guidancePoints 均需附带）：
+- score 为 0–100 整数，表示该条目的「AI 信号强度」
+- 信号强度 = 临床相关性 × 证据充分度；须体现真实差异，不要全部给相同分数
+- 高分（≥70）：有明确案例依据、临床意义显著
+- 中分（40–69）：有部分依据或中等临床意义
+- 低分（<40）：推测性或次要观察
+
 输出要求：
 - 只输出一个合法 json 对象，不要 markdown 代码块，不要任何说明文字
 - 全部简体中文
@@ -51,19 +58,22 @@ export const DOCTOR_EVALUATION_SYSTEM_PROMPT = `
 必须输出以下结构：
 {
   "profileSummary": "string（最多2句短句；样本不足3条时首句注明）",
-  "keyObservations": ["string（不超过28字，基于案例观察到的规律，最多3条）"],
+  "keyObservations": [
+    { "text": "string（不超过28字，基于案例观察到的规律，最多3条）", "score": 75 }
+  ],
   "strengths": [
-    { "text": "string（具体描述，不超过32字）" }
+    { "text": "string（具体描述，不超过32字）", "score": 82 }
   ],
   "gapsNarrative": [
     {
       "field": "pastHistory",
       "evidence": "string（说明为何是差距，可引用统计数据，不超过28字）",
-      "guidanceHint": "string（不超过18字，对管理员的行动建议）"
+      "guidanceHint": "string（不超过18字，对管理员的行动建议）",
+      "score": 65
     }
   ],
   "guidancePoints": [
-    { "text": "string（不超过24字）" }
+    { "text": "string（不超过24字）", "score": 58 }
   ]
 }
 
@@ -72,6 +82,7 @@ export const DOCTOR_EVALUATION_SYSTEM_PROMPT = `
 2. gapsNarrative 的 field 是否只包含 DETERMINISTIC_GAP_CANDIDATES 中列出的字段？
 3. keyObservations 每条是否都有案例依据，没有捏造？
 4. 若样本不足 3 条，profileSummary 是否已注明？
+5. 每条 score 是否体现了真实差异（不全相同）？
 `.trim();
 
 // ---------------------------------------------------------------------------

@@ -2030,6 +2030,65 @@ details[open] .sample-details__toggle::before {
   line-height: 1.5;
 }
 
+/* Score bar — inline signal strength indicator */
+.profile-list-item-line {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.profile-list-item-line .profile-list-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.profile-score-bar {
+  flex-shrink: 0;
+  width: 64px;
+  height: 4px;
+  background: var(--border, #EAE6E2);
+  border-radius: 2px;
+  position: relative;
+  top: -1px;
+  cursor: default;
+}
+
+.profile-score-bar__fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--border-strong, #C8C4BE);
+  transition: width 0.3s ease;
+}
+
+.profile-score-bar--sage .profile-score-bar__fill { background: var(--profile-sage); }
+.profile-score-bar--tan  .profile-score-bar__fill { background: var(--profile-tan); }
+.profile-score-bar--ink  .profile-score-bar__fill { background: var(--profile-ink); }
+
+/* Tooltip for score bar */
+.profile-score-bar[data-tooltip] {
+  position: relative;
+}
+.profile-score-bar[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(26, 26, 26, 0.88);
+  color: #fff;
+  font-size: 11px;
+  white-space: nowrap;
+  padding: 3px 7px;
+  border-radius: 4px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 10;
+}
+.profile-score-bar[data-tooltip]:hover::after {
+  opacity: 1;
+}
+
 /* Strengths */
 .profile-strength-list {
   display: flex;
