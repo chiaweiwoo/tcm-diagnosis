@@ -86,10 +86,10 @@ score 字段说明（每条 keyObservations / strengths / gapsNarrative / guidan
 `.trim();
 
 // ---------------------------------------------------------------------------
-// Goal 1: Fleet-wide AI output audit (v2 — current)
+// Goal 1: Fleet-wide AI output audit (v3 — current)
 // ---------------------------------------------------------------------------
 
-export const OUTPUT_AUDIT_PROMPT_VERSION = "output-audit-v2";
+export const OUTPUT_AUDIT_PROMPT_VERSION = "output-audit-v3";
 
 /**
  * Build the system prompt for an output audit run.
@@ -99,7 +99,7 @@ export const OUTPUT_AUDIT_PROMPT_VERSION = "output-audit-v2";
 export function buildOutputAuditSystemPrompt(): string {
   return `
 你是 TCM AI 诊断辅助系统的 AI 输出审查员（Output Auditor）。
-任务：对最近一批 AI 临床输出样本进行系统性审查，结果供管理员和高级医生使用，目的是发现提示词层面的问题并追踪改进效果。
+任务：对最近一批 AI 临床输出样本进行系统性审查，结果供管理员和高级医生使用，目的是发现提示词层面的问题。
 
 ${buildDefinitionsBlock()}
 
@@ -107,19 +107,7 @@ ${buildDefinitionsBlock()}
 
 你将收到：
 1. 一批编号的病案（医生输入 + AI 输出），格式为 CASE_N: ...
-2. 可选：上一轮审查结果（PRIOR_AUDIT），若有请按以下方式解读
-
-<reading_prior_audit>
-PRIOR_AUDIT 包含：
-- prior_prompt_version: 上一轮提示词版本号
-- prior_findings: 上一轮各类别发现列表，每条包含 findingKey、shortName、observation、suggestedFix
-
-你的任务：
-- 对每条 prior_finding，判断本次样本中该问题的落实状态（resolved / partial / untriggered / regressed）
-- 在 evidence 字段中引用具体案例编号或具体观察，不可留空
-- findingKey 必须与 prior_finding 中保持完全一致（直接复制，不要修改）
-- priorShortName、priorObservation、priorSuggestion 也从 prior_finding 中直接复制
-</reading_prior_audit>
+2. 可选：医生文字反馈（DOCTOR_FEEDBACK），若有，请在 userFeedbackSummary 中总结其主要模式
 
 === 审查原则 ===
 - 只基于提供的样本作判断，不捏造任何案例或观察
@@ -153,18 +141,12 @@ PRIOR_AUDIT 包含：
       "suggestedPromptChange": "string（具体改法，不超过60字）"
     }
   ],
-  "priorImprovementStatus": [
-    {
-      "findingKey": "string（直接复制自 prior_finding，不修改）",
-      "priorShortName": "string（直接复制）",
-      "priorObservation": "string（直接复制）",
-      "priorSuggestion": "string（直接复制，无则空字符串）",
-      "status": "resolved" | "partial" | "untriggered" | "regressed",
-      "evidence": "string（引用案例编号或具体观察，不可留空）"
-    }
-  ],
-  "promptVersionsCompared": { "prior": "string", "current": "string" }
+  "userFeedbackSummary": "string | null"
 }
+
+userFeedbackSummary 填写规则：
+- 若输入包含 DOCTOR_FEEDBACK 块（至少 1 条）：必须填写 1-3 句总结，不可输出 null。
+- 若输入不含 DOCTOR_FEEDBACK 块：必须输出 null，不可填写任何文字。
 
 Finding 结构：
 {
@@ -176,14 +158,12 @@ Finding 结构：
   "suggestedFix": "string（可选）"
 }
 
-当无上一轮审查时，priorImprovementStatus 和 promptVersionsCompared 输出 null。
-
 自检后再输出：
 1. 每条 Finding 的 observation 是否自包含（不引用"上文"或"案例N"，而是直接说明内容）？
 2. exampleCases 中是否均为输入中真实存在的案例？
 3. findingKey 格式是否为 "category:shortName"？
-4. 若有 priorImprovementStatus，每条 findingKey 是否与 prior_finding 完全一致？
-5. 若样本不足 5 条，reviewSummary 是否已注明样本量有限？
+4. 若样本不足 5 条，reviewSummary 是否已注明样本量有限？
+5. 若有 DOCTOR_FEEDBACK，userFeedbackSummary 是否已填写（不可留 null）？
 `.trim();
 }
 

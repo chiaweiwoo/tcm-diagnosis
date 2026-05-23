@@ -1,5 +1,5 @@
 /**
- * Fleet-wide AI output audit endpoint (Goal 1 v2).
+ * Fleet-wide AI output audit endpoint (Goal 1 v3).
  * Triggered via GH Actions workflow_dispatch (manual only — no schedule).
  * Auth: x-assessment-key header must match ASSESSMENT_API_KEY env var.
  */

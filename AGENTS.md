@@ -151,12 +151,12 @@ Admin (browser, is_admin=true only)
   └── GET  /api/admin/users/[doctorId]/consultations → per-doctor consultation list (service_role)
   └── GET  /api/admin/analytics/evaluate/[doctorId] → latest doctor profile evaluation
   └── POST /api/admin/analytics/evaluate/[doctorId] → trigger new doctor profile evaluation (14d window)
-  └── GET  /api/admin/analytics/output-audit       → list fleet-wide AI output audits (v2, current)
-  └── POST /api/admin/analytics/output-audit       → trigger new AI output audit (v2)
+  └── GET  /api/admin/analytics/output-audit       → list fleet-wide AI output audits (v3, current)
+  └── POST /api/admin/analytics/output-audit       → trigger new AI output audit (v3)
   └── GET  /api/admin/analytics/session-review     → legacy v1 (reads analytics_output_audits post-migration)
   └── /admin/users                             → doctor list page
   └── /admin/users/[doctorId]                  → 2-tab view: 病案列表 | 临床画像
-  └── /admin/output-audits                     → fleet-wide AI output audits (v2, current)
+  └── /admin/output-audits                     → fleet-wide AI output audits (v3, current)
 
 GH Actions (ASSESSMENT_API_KEY auth, workflow_dispatch only — no schedule)
   └── POST /api/cron/evaluate-doctors          → bulk doctor profile evaluation (14d window, skips empty doctors)
@@ -266,7 +266,7 @@ Admin guard: `src/app/admin/layout.tsx` — server-side, redirects to `/?reason=
 
 Admin nav (2 tabs, `src/app/admin/AdminNav.tsx`):
 - **用户** — `/admin/users` — doctor list with 30-day stats + link to per-doctor view
-- **AI 输出审查** — `/admin/output-audits` — fleet-wide AI output audits (v2)
+- **AI 输出审查** — `/admin/output-audits` — fleet-wide AI output audits (v3)
 
 `/admin` redirects to `/admin/users`.
 
@@ -364,14 +364,13 @@ All section titles have a `(?)` help tooltip.
 Prompts: `DOCTOR_EVALUATION_SYSTEM_PROMPT` (`doctor-eval-v1.3`) in `src/lib/analytics/prompts.ts`
 Window helper: `buildWindow(days)` in `src/lib/analytics/stats.ts`
 
-## AI Output Audit (Goal 1 — v2, current)
+## AI Output Audit (Goal 1 — v3, current)
 
 **On-demand only.** Fleet-wide audit of AI output quality across all doctors. Admin/senior-doctor use only.
 
 Route: `POST /api/admin/analytics/output-audit`
 - Admin session auth required
-- Samples up to 10 consultations per prescriptionType group, stratified
-- Auto-links to most recent prior audit for cross-round tracking; pass `{ includePrior: false }` for fresh baseline
+- No body required; no prior-audit chaining
 - Returns inserted `analytics_output_audits` row
 
 Route: `GET /api/admin/analytics/output-audit?limit=20`
@@ -381,18 +380,25 @@ Cron route: `POST /api/cron/output-audit` — same logic, auth via `X-Assessment
 
 GH Workflow: `.github/workflows/ai-output-audit.yml` → calls `/api/cron/output-audit`
 
-UI: `/admin/output-audits` — append-only list, each row collapsible, v2 category sections with tooltips
+UI: `/admin/output-audits` — append-only list, each row collapsible, category sections + "用户反馈" section with tooltips
 - Backward compat: old v1 rows (without `categories` key) are rendered with legacy renderer and "v1 旧版" badge
+- Old v2 rows (with `priorImprovementStatus`) are silently ignored — field is optional on the type
 
-v2 schema key features:
-- 6 Finding categories: safety / hallucination / reliability / completeness / tone / structure
-- `findingKey = "category:shortName"` for stable cross-round matching
+v3 schema key features:
+- Window anchored to `MAX(analyzed_at)` fleet-wide then −14 days (not wall-clock "now")
+- Sampling: newest-first, cap 100, no stratification
+- Doctor feedback corpus: `ai_feedback` within same window, cap 50, anonymised, no doctor identity
+- New output field: `userFeedbackSummary: string | null` — 1-3 sentence summary of feedback patterns
+- Prior-audit chaining removed; `priorImprovementStatus` / `promptVersionsCompared` dropped from v3 output
+- 6 Finding categories retained: safety / hallucination / reliability / completeness / tone / structure
+- `findingKey = "category:shortName"` for stable reference within a single audit
 - `exampleCases[].summary` self-contained: "女 45岁 头痛 — AI建议加酸枣仁（原案未提睡眠）"
 - Severity grounded in patient health risk (see `auditDefinitions.ts`)
 - All term definitions in `src/lib/analytics/auditDefinitions.ts` (single source of truth for both AI rubric and UI tooltips)
 
-Prompts: `buildOutputAuditSystemPrompt()` (injects definitions), `OUTPUT_AUDIT_PROMPT_VERSION = "output-audit-v2"` in `src/lib/analytics/prompts.ts`
+Prompts: `buildOutputAuditSystemPrompt()` (injects definitions), `OUTPUT_AUDIT_PROMPT_VERSION = "output-audit-v3"` in `src/lib/analytics/prompts.ts`
 Library: `runOutputAudit()` in `src/lib/analytics/outputAudit.ts`
+Window helper: `buildWindowFromLatestAnalysis(client, days)` in `src/lib/analytics/stats.ts`
 
 **Legacy:** `SESSION_REVIEW_SYSTEM_PROMPT` / `reviewSession()` / `src/lib/analytics/sessionReview.ts` — kept for backward compat; do not use for new runs.
 

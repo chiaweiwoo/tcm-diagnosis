@@ -1,8 +1,8 @@
 /**
- * AI Output Audit routes — fleet-wide AI output review (Goal 1 v2).
+ * AI Output Audit routes — fleet-wide AI output review (Goal 1 v3).
  *
  * GET  — list recent audits (newest first)
- * POST — trigger a new audit (optionally chained to a prior audit)
+ * POST — trigger a new audit
  */
 
 import { type NextRequest, NextResponse } from "next/server";
@@ -12,7 +12,7 @@ import { apiError } from "@/lib/apiResponses";
 import { runOutputAudit } from "@/lib/analytics/outputAudit";
 import { logServerEvent } from "@/lib/logging";
 
-// Smart model + up to 10 cases per group — allow generous time
+// Up to 100 cases + feedback corpus — allow generous time
 export const maxDuration = 120;
 
 async function guardAdmin() {
@@ -49,27 +49,14 @@ export async function GET(req: NextRequest) {
 // POST — trigger new output audit
 // ---------------------------------------------------------------------------
 
-export async function POST(req: NextRequest) {
+export async function POST(_req: NextRequest) {
   const user = await guardAdmin();
   if (!user) return apiError(403, "UNAUTHORIZED", "仅管理员可访问。");
-
-  let priorAuditId: string | null = null;
-  let includePrior = true;
-  try {
-    const body = await req.json() as { priorAuditId?: string; includePrior?: boolean };
-    if (typeof body.priorAuditId === "string" && body.priorAuditId.trim()) {
-      priorAuditId = body.priorAuditId.trim();
-    }
-    if (body.includePrior === false) includePrior = false;
-  } catch { /* no body */ }
 
   const admin = getServiceRoleClient();
 
   try {
-    const row = await runOutputAudit({
-      client: admin,
-      priorAuditId: includePrior ? priorAuditId : null,
-    });
+    const row = await runOutputAudit({ client: admin });
 
     return NextResponse.json({ ok: true, audit: row });
   } catch (err) {

@@ -3019,6 +3019,22 @@ details[open] .sample-details__toggle::before {
   border-radius: 5px;
 }
 
+/* User feedback summary block (v3) */
+.audit-feedback-block {
+  padding: 12px 14px;
+  border: 1px solid #E2EAF6;
+  border-left: 4px solid #6B8CBA;
+  border-radius: 8px;
+  background: #F0F5FB;
+}
+
+.audit-feedback-text {
+  font-size: 13.5px;
+  color: var(--text, #1A1A1A);
+  margin: 0;
+  line-height: 1.6;
+}
+
 .audit-prior-list {
   display: flex;
   flex-direction: column;

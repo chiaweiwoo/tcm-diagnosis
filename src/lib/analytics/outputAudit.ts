@@ -1,22 +1,23 @@
 /**
- * Fleet-wide AI output audit — Goal 1 (v2).
+ * Fleet-wide AI output audit — Goal 1 (v3).
  *
- * Audits AI output quality across all doctors over a rolling window.
+ * Audits AI output quality across all doctors over a rolling window anchored
+ * to the fleet's most recent analyzed_at timestamp.
  * On-demand only. Stored in analytics_output_audits. Never shown to doctors.
  *
- * v2 changes vs legacy session review:
- *  - 6-category Finding schema (hallucination/reliability/safety/completeness/tone/structure)
- *  - findingKey for stable cross-round matching ("category:shortName")
- *  - self-contained exampleCases.summary (no case number references)
- *  - severity grounded in patient health risk rubric
- *  - definitions embedded from auditDefinitions.ts (single source of truth)
+ * v3 changes vs v2:
+ *  - Window anchored to MAX(analyzed_at) fleet-wide, not wall-clock "now"
+ *  - Simple newest-first sampling, cap 100 (no stratification)
+ *  - Prior-audit chaining removed — no priorImprovementStatus tracking
+ *  - Doctor feedback corpus included (cap 50, anonymised)
+ *  - New output field: userFeedbackSummary
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { callDeepSeekJson, getDeepSeekFastModel } from "@/lib/ai/deepseek";
 import { buildOutputAuditSystemPrompt, OUTPUT_AUDIT_PROMPT_VERSION } from "./prompts";
 import { TCM_ANALYSIS_PROMPT_VERSION } from "@/lib/ai/prompts";
-import { buildWindow } from "./stats";
+import { buildWindowFromLatestAnalysis } from "./stats";
 import { serializeConsultationsCompact } from "./evaluation";
 import { getLangfuse } from "@/lib/langfuse";
 import { CATEGORY_ORDER } from "./auditDefinitions";
@@ -43,6 +44,7 @@ export type AuditCategories = {
   structure: Finding[];
 };
 
+// Kept for backward-compat rendering of v2 rows stored in the DB.
 export type PriorStatus = {
   findingKey: string;
   priorShortName: string;
@@ -62,8 +64,10 @@ export type OutputAuditResult = {
   reviewSummary: string;
   categories: AuditCategories;
   promptImprovements: PromptImprovement[];
-  priorImprovementStatus: PriorStatus[] | null;
-  promptVersionsCompared: { prior: string; current: string } | null;
+  userFeedbackSummary: string | null;
+  // v2 legacy fields — present on old DB rows, absent on v3+
+  priorImprovementStatus?: PriorStatus[] | null;
+  promptVersionsCompared?: { prior: string; current: string } | null;
 };
 
 export type OutputAuditRow = {
@@ -79,64 +83,34 @@ export type OutputAuditRow = {
 };
 
 // ---------------------------------------------------------------------------
-// Sampling — stratified by prescriptionType, up to perGroupMax per group
+// Internal row types
 // ---------------------------------------------------------------------------
 
-type RawRow = {
+type CaseRow = {
   form_data: Record<string, unknown> | null;
   analysis_result: Record<string, unknown> | null;
   analyzed_at: string | null;
 };
 
-function stratifiedSample(rows: RawRow[], perGroupMax: number): RawRow[] {
-  const buckets: Record<string, RawRow[]> = {};
-  for (const row of rows) {
-    const types = Array.isArray(row.form_data?.prescriptionType)
-      ? (row.form_data!.prescriptionType as string[]).join("+")
-      : String(row.form_data?.prescriptionType ?? "other");
-    (buckets[types] ??= []).push(row);
-  }
-  const sampled: RawRow[] = [];
-  for (const bucket of Object.values(buckets)) {
-    sampled.push(...bucket.slice(0, perGroupMax));
-  }
-  return sampled;
-}
+type FeedbackRow = {
+  ai_feedback: string;
+};
 
 // ---------------------------------------------------------------------------
-// Build prior-findings block for the user prompt
+// Feedback block builder
 // ---------------------------------------------------------------------------
 
-function buildPriorAuditBlock(prior: OutputAuditRow): string {
-  const allFindings: Finding[] = [];
-  const cats = prior.review.categories;
-  if (cats) {
-    for (const key of CATEGORY_ORDER) {
-      const findings = cats[key as keyof AuditCategories] ?? [];
-      allFindings.push(...findings);
-    }
-  }
-
-  if (allFindings.length === 0) return "";
-
-  const lines = [
+function buildFeedbackBlock(feedbacks: FeedbackRow[]): string {
+  if (feedbacks.length === 0) return "";
+  return [
     "",
-    "=== 上一轮审查结果（PRIOR_AUDIT）===",
-    `prior_prompt_version: ${prior.prompt_version_at_run}`,
-    "prior_findings:",
-    JSON.stringify(
-      allFindings.map((f) => ({
-        findingKey: f.findingKey,
-        shortName: f.shortName,
-        observation: f.observation,
-        suggestedFix: f.suggestedFix ?? "",
-      })),
-      null,
-      2,
-    ),
-  ];
-
-  return lines.join("\n");
+    `=== 医生反馈（DOCTOR_FEEDBACK，${feedbacks.length} 条）===`,
+    "以下为医生在使用本系统中留下的文字反馈，已匿名，无医生身份信息。",
+    "请在 userFeedbackSummary 字段中总结主要反馈模式。",
+    "若反馈内容分散、无明显共性，可写「反馈内容分散，无明显共性」。",
+    "",
+    ...feedbacks.map((f, i) => `${i + 1}. ${f.ai_feedback}`),
+  ].join("\n");
 }
 
 // ---------------------------------------------------------------------------
@@ -145,70 +119,61 @@ function buildPriorAuditBlock(prior: OutputAuditRow): string {
 
 export async function runOutputAudit({
   client,
-  priorAuditId,
   windowDays = 14,
-  perGroupMax = 10,
+  sampleCap = 100,
+  feedbackCap = 50,
 }: {
   client: SupabaseClient;
-  priorAuditId?: string | null;
   windowDays?: number;
-  perGroupMax?: number;
+  sampleCap?: number;
+  feedbackCap?: number;
 }): Promise<OutputAuditRow> {
-  const { windowStart, windowEnd } = buildWindow(windowDays);
+  const { windowStart, windowEnd } = await buildWindowFromLatestAnalysis(client, windowDays);
 
-  const { data: rawRows, error } = await client
+  // Fetch cases — newest first, cap at sampleCap
+  const { data: caseData, error: caseError } = await client
     .from("consultations")
     .select("form_data,analysis_result,analyzed_at")
     .not("analyzed_at", "is", null)
     .gte("analyzed_at", windowStart.toISOString())
     .lt("analyzed_at", windowEnd.toISOString())
-    .order("analyzed_at", { ascending: false });
+    .order("analyzed_at", { ascending: false })
+    .limit(sampleCap);
 
-  if (error) throw new Error(error.message);
+  if (caseError) throw new Error(caseError.message);
 
-  const allRows = (rawRows ?? []) as RawRow[];
-  const sampled = stratifiedSample(allRows, perGroupMax);
-  const sampleSize = sampled.length;
+  const caseRows = (caseData ?? []) as CaseRow[];
+  const sampleSize = caseRows.length;
 
   if (sampleSize === 0) {
     throw new Error(`最近 ${windowDays} 天无已分析病案，无法生成审查。`);
   }
 
-  // Resolve prior audit for chaining
-  let priorAudit: OutputAuditRow | null = null;
-  let resolvedPriorId = priorAuditId ?? null;
+  // Fetch feedback — within the same window, newest first, cap at feedbackCap
+  const { data: feedbackData } = await client
+    .from("consultations")
+    .select("ai_feedback")
+    .not("ai_feedback", "is", null)
+    .neq("ai_feedback", "")
+    .gte("ai_feedback_updated_at", windowStart.toISOString())
+    .lt("ai_feedback_updated_at", windowEnd.toISOString())
+    .order("ai_feedback_updated_at", { ascending: false })
+    .limit(feedbackCap);
 
-  if (resolvedPriorId) {
-    const { data: prior } = await client
-      .from("analytics_output_audits")
-      .select("*")
-      .eq("id", resolvedPriorId)
-      .maybeSingle();
-    priorAudit = prior as OutputAuditRow | null;
-  } else {
-    const { data: latest } = await client
-      .from("analytics_output_audits")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (latest) {
-      priorAudit = latest as OutputAuditRow;
-      resolvedPriorId = latest.id;
-    }
-  }
+  const feedbackRows = (feedbackData ?? []) as FeedbackRow[];
 
-  const serialized = serializeConsultationsCompact(sampled);
+  const serialized = serializeConsultationsCompact(caseRows);
+  const feedbackBlock = buildFeedbackBlock(feedbackRows);
   const model = getDeepSeekFastModel();
   const systemPrompt = buildOutputAuditSystemPrompt();
 
   const userPrompt = [
     `请对以下 ${sampleSize} 条来自不同医生的病案 AI 输出进行系统审查。`,
-    `窗口：过去 ${windowDays} 天`,
+    `窗口：${windowStart.toISOString().slice(0, 10)} — ${windowEnd.toISOString().slice(0, 10)}`,
     `当前提示词版本：${TCM_ANALYSIS_PROMPT_VERSION}`,
     "",
     serialized,
-    ...(priorAudit ? [buildPriorAuditBlock(priorAudit)] : []),
+    feedbackBlock,
   ].join("\n");
 
   const langfuse = getLangfuse();
@@ -216,10 +181,10 @@ export async function runOutputAudit({
     name: "output-audit",
     metadata: {
       windowDays,
-      perGroupMax,
+      sampleCap,
       sampleSize,
+      feedbackCount: feedbackRows.length,
       promptVersion: TCM_ANALYSIS_PROMPT_VERSION,
-      hasPrior: !!priorAudit,
     },
   });
 
@@ -252,8 +217,8 @@ export async function runOutputAudit({
         repairedJson: result.repairedJson ?? false,
         latencyMs: Date.now() - callStartedAt,
         sampleSize,
+        feedbackCount: feedbackRows.length,
         windowDays,
-        hasPrior: !!priorAudit,
       },
     });
     try { await langfuse.flushAsync(); } catch { /* non-critical */ }
@@ -273,13 +238,10 @@ export async function runOutputAudit({
   const audit: OutputAuditResult = {
     ...result.data,
     categories,
-    priorImprovementStatus: priorAudit ? (result.data.priorImprovementStatus ?? null) : null,
-    promptVersionsCompared: priorAudit
-      ? (result.data.promptVersionsCompared ?? {
-          prior: priorAudit.prompt_version_at_run,
-          current: TCM_ANALYSIS_PROMPT_VERSION,
-        })
-      : null,
+    userFeedbackSummary: result.data.userFeedbackSummary ?? null,
+    // v3 removes these fields; null them explicitly so no stale v2 data leaks
+    priorImprovementStatus: null,
+    promptVersionsCompared: null,
   };
 
   const { data: inserted, error: insertError } = await client
@@ -287,7 +249,7 @@ export async function runOutputAudit({
     .insert({
       window_start: windowStart.toISOString(),
       window_end: windowEnd.toISOString(),
-      prior_review_id: resolvedPriorId,
+      prior_review_id: null,
       prompt_version_at_run: `${OUTPUT_AUDIT_PROMPT_VERSION}/${TCM_ANALYSIS_PROMPT_VERSION}`,
       sample_size: sampleSize,
       model: result.model,
@@ -300,3 +262,4 @@ export async function runOutputAudit({
 
   return inserted as OutputAuditRow;
 }
+

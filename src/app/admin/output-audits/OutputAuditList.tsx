@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type { OutputAuditRow, Finding, AuditCategories } from "@/lib/analytics/outputAudit";
-import { VERDICT, SEVERITY, CATEGORY, CATEGORY_ORDER, PRIOR_STATUS } from "@/lib/analytics/auditDefinitions";
+import { VERDICT, SEVERITY, CATEGORY, CATEGORY_ORDER } from "@/lib/analytics/auditDefinitions";
 
 // ---------------------------------------------------------------------------
 // Tooltip helper — reuses .profile-help-tip CSS from admin.css
@@ -244,9 +244,8 @@ function AuditCard({ row }: { row: OutputAuditRow }) {
           </div>
           <p className="audit-card-meta">
             {formatSGT(row.created_at)} ·{" "}
-            窗口 {formatDateSGT(row.window_start)} — {formatDateSGT(row.window_end)} ·{" "}
+            样本窗口 {formatDateSGT(row.window_start)} — {formatDateSGT(row.window_end)} ·{" "}
             {row.sample_size} 个样本 · {row.prompt_version_at_run}
-            {row.prior_review_id && " · 链接上一轮"}
           </p>
         </div>
         <button
@@ -283,6 +282,19 @@ function AuditCard({ row }: { row: OutputAuditRow }) {
                 </div>
               )}
 
+              {/* User feedback summary (v3+) */}
+              {review.userFeedbackSummary && (
+                <div>
+                  <h3 className="audit-section-title">
+                    用户反馈
+                    <Tip text="医生在病案中留下的文字反馈（匿名汇总），反映使用体验与意见。" />
+                  </h3>
+                  <div className="audit-feedback-block">
+                    <p className="audit-feedback-text">{review.userFeedbackSummary}</p>
+                  </div>
+                </div>
+              )}
+
               {/* Prompt improvements */}
               {review.promptImprovements && review.promptImprovements.length > 0 && (
                 <div>
@@ -297,41 +309,6 @@ function AuditCard({ row }: { row: OutputAuditRow }) {
                         <p className="audit-improvement-change">💡 {p.suggestedPromptChange}</p>
                       </div>
                     ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Prior improvement status */}
-              {review.priorImprovementStatus && review.priorImprovementStatus.length > 0 && (
-                <div>
-                  <h3 className="audit-section-title">
-                    上一轮建议追踪
-                    <Tip text="对上一轮每条发现的落实情况进行核查。findingKey 保持一致以便跨轮匹配。" />
-                  </h3>
-                  {review.promptVersionsCompared && (
-                    <p className="eval-meta" style={{ marginBottom: "10px" }}>
-                      {review.promptVersionsCompared.prior} → {review.promptVersionsCompared.current}
-                    </p>
-                  )}
-                  <div className="audit-prior-list">
-                    {review.priorImprovementStatus.map((s, i) => {
-                      const statusDef = PRIOR_STATUS[s.status];
-                      return (
-                        <div key={i} className="audit-prior-card">
-                          <div className="audit-prior-row">
-                            <span className="audit-prior-name">{s.priorShortName}</span>
-                            <span className={`audit-status-badge audit-status--${s.status}`}>
-                              {statusDef?.label ?? s.status}
-                              {statusDef && <Tip text={statusDef.tip} />}
-                            </span>
-                          </div>
-                          <p className="audit-prior-obs">{s.priorObservation}</p>
-                          {s.evidence && (
-                            <p className="audit-prior-evidence">{s.evidence}</p>
-                          )}
-                        </div>
-                      );
-                    })}
                   </div>
                 </div>
               )}
@@ -364,7 +341,7 @@ export function OutputAuditList({ initialAudits }: { initialAudits: OutputAuditR
   return (
     <div>
       <p style={{ margin: "0 0 1.5rem", color: "var(--text-muted)", fontSize: "0.875rem" }}>
-        对近 14 天全体医生的 AI 临床输出进行系统审查，发现提示词层面问题并追踪改进效果。
+        对最近一批 AI 临床输出（窗口锚定至最新病案时间）进行系统审查，发现提示词层面问题，并汇总医生文字反馈。
         通过 GitHub Actions → <strong>AI Output Audit</strong> → Run workflow 触发。
       </p>
 
