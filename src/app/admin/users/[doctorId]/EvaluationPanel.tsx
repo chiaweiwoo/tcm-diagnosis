@@ -707,11 +707,11 @@ export function EvaluationPanel({ doctorId }: { doctorId: string }) {
 
           <section className="profile-section">
             <h2 className="profile-section-title">描述性分析</h2>
+            <TimeSeriesCard doctorId={doctorId} />
             <div className="profile-cards-grid profile-cards-grid--two">
               <ClinicalObservationCard profile={profile} />
               <AiThemesCard profile={profile} />
             </div>
-            <TimeSeriesCard doctorId={doctorId} />
           </section>
 
           <section className="profile-section">
