@@ -1595,7 +1595,7 @@ button.case-linkage__item:hover {
   .view-as-banner,
   .workbench__main,
   .workbench-footer {
-    max-width: 1600px;
+    max-width: 100%;
   }
 
   .workbench__body {
