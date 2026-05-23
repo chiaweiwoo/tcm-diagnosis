@@ -322,7 +322,6 @@ export async function runOutputAudit({
     .insert({
       window_start: windowStart.toISOString(),
       window_end: windowEnd.toISOString(),
-      prior_review_id: null,
       prompt_version_at_run: `${OUTPUT_AUDIT_PROMPT_VERSION}/${TCM_ANALYSIS_PROMPT_VERSION}`,
       sample_size: sampleSize,
       model: result.model,

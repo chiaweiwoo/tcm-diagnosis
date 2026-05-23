@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
 
   const admin = getServiceRoleClient();
 
-  let windowDays = 14;
+  let windowDays: number | undefined;
   try {
     const body = await req.json().catch(() => ({}));
     if (typeof body.windowDays === "number" && body.windowDays > 0) {
