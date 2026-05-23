@@ -1,4 +1,4 @@
-name: Evaluate Doctors
+name: Evaluate Doctor
 
 on:
   workflow_dispatch:
@@ -23,7 +23,7 @@ on:
         type: string
 
 jobs:
-  evaluate-doctors:
+  evaluate-doctor:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

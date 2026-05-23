@@ -295,7 +295,7 @@ Only `chiaweiwoo123@gmail.com` is seeded as admin.
 
 **On-demand only.** No scheduled cron. Triggered by:
 - Admin UI button on `/admin/users/[doctorId]` → 临床画像 tab
-- GH Actions `workflow_dispatch` (`.github/workflows/evaluate-doctors.yml`) for manual per-doctor runs
+- GH Actions `workflow_dispatch` (`.github/workflows/evaluate-doctor.yml`) for manual per-doctor runs
 - Local CLI: `npm run evaluate -- --email doctor@example.com` (Requires email or doctorId)
 
 Route: `POST /api/admin/analytics/evaluate/[doctorId]`
@@ -337,7 +337,7 @@ Goal 2 is a doctor-readable clinical review. The canonical evaluator uses a 4-st
 - The visible UI is split into `描述性分析` and `复盘与沟通`.
 - Pie charts / patient distribution are no longer shown in the profile UI; time-series remains as light `近期记录背景`.
 
-The active canonical storage workflow is `.github/workflows/evaluate-doctors.yml`.
+The active canonical storage workflow is `.github/workflows/evaluate-doctor.yml`.
 
 ### Legacy deterministic pipeline (kept for helpers/tests)
 
