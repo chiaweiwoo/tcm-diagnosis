@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       doctor_email:
-        description: "Optional doctor email. Leave blank to evaluate all active doctors."
-        required: false
+        description: "Doctor email to evaluate. Doctor reviews are run per-doctor."
+        required: true
         type: string
       doctor_id:
-        description: "Optional doctor UUID. Takes precedence over email."
+        description: "Optional doctor UUID (takes precedence over email if specified)."
         required: false
         type: string
       force:

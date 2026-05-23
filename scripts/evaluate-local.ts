@@ -62,48 +62,34 @@ async function resolveDoctors() {
   const targetEmail = values.email?.trim();
   const targetId = values.doctorId?.trim();
 
-  // If a specific ID is provided, query allowlist directly to map email
-  if (targetId) {
-    const { data: allow } = await client
-      .from("doctor_allowlist")
-      .select("email")
-      .eq("is_active", true)
-      .maybeSingle();
-
-    return [{ doctorId: targetId, email: allow?.email || "unknown" }];
+  if (!targetEmail && !targetId) {
+    console.error("Error: Doctor reviews are run per-doctor. You must specify a target doctor via --email or --doctorId.");
+    console.error("Example: npm run evaluate -- --email doctor@example.com");
+    process.exit(1);
   }
 
-  // Fetch all active allowlist entries
-  const { data: allowlist, error: err1 } = await client
-    .from("doctor_allowlist")
-    .select("email")
-    .eq("is_active", true);
+  // Fetch active allowlist and auth users
+  const [allowlistResult, usersResult] = await Promise.all([
+    client.from("doctor_allowlist").select("email").eq("is_active", true),
+    client.auth.admin.listUsers({ perPage: 1000 }),
+  ]);
 
-  if (err1) throw err1;
-  if (!allowlist || allowlist.length === 0) return [];
+  if (allowlistResult.error) throw allowlistResult.error;
+  if (usersResult.error) throw usersResult.error;
 
-  // Query auth.users to map email -> doctor_id (UUID)
-  const { data: users, error: err2 } = await client.auth.admin.listUsers();
-  if (err2) throw err2;
+  const emailToId = new Map(
+    usersResult.data.users.map((user) => [user.email?.toLowerCase() ?? "", user.id])
+  );
+  const requestedEmail = targetEmail?.toLowerCase();
+  const requestedId = targetId;
 
-  const emailToId = new Map<string, string>();
-  for (const u of users.users) {
-    if (u.email) emailToId.set(u.email.toLowerCase(), u.id);
-  }
-
-  const targets: Array<{ doctorId: string; email: string }> = [];
-  for (const row of allowlist) {
-    const emailLower = row.email.toLowerCase();
-    const id = emailToId.get(emailLower);
-    if (id) {
-      if (targetEmail && targetEmail.toLowerCase() !== emailLower) {
-        continue;
-      }
-      targets.push({ doctorId: id, email: row.email });
-    }
-  }
-
-  return targets;
+  return (allowlistResult.data ?? [])
+    .map((row) => row.email?.toLowerCase())
+    .filter((email): email is string => Boolean(email))
+    .map((email) => ({ email, doctorId: emailToId.get(email) }))
+    .filter((doctor): doctor is { email: string; doctorId: string } => Boolean(doctor.doctorId))
+    .filter((doctor) => !requestedEmail || doctor.email === requestedEmail)
+    .filter((doctor) => !requestedId || doctor.doctorId === requestedId);
 }
 
 async function main() {
