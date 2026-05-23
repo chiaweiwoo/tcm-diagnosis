@@ -9,11 +9,28 @@ import { logActivity } from "@/lib/activityLog";
 import { AnalysisJson, buildAnalysisResult } from "@/lib/ai/analysisResult";
 import { requireApiAuth } from "@/lib/apiAuth";
 import { getLangfuse } from "@/lib/langfuse";
+import { assertWritable, getRequestedViewAsDoctorId, getViewAsContext, ViewAsError } from "@/lib/viewAs";
 
 export async function POST(request: NextRequest) {
   const auth = await requireApiAuth(request);
   if (!auth.ok) return auth.response;
   const { doctorEmail, isCli } = auth;
+
+  try {
+    if (getRequestedViewAsDoctorId(request)) {
+      if (isCli) {
+        return apiError(403, "VIEW_AS_FORBIDDEN", "预览医生工作台仅支持管理员会话。");
+      }
+      const viewAs = await getViewAsContext(request);
+      const blocked = assertWritable(viewAs);
+      if (blocked) return blocked;
+    }
+  } catch (error) {
+    if (error instanceof ViewAsError) {
+      return apiError(error.status, error.code, error.message);
+    }
+    throw error;
+  }
 
   const startedAt = Date.now();
   const langfuse = getLangfuse();

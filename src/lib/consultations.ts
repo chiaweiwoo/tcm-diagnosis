@@ -44,13 +44,13 @@ type ConsultationPatch = Partial<
 
 /**
  * When isDevBypass=true the caller uses a service-role client (no session JWT).
- * Pass doctorEmail so the query filters explicitly — RLS is bypassed but we still
+ * Pass doctorId so the query filters explicitly — RLS is bypassed but we still
  * scope to the right doctor.
  *
  * When isDevBypass=false the caller uses the user-scoped session client and RLS
  * on doctor_id=auth.uid() handles isolation — no extra filter needed.
  */
-type DbOpts = { doctorEmail?: string };
+type DbOpts = { doctorId?: string };
 
 function dbError(error: { message?: string } | null) {
   return new Error(error?.message ?? "Database error");
@@ -68,8 +68,8 @@ export async function listConsultations(
     .select(LIST_COLUMNS)
     .order("created_at", { ascending: false });
 
-  const { data, error } = await (opts.doctorEmail
-    ? base.eq("doctor_email", opts.doctorEmail)
+  const { data, error } = await (opts.doctorId
+    ? base.eq("doctor_id", opts.doctorId)
     : base);
 
   if (error) throw dbError(error);
@@ -82,8 +82,8 @@ export async function getConsultation(
   opts: DbOpts = {},
 ): Promise<ConsultationRecord | null> {
   const base = client.from("consultations").select("*").eq("id", id);
-  const { data, error } = await (opts.doctorEmail
-    ? base.eq("doctor_email", opts.doctorEmail)
+  const { data, error } = await (opts.doctorId
+    ? base.eq("doctor_id", opts.doctorId)
     : base).maybeSingle();
 
   if (error) throw dbError(error);
@@ -132,8 +132,8 @@ export async function updateConsultation(
     .update({ ...patch, updated_at: new Date().toISOString() })
     .eq("id", id);
 
-  const { data, error } = await (opts.doctorEmail
-    ? base.eq("doctor_email", opts.doctorEmail)
+  const { data, error } = await (opts.doctorId
+    ? base.eq("doctor_id", opts.doctorId)
     : base).select().single();
 
   if (error) throw dbError(error);
@@ -146,8 +146,8 @@ export async function deleteConsultation(
   opts: DbOpts = {},
 ): Promise<void> {
   const base = client.from("consultations").delete().eq("id", id);
-  const { error } = await (opts.doctorEmail
-    ? base.eq("doctor_email", opts.doctorEmail)
+  const { error } = await (opts.doctorId
+    ? base.eq("doctor_id", opts.doctorId)
     : base);
 
   if (error) throw dbError(error);
