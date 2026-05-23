@@ -2044,10 +2044,11 @@ details[open] .sample-details__toggle::before {
 }
 
 .profile-list-item-line .profile-list-main {
+  min-width: 0;           /* allow grid cell to shrink below content size */
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  padding-left: 14px; /* keep bullet indent */
+  padding-left: 14px;     /* keep bullet indent */
 }
 
 .profile-score-track {
