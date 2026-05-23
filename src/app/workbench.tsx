@@ -780,6 +780,18 @@ export default function Workbench({
   const searchParams = useSearchParams();
   const isReadOnly = Boolean(viewAs);
 
+  const buildUrl = useCallback((params?: { id?: string }) => {
+    const qp = new URLSearchParams();
+    if (viewAs?.doctorId) {
+      qp.set("viewAs", viewAs.doctorId);
+    }
+    if (params?.id) {
+      qp.set("id", params.id);
+    }
+    const qs = qp.toString();
+    return qs ? `/?${qs}` : "/";
+  }, [viewAs?.doctorId]);
+
   const [form, setForm] = useState<StructuredCaseForm>(EMPTY_FORM);
   const [touched, setTouched] = useState<Set<keyof StructuredCaseForm>>(new Set());
 
@@ -968,8 +980,8 @@ export default function Workbench({
     setHistoryOpen(false);
     setSaveStatus("new");
     setSavedAt(null);
-    router.replace("/", { scroll: false });
-  }, [router]);
+    router.replace(buildUrl(), { scroll: false });
+  }, [router, buildUrl]);
 
   async function handleNew() {
     if (!await confirmDiscardChanges()) return;
