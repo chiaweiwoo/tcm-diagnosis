@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { apiError } from "@/lib/apiResponses";
 import { createConsultation, listConsultations, updateConsultation } from "@/lib/consultations";
-import { getCurrentDoctor } from "@/lib/currentDoctor";
 import { createServerSupabaseClient, getServiceRoleClient } from "@/lib/supabase/server";
 import { logServerEvent } from "@/lib/logging";
+import { assertWritable, getViewAsContext, ViewAsError } from "@/lib/viewAs";
 
 const CASE_ID_MAX_LENGTH = 64;
 
@@ -21,14 +21,23 @@ function normalizeCaseId(value: unknown) {
   return trimmed;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const doctor = await getCurrentDoctor();
-    const supabase = doctor.isDevBypass ? getServiceRoleClient() : await createServerSupabaseClient();
-    const dbOpts = doctor.isDevBypass ? { doctorEmail: doctor.email } : {};
+    const context = await getViewAsContext(request);
+    const supabase =
+      context.actualDoctor.isDevBypass || context.isViewAs
+        ? getServiceRoleClient()
+        : await createServerSupabaseClient();
+    const dbOpts =
+      context.actualDoctor.isDevBypass || context.isViewAs
+        ? { doctorId: context.effectiveDoctor.id }
+        : {};
     const records = await listConsultations(supabase, dbOpts);
     return NextResponse.json({ records });
   } catch (error) {
+    if (error instanceof ViewAsError) {
+      return apiError(error.status, error.code, error.message);
+    }
     if (error instanceof Error && error.message === "Unauthorized") {
       return apiError(401, "UNAUTHORIZED", "请先登录。");
     }
@@ -44,9 +53,14 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const doctor = await getCurrentDoctor();
-    const supabase = doctor.isDevBypass ? getServiceRoleClient() : await createServerSupabaseClient();
-    const dbOpts = doctor.isDevBypass ? { doctorEmail: doctor.email } : {};
+    const context = await getViewAsContext(request);
+    const blocked = assertWritable(context);
+    if (blocked) return blocked;
+
+    const supabase = context.actualDoctor.isDevBypass
+      ? getServiceRoleClient()
+      : await createServerSupabaseClient();
+    const dbOpts = context.actualDoctor.isDevBypass ? { doctorId: context.actualDoctor.id } : {};
 
     const body = (await request.json()) as {
       consultationName?: unknown;
@@ -60,8 +74,8 @@ export async function POST(request: Request) {
     };
 
     const record = await createConsultation(supabase, {
-      doctorId: doctor.id,
-      doctorEmail: doctor.email,
+      doctorId: context.actualDoctor.id,
+      doctorEmail: context.actualDoctor.email,
       consultationName: normalizeName(body.consultationName),
       caseId: normalizeCaseId(body.caseId),
       relatedCaseId: normalizeCaseId(body.relatedCaseId),
@@ -86,11 +100,14 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ record });
   } catch (error) {
+    if (error instanceof ViewAsError) {
+      return apiError(error.status, error.code, error.message);
+    }
     if (error instanceof Error && error.message === "Unauthorized") {
       return apiError(401, "UNAUTHORIZED", "请先登录。");
     }
     if (error instanceof Error && error.message === "CASE_ID_TOO_LONG") {
-      return apiError(400, "CASE_ID_TOO_LONG", "病案编号与随访病案编号不能超过64个字符。");
+      return apiError(400, "CASE_ID_TOO_LONG", "病案编号与随访记录编号不能超过64个字符。");
     }
 
     await logServerEvent({

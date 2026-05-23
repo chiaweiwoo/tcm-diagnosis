@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 import { apiError } from "@/lib/apiResponses";
 import { deleteConsultation, getConsultation, updateConsultation } from "@/lib/consultations";
 import { structuredCaseSchema } from "@/lib/forms/caseSchema";
-import { getCurrentDoctor } from "@/lib/currentDoctor";
 import { createServerSupabaseClient, getServiceRoleClient } from "@/lib/supabase/server";
 import { logServerEvent } from "@/lib/logging";
+import { assertWritable, getViewAsContext, ViewAsError } from "@/lib/viewAs";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -30,11 +30,17 @@ function isUnauthorized(error: unknown) {
   return error instanceof Error && error.message === "Unauthorized";
 }
 
-export async function GET(_request: Request, context: RouteContext) {
+export async function GET(request: Request, context: RouteContext) {
   try {
-    const doctor = await getCurrentDoctor();
-    const supabase = doctor.isDevBypass ? getServiceRoleClient() : await createServerSupabaseClient();
-    const dbOpts = doctor.isDevBypass ? { doctorEmail: doctor.email } : {};
+    const viewAs = await getViewAsContext(request);
+    const supabase =
+      viewAs.actualDoctor.isDevBypass || viewAs.isViewAs
+        ? getServiceRoleClient()
+        : await createServerSupabaseClient();
+    const dbOpts =
+      viewAs.actualDoctor.isDevBypass || viewAs.isViewAs
+        ? { doctorId: viewAs.effectiveDoctor.id }
+        : {};
     const { id } = await context.params;
     const record = await getConsultation(supabase, id, dbOpts);
 
@@ -44,13 +50,16 @@ export async function GET(_request: Request, context: RouteContext) {
 
     return NextResponse.json({ record });
   } catch (error) {
+    if (error instanceof ViewAsError) {
+      return apiError(error.status, error.code, error.message);
+    }
     if (isUnauthorized(error)) {
       return apiError(401, "UNAUTHORIZED", "请先登录。");
     }
-
     if (error instanceof Error && error.message === "CASE_ID_TOO_LONG") {
       return apiError(400, "CASE_ID_TOO_LONG", "病案编号与随访病案编号不能超过64个字符。");
     }
+
     await logServerEvent({
       source: "api/consultations/[id]",
       message: "读取病案记录失败。",
@@ -62,9 +71,14 @@ export async function GET(_request: Request, context: RouteContext) {
 
 export async function PATCH(request: Request, context: RouteContext) {
   try {
-    const doctor = await getCurrentDoctor();
-    const supabase = doctor.isDevBypass ? getServiceRoleClient() : await createServerSupabaseClient();
-    const dbOpts = doctor.isDevBypass ? { doctorEmail: doctor.email } : {};
+    const viewAs = await getViewAsContext(request);
+    const blocked = assertWritable(viewAs);
+    if (blocked) return blocked;
+
+    const supabase = viewAs.actualDoctor.isDevBypass
+      ? getServiceRoleClient()
+      : await createServerSupabaseClient();
+    const dbOpts = viewAs.actualDoctor.isDevBypass ? { doctorId: viewAs.actualDoctor.id } : {};
     const { id } = await context.params;
     const existing = await getConsultation(supabase, id, dbOpts);
 
@@ -149,8 +163,6 @@ export async function PATCH(request: Request, context: RouteContext) {
               form_data: newFormData.data,
             }
           : {}),
-        // Mark analysis as stale when form_data is edited without a paired re-analysis.
-        // Cleared when a full analysis payload is saved. This persists across page reloads.
         ...(newFormData !== undefined && !hasCompleteAnalysisPayload && existing.analysis_status === "analyzed"
           ? { analysis_stale: true }
           : {}),
@@ -166,6 +178,9 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     return NextResponse.json({ record });
   } catch (error) {
+    if (error instanceof ViewAsError) {
+      return apiError(error.status, error.code, error.message);
+    }
     if (isUnauthorized(error)) {
       return apiError(401, "UNAUTHORIZED", "请先登录。");
     }
@@ -179,15 +194,23 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 }
 
-export async function DELETE(_request: Request, context: RouteContext) {
+export async function DELETE(request: Request, context: RouteContext) {
   try {
-    const doctor = await getCurrentDoctor();
-    const supabase = doctor.isDevBypass ? getServiceRoleClient() : await createServerSupabaseClient();
-    const dbOpts = doctor.isDevBypass ? { doctorEmail: doctor.email } : {};
+    const viewAs = await getViewAsContext(request);
+    const blocked = assertWritable(viewAs);
+    if (blocked) return blocked;
+
+    const supabase = viewAs.actualDoctor.isDevBypass
+      ? getServiceRoleClient()
+      : await createServerSupabaseClient();
+    const dbOpts = viewAs.actualDoctor.isDevBypass ? { doctorId: viewAs.actualDoctor.id } : {};
     const { id } = await context.params;
     await deleteConsultation(supabase, id, dbOpts);
     return NextResponse.json({ ok: true });
   } catch (error) {
+    if (error instanceof ViewAsError) {
+      return apiError(error.status, error.code, error.message);
+    }
     if (isUnauthorized(error)) {
       return apiError(401, "UNAUTHORIZED", "请先登录。");
     }
