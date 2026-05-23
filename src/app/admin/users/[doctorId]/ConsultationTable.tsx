@@ -148,7 +148,7 @@ export function ConsultationTable({ rows }: { rows: ConsultationRow[] }) {
                   <th className="ctable-th ctable-th--type">类型</th>
                   <th className="ctable-th ctable-th--caseid">病案编号</th>
                   <th className="ctable-th ctable-th--related">随访编号</th>
-                  <th className="ctable-th ctable-th--date">更新时间</th>
+                  <th className="ctable-th ctable-th--date">创建时间</th>
                 </tr>
               </thead>
               <tbody>
