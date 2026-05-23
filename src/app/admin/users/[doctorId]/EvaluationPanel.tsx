@@ -135,6 +135,8 @@ function normalizeProfile(value: unknown): DoctorProfile {
     };
   }).filter((item) => item.text);
 
+  const treatmentStyle = normalizeScored("treatmentStyle");
+
   function draftStrings(key: string): string[] {
     return array(key).filter((item): item is string => typeof item === "string" && item.trim().length > 0);
   }
@@ -180,9 +182,8 @@ function normalizeProfile(value: unknown): DoctorProfile {
 
   return {
     profileSummary: asString(raw.profileSummary) || asString(raw.clinicalSummary) || "暂无可展示的画像摘要。",
-    keyObservations: keyObservations.length
-      ? keyObservations
-      : draftToScored([...draftMainCaseTypes, ...draftTreatmentStyle]),
+    keyObservations: keyObservations.length ? keyObservations : draftToScored(draftMainCaseTypes),
+    treatmentStyle: treatmentStyle.length ? treatmentStyle : draftToScored(draftTreatmentStyle),
     patientDistribution,
     fieldCompleteness,
     aiRecurringThemes: aiRecurringThemes.length
@@ -529,6 +530,31 @@ function ClinicalObservationCard({ profile }: { profile: DoctorProfile }) {
 }
 
 // ---------------------------------------------------------------------------
+// Treatment style
+// ---------------------------------------------------------------------------
+
+function TreatmentStyleCard({ profile }: { profile: DoctorProfile }) {
+  const sorted = [...profile.treatmentStyle].sort((a, b) => b.score - a.score);
+  return (
+    <div className="profile-card profile-card--teal">
+      <h3 className="profile-card-title">
+        <Compass size={15} /> 诊疗风格
+        <HelpTip text="近期病案中体现的诊疗思路与用方特点。" />
+      </h3>
+      {sorted.length === 0 ? (
+        <p className="profile-empty">本期暂无诊疗风格数据</p>
+      ) : (
+        <div className="profile-list">
+          {sorted.map((item, index) => (
+            <ProfileListItem key={index} text={item.text} score={item.score} cardClass="profile-score-bar--teal" />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // AI themes chip cloud
 // ---------------------------------------------------------------------------
 
@@ -707,8 +733,9 @@ export function EvaluationPanel({ doctorId }: { doctorId: string }) {
           <section className="profile-section">
             <h2 className="profile-section-title">描述性分析</h2>
             <TimeSeriesCard doctorId={doctorId} />
-            <div className="profile-cards-grid profile-cards-grid--two">
+            <div className="profile-cards-grid profile-cards-grid--three">
               <ClinicalObservationCard profile={profile} />
+              <TreatmentStyleCard profile={profile} />
               <AiThemesCard profile={profile} />
             </div>
           </section>

@@ -2070,6 +2070,7 @@ details[open] .sample-details__toggle::before {
 .profile-list-item-line.profile-score-bar--sage .profile-score-fill { background: var(--profile-sage); }
 .profile-list-item-line.profile-score-bar--tan  .profile-score-fill { background: var(--profile-tan); }
 .profile-list-item-line.profile-score-bar--ink  .profile-score-fill { background: var(--profile-ink); }
+.profile-list-item-line.profile-score-bar--teal .profile-score-fill { background: #3B7A7A; }
 
 /* Standalone full-width card below the two-col row */
 .profile-section > .profile-card {

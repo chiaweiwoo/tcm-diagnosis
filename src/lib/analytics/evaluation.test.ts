@@ -126,9 +126,11 @@ describe("Goal 2 deterministic evaluation helpers", () => {
 
     expect(profile.profileSummary).toBe("疼痛筋伤病例较多，针灸与方药并用。");
     expect(profile.keyObservations).toEqual([
-      { text: "疼痛筋伤",         score: 80 },
-      { text: "呼吸咳嗽",         score: 67 },
-      { text: "针灸处理局部筋伤", score: 53 },
+      { text: "疼痛筋伤", score: 80 },
+      { text: "呼吸咳嗽", score: 40 },
+    ]);
+    expect(profile.treatmentStyle).toEqual([
+      { text: "针灸处理局部筋伤", score: 80 },
       { text: "方药重视气血辨证", score: 40 },
     ]);
     expect(profile.aiRecurringThemes).toEqual([

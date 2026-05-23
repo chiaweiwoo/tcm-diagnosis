@@ -120,8 +120,10 @@ type EvalNarrative = {
 
 export type DoctorProfile = {
   profileSummary: string;
-  /** Each observation carries an AI-assigned signal strength score (0–100). */
+  /** Main case types (mainCaseTypes from draft). Each item has an AI signal score. */
   keyObservations: Array<{ text: string; score: number }>;
+  /** Treatment style patterns (treatmentStyle from draft). Shown separately in 诊疗风格. */
+  treatmentStyle: Array<{ text: string; score: number }>;
   patientDistribution: PatientDistribution | null;
   /** Kept in DB for gap detection and backward compat; not rendered in UI. */
   fieldCompleteness: Array<{
@@ -746,15 +748,15 @@ async function narrateFindings(
 }
 
 export function doctorReviewDraftToProfile(draft: DoctorReviewDraft): DoctorProfile {
+  function toScored(items: string[] | undefined): Array<{ text: string; score: number }> {
+    return (items ?? [])
+      .filter((item) => stringValue(item).length > 0)
+      .map((text, i, arr) => ({ text, score: Math.round(80 - (i / Math.max(arr.length - 1, 1)) * 40) }));
+  }
   return {
     profileSummary: stringValue(draft.clinicalSummary) || "暂无可展示的画像摘要。",
-    keyObservations: [
-      ...(draft.mainCaseTypes ?? []),
-      ...(draft.treatmentStyle ?? []),
-    ].filter((item) => stringValue(item).length > 0).map((text, i, arr) => ({
-      text,
-      score: Math.round(80 - (i / Math.max(arr.length - 1, 1)) * 40),
-    })),
+    keyObservations: toScored(draft.mainCaseTypes),
+    treatmentStyle: toScored(draft.treatmentStyle),
     patientDistribution: null,
     fieldCompleteness: [],
     aiRecurringThemes: (draft.aiMedicalRiskThemes ?? [])
@@ -844,6 +846,7 @@ export function normalizeDoctorProfile(value: unknown): DoctorProfile {
   return {
     profileSummary: stringValue(raw.profileSummary) || "暂无可展示的画像摘要。",
     keyObservations: normalizeScored("keyObservations"),
+    treatmentStyle: normalizeScored("treatmentStyle"), // empty [] for old rows — backward compat
     patientDistribution: (raw.patientDistribution as PatientDistribution | null) ?? null,
     fieldCompleteness: listObjects<DoctorProfile["fieldCompleteness"][number]>("fieldCompleteness"),
     aiRecurringThemes: listObjects<DoctorProfile["aiRecurringThemes"][number]>("aiRecurringThemes"),
