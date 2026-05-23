@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { parseArgs } from "node:util";
 import { createClient } from "@supabase/supabase-js";
+import ws from "ws";
 import { evaluateDoctor, insertDoctorEvaluation } from "../src/lib/analytics/evaluation";
 
 function loadEnvLocal() {
@@ -53,6 +54,7 @@ if (isNaN(windowDays) || windowDays <= 0 || windowDays > 90) {
 
 const client = createClient(supabaseUrl, serviceKey, {
   auth: { persistSession: false },
+  realtime: { transport: ws },
 });
 
 // 3. Resolve active doctor target(s)
