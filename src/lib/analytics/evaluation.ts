@@ -34,6 +34,7 @@ import {
   type DoctorReviewDraft,
   type DoctorReviewDraftRow,
 } from "./doctorReviewDraft";
+import { stratifyAndSample } from "./sampling";
 
 // ---------------------------------------------------------------------------
 // Errors
@@ -161,7 +162,7 @@ type EvalRow = {
   analyzed_at: string | null;
 };
 
-const MEDICAL_REVIEW_PROMPT_VERSION = "doctor-review-medical-v2";
+const MEDICAL_REVIEW_PROMPT_VERSION = "doctor-eval-v2.0";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -864,7 +865,7 @@ export function normalizeDoctorProfile(value: unknown): DoctorProfile {
 export async function evaluateDoctor(
   client: SupabaseClient,
   doctorId: string,
-  windowDays = 14,
+  windowDays = 7,
 ): Promise<{
   evaluation: DoctorEvaluation;
   consultationCount: number;
@@ -884,18 +885,23 @@ export async function evaluateDoctor(
 
   if (error) throw new Error(error.message);
 
-  const rows = (data ?? []) as EvalRow[];
-  if (rows.length === 0) throw new NoConsultationsError(windowDays);
+  const rawRows = (data ?? []) as EvalRow[];
+  if (rawRows.length === 0) throw new NoConsultationsError(windowDays);
+
+  const startTime = Date.now();
+  const sampledRows = stratifyAndSample(rawRows as DoctorReviewDraftRow[], 100);
+  const sampleTime = Date.now() - startTime;
+  console.log(`[fetch] window=${windowDays}d raw=${rawRows.length} → stratified to ${sampledRows.length} across categories (${sampleTime}ms)`);
 
   const review = await runDoctorReviewDraft({
-    rows: rows as DoctorReviewDraftRow[],
+    rows: sampledRows,
     windowDays,
   });
   const doctorProfile = doctorReviewDraftToProfile(review.draft);
 
   return {
     evaluation: { doctorProfile },
-    consultationCount: rows.length,
+    consultationCount: rawRows.length,
     model: `${getDeepSeekFastModel()}+${process.env.DEEPSEEK_MODEL_DEEP ?? "deepseek-reasoner"}`,
     promptVersion: MEDICAL_REVIEW_PROMPT_VERSION,
   };

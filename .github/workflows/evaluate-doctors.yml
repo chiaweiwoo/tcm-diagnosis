@@ -19,7 +19,7 @@ on:
       window_days:
         description: "Evaluation window in days."
         required: false
-        default: "14"
+        default: "7"
         type: string
 
 jobs:

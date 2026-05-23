@@ -160,8 +160,6 @@ Admin (browser, is_admin=true only)
 GH Actions (ASSESSMENT_API_KEY auth, workflow_dispatch only — no schedule)
   └── POST /api/cron/evaluate-doctors          → bulk doctor profile evaluation (14d window, skips empty doctors)
                                                   triggerable via workflow_dispatch with optional email input
-  └── POST /api/cron/evaluate-doctors-draft    → read-only experimental doctor-review draft
-                                                  (Flash case-card compression + Pro synthesis; no DB writes)
 
 Workbench header (admin only):
   └── ⚙ Settings2 icon → /admin → redirects to /admin/users
@@ -302,36 +300,43 @@ Only `chiaweiwoo123@gmail.com` is seeded as admin.
 
 Route: `POST /api/admin/analytics/evaluate/[doctorId]`
 - Admin session auth required
-- Window: **14 days rolling**, append-only (no upsert)
+- Window: **7 days rolling** (default), append-only (no upsert)
+- Sampling: **Hard cap at 100 cases**. If N > 100, dynamic stratified round-robin sampling is applied across case categories (妇科调理, 皮肤问题, etc.) sorted newest-first, maintaining chronological ascending order for the final selected cases.
 - Empty window → 400 `NO_CONSULTATIONS` with friendly Chinese message
 
 Bulk route: `POST /api/cron/evaluate-doctors`
 - Auth: `X-Assessment-Key` header
-- Body: `{ doctorEmail?: string }`
+- Body: `{ doctorEmail?: string, windowDays?: number }`
 - Doctors with 0 consultations in window → skipped silently (not failed)
 - 3-attempt retry with exponential backoff in the GH Actions workflow
 
-Draft experiment route: `POST /api/cron/evaluate-doctors-draft`
-- Auth: `X-Assessment-Key` header
-- Body: `{ doctorEmail: string, windowDays?: number, mode?: "medical_profile_v2" }`
-- Read-only; never inserts into `analytics_doctor_evaluations`
-- Used by `.github/workflows/evaluate-doctor-draft.yml` to inspect sandbox artifacts without writing rows
-- Pipeline: all rows are seen by code; Flash compresses them into compact case cards; code aggregates case types / treatment logic / AI risk / strength signals; Pro writes the six medical sections; optional Flash cleanup if Pro is too long
-- Logs must show only sanitized summary/diagnostics; no full consultation input in GitHub logs
+### Hardened Pipeline (medical v2.0)
 
-### Current pipeline (medical v2)
+Goal 2 is a doctor-readable clinical review. The canonical evaluator uses a 4-stage batch-and-synthesize pipeline using `p-limit` for strict concurrency control:
 
-Goal 2 is now a doctor-readable clinical review, not an operational audit. The canonical stored route uses the Flash + Pro medical-review pipeline and writes into `analytics_doctor_evaluations.doctor_profile` through the existing append-only insert path.
+1. **Stage 1: Per-row compression (Flash)**:
+   - Compresses each raw consultation into a tiny case card.
+   - Throttled concurrency: `p-limit(6)`.
+   - Fallback: deterministic case card if API fails/timeouts.
+2. **Stage 2a: Batched synthesis (Flash)**:
+   - Groups case cards into batches of 12.
+   - Synthesizes each batch concurrently via `p-limit(4)` into partial drafts.
+   - Short-circuit optimization: If N <= 12, skips Stage 2a and 2b, executes a single Flash synthesis, and proceeds to Stage 3.
+3. **Stage 2b: Consolidated merge (Flash)**:
+   - Consolidates M partial drafts + overall aggregate signals into a single unified draft (single call).
+4. **Stage 3: Pro creative review (Pro)**:
+   - Refines the consolidated draft using DeepSeek Pro for senior professional tone.
+   - **Timeout (90s)**: Strict timeout. If Pro fails or times out, safely falls back to the consolidated Stage 2b Flash draft.
+5. **Stage 4: Length cleanup (Flash)**:
+   - Trims the final profile if the JSON string size exceeds 2600 characters.
 
-- Flash compresses each consultation into compact case cards with bounded parallelism and deterministic fallback.
-- TypeScript aggregates medical signals from the cards.
-- DeepSeek Pro synthesizes the final Chinese clinical review.
-- The result is adapted into the existing `DoctorProfile` storage shape so no DB migration is required.
+**Observability**: Spans (`stage1-flash-case-cards`, `stage2a-flash-batch-synth`, `stage2b-flash-merge`, `stage3-pro-review`, `stage4-cleanup`) trace each step in Langfuse under a single `doctor-evaluation` trace, logging pricing-aware costs, token usage, and latencies with zero clinical text leaking.
+
 - Do not show explicit `x/y`, percentages, or visible frequency counts in the admin profile UI.
 - The visible UI is split into `描述性分析` and `复盘与沟通`.
 - Pie charts / patient distribution are no longer shown in the profile UI; time-series remains as light `近期记录背景`.
 
-The draft workflow `.github/workflows/evaluate-doctor-draft.yml` remains available for sandbox inspection and artifacts, but it is not the canonical storage path. The canonical storage workflow is `.github/workflows/evaluate-doctors.yml`.
+The active canonical storage workflow is `.github/workflows/evaluate-doctors.yml`.
 
 ### Legacy deterministic pipeline (kept for helpers/tests)
 

@@ -154,14 +154,15 @@ Both pipelines are **on-demand only** — no automated schedule.
 
 ### Per-Doctor Clinical Profile
 
-Analyzes a doctor's input patterns and clinical tendencies over the last 14 days. Results are visible to admins at `/admin/users/[doctorId]` → 临床画像 tab.
+Analyzes a doctor's input patterns and clinical tendencies over the last 7 days. Results are visible to admins at `/admin/users/[doctorId]` → 临床画像 tab.
 
 ```bash
 # Run for all doctors
 npm run evaluate
 
 # Run for a specific doctor
-npm run evaluate -- --email doctor@example.com --windowDays 14
+npm run evaluate -- --email doctor@example.com --windowDays 7
+
 ```
 
 Or trigger via **GitHub Actions → Evaluate Doctors → Run workflow**.

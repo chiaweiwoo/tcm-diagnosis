@@ -17,7 +17,7 @@ async function guardAdmin() {
 }
 
 function cleanWindowDays(value: unknown) {
-  return typeof value === "number" && value > 0 && value <= 90 ? value : 14;
+  return typeof value === "number" && value > 0 && value <= 90 ? value : 7;
 }
 
 // ---------------------------------------------------------------------------
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
   const { doctorId } = await context.params;
   const admin = getServiceRoleClient();
 
-  let windowDays = 14;
+  let windowDays = 7;
   try {
     const body = await req.json() as { windowDays?: number };
     windowDays = cleanWindowDays(body.windowDays);

@@ -40,7 +40,7 @@ type Failure = {
 };
 
 function cleanWindowDays(value: unknown) {
-  return typeof value === "number" && value > 0 && value <= 90 ? value : 14;
+  return typeof value === "number" && value > 0 && value <= 90 ? value : 7;
 }
 
 function safeErrorMessage(error: unknown) {

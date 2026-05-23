@@ -1,4 +1,7 @@
 import { callDeepSeekJson, DeepSeekError, getDeepSeekFastModel, getDeepSeekSmartModel } from "@/lib/ai/deepseek";
+import pLimit from "p-limit";
+import { z } from "zod";
+import { getLangfuse } from "@/lib/langfuse";
 
 type Usage = {
   prompt_tokens?: number;
@@ -35,7 +38,14 @@ export type DoctorReviewDraft = {
 };
 
 export type DraftCallDiagnostic = {
-  stage: "flash_case_cards" | "pro_synthesis" | "flash_cleanup";
+  stage:
+    | "flash_case_cards"
+    | "pro_synthesis"
+    | "flash_cleanup"
+    | "flash_single_synth"
+    | "flash_batch_synth"
+    | "flash_merge"
+    | "pro_review";
   model: string;
   usage?: Usage;
   finishReason?: string | null;
@@ -146,7 +156,7 @@ function collectCautions(analysisResult: Record<string, unknown> | null): string
   return collectAnalysisText(analysisResult).join(" ");
 }
 
-function inferCaseCategory(formData: Record<string, unknown> | null): string {
+export function inferCaseCategory(formData: Record<string, unknown> | null): string {
   const primaryText = [
     formData?.chiefComplaint,
     formData?.diagnosis,
@@ -344,103 +354,186 @@ function pushDiagnostic(
   });
 }
 
+const flashCaseCardSchema = z.object({
+  caseCard: z.object({
+    label: z.string(),
+    category: z.string(),
+    treatmentType: z.string(),
+    patternOrLogic: z.string(),
+    keyEvidence: z.string(),
+    aiRiskTags: z.array(z.string()).max(2),
+  })
+});
+
+const doctorReviewDraftSchema = z.object({
+  clinicalSummary: z.string(),
+  mainCaseTypes: z.array(z.string()).max(4),
+  treatmentStyle: z.array(z.string()).max(4),
+  aiMedicalRiskThemes: z.array(z.string()).max(4),
+  strengths: z.array(z.string()).max(4),
+  discussionDirections: z.array(z.string()).max(4),
+  conversationReference: z.array(z.string()).min(2).max(4),
+});
+
+function logGenerationToLangfuse({
+  parent,
+  name,
+  model,
+  startTime,
+  endTime,
+  usage,
+  metadata,
+}: {
+  parent: any;
+  name: string;
+  model: string;
+  startTime: number;
+  endTime: number;
+  usage?: Usage;
+  metadata?: any;
+}) {
+  if (!parent) return;
+  const promptTokens = usage?.prompt_tokens ?? 0;
+  const completionTokens = usage?.completion_tokens ?? 0;
+  const cacheHit = usage?.prompt_cache_hit_tokens ?? 0;
+  const cacheMiss = usage?.prompt_cache_miss_tokens ?? 0;
+
+  const hitPrice = 0.07;
+  const missPrice = 0.27;
+  const outPrice = 1.10;
+
+  const inputCost = ((cacheHit * hitPrice) + (cacheMiss * missPrice)) / 1_000_000;
+  const outputCost = (completionTokens * outPrice) / 1_000_000;
+  const totalCost = inputCost + outputCost;
+
+  parent.generation({
+    name,
+    model,
+    startTime: new Date(startTime),
+    endTime: new Date(endTime),
+    usage: {
+      promptTokens,
+      completionTokens,
+      totalTokens: promptTokens + completionTokens,
+      unit: "TOKENS",
+    },
+    usageDetails: {
+      cacheHit,
+      cacheMiss,
+    },
+    costDetails: {
+      input: inputCost,
+      output: outputCost,
+      total: totalCost,
+    },
+    metadata,
+  });
+}
+
+function buildFallbackDraft(): DoctorReviewDraft {
+  return {
+    clinicalSummary: "暂无足够数据生成完整的临床分析摘要。",
+    mainCaseTypes: ["常见中医病证"],
+    treatmentStyle: ["常规中医调理"],
+    aiMedicalRiskThemes: ["建议常规关注临床诊疗安全与随访监视"],
+    strengths: ["诊疗流程记录完整"],
+    discussionDirections: ["建议结合具体病案分析进一步复盘"],
+    conversationReference: ["我们可以结合近期的病案记录来聊聊您的常用诊疗思路。"],
+  };
+}
+
 async function buildFlashCaseCards(
   rows: DoctorReviewDraftRow[],
   calls: DraftCallDiagnostic[],
-): Promise<{ caseCards: DraftCaseCard[]; strengthSignals: string[] }> {
+  trace: any,
+): Promise<{ caseCards: DraftCaseCard[]; strengthSignals: string[]; okCount: number; fallbackCount: number }> {
   const fallback = deterministicCaseCards(rows);
   const model = getDeepSeekFastModel();
   const strengthSignals = rows.flatMap((row) => deterministicStrengthTags(row.form_data, row.analysis_result));
 
-  const flashResults: Array<{
-    card: DraftCaseCard;
-    diagnostic: {
-      model: string;
-      usage?: Usage;
-      finishReason?: string | null;
-      repairedJson?: boolean;
-      maxTokens?: number;
-    };
-  }> = [];
+  const span1 = trace ? trace.span({ name: "stage1-flash-case-cards" }) : null;
+  const limit1 = pLimit(6);
 
-  async function runCase(row: DoctorReviewDraftRow, fallbackCard: DraftCaseCard) {
-    try {
-      const result = await callDeepSeekJson<FlashCaseCardResponse>({
-        model,
-        maxTokens: 220,
-        timeoutMs: 60_000,
-        repairJson: true,
-        retryOnEmpty: true,
-        jsonMode: false,
-        messages: [
-          {
-            role: "system",
-            content: [
-              "You compress one TCM consultation into one tiny caseCard.",
-              "Do not evaluate the doctor. Do not expand the text. Do not add facts not present in the input.",
-              "Prefer the provided category_hint and risk_hint unless they are clearly wrong.",
-              "Keep every field very short: label <= 10 chars, category <= 6 chars, patternOrLogic <= 10 chars, keyEvidence <= 12 chars.",
-              "aiRiskTags may contain at most 2 items, each <= 8 chars.",
-              "Return valid JSON only.",
-              'Shape: {"caseCard":{"label":"女35咳嗽","category":"呼吸","treatmentType":"方药","patternOrLogic":"寒痰","keyEvidence":"舌暗红苔白","aiRiskTags":["血压监测"]}}',
-            ].join("\n"),
-          },
-          { role: "user", content: serializeRawCase(row, fallbackCard.caseNumber) },
-        ],
-      });
+  let okCount = 0;
+  let fallbackCount = 0;
 
-      const raw = result.data.caseCard;
-      return {
-        card: {
-          caseNumber: fallbackCard.caseNumber,
-          label: compact(raw?.label || fallbackCard.label, 28),
-          category: compact(raw?.category || fallbackCard.category, 16),
-          treatmentType: compact(raw?.treatmentType || fallbackCard.treatmentType, 16),
-          patternOrLogic: compact(raw?.patternOrLogic || fallbackCard.patternOrLogic, 36),
-          keyEvidence: compact(raw?.keyEvidence || fallbackCard.keyEvidence, 54),
-          aiRiskTags: Array.isArray(raw?.aiRiskTags) && raw.aiRiskTags.length
-            ? raw.aiRiskTags.map((tag) => compact(tag, 18)).slice(0, 4)
-            : fallbackCard.aiRiskTags,
-        },
-        diagnostic: {
-          model: result.model,
-          usage: result.usage,
-          finishReason: result.finishReason,
-          repairedJson: result.repairedJson ?? false,
-          maxTokens: result.maxTokens,
-        },
-      };
-    } catch (error) {
-      const details = error instanceof DeepSeekError ? (error.details ?? {}) : {};
-      return {
-        card: fallbackCard,
-        diagnostic: {
-          model,
-          usage: typeof details === "object" && details && "usage" in details ? details.usage as Usage : undefined,
-          finishReason: typeof details === "object" && details && "finishReason" in details ? String(details.finishReason ?? "fallback") : "fallback",
-          repairedJson: false,
-          maxTokens: 220,
-        },
-      };
-    }
-  }
+  const caseCards = await Promise.all(
+    rows.map((row, idx) =>
+      limit1(async () => {
+        const fallbackCard = fallback[idx];
+        const sTime = Date.now();
+        try {
+          const result = await callDeepSeekJson<FlashCaseCardResponse>({
+            model,
+            maxTokens: 220,
+            timeoutMs: 60_000,
+            repairJson: true,
+            retryOnEmpty: true,
+            jsonMode: false,
+            messages: [
+              {
+                role: "system",
+                content: [
+                  "You compress one TCM consultation into one tiny caseCard.",
+                  "Do not evaluate the doctor. Do not expand the text. Do not add facts not present in the input.",
+                  "Prefer the provided category_hint and risk_hint unless they are clearly wrong.",
+                  "Keep every field very short: label <= 10 chars, category <= 6 chars, patternOrLogic <= 10 chars, keyEvidence <= 12 chars.",
+                  "aiRiskTags may contain at most 2 items, each <= 8 chars.",
+                  "Return valid JSON only.",
+                  'Shape: {"caseCard":{"label":"女35咳嗽","category":"呼吸","treatmentType":"方药","patternOrLogic":"寒痰","keyEvidence":"舌暗红苔白","aiRiskTags":["血压监测"]}}',
+                ].join("\n"),
+              },
+              { role: "user", content: serializeRawCase(row, fallbackCard.caseNumber) },
+            ],
+          });
 
-  for (let index = 0; index < rows.length; index += FLASH_CASE_CONCURRENCY) {
-    const groupRows = rows.slice(index, index + FLASH_CASE_CONCURRENCY);
-    const groupFallbacks = fallback.slice(index, index + FLASH_CASE_CONCURRENCY);
-    const groupResults = await Promise.all(
-      groupRows.map((row, rowIndex) => runCase(row, groupFallbacks[rowIndex])),
-    );
-    flashResults.push(...groupResults);
-  }
+          const endTime = Date.now();
+          pushDiagnostic(calls, "flash_case_cards", result);
 
-  for (const result of flashResults) {
-    pushDiagnostic(calls, "flash_case_cards", result.diagnostic);
-  }
+          if (span1 && result.usage) {
+            logGenerationToLangfuse({
+              parent: span1,
+              name: "flash-case-card",
+              model: result.model,
+              startTime: sTime,
+              endTime,
+              usage: result.usage,
+              metadata: { caseNumber: fallbackCard.caseNumber },
+            });
+          }
+
+          const parseResult = flashCaseCardSchema.safeParse(result.data);
+          const raw = parseResult.success ? parseResult.data.caseCard : null;
+          if (raw) {
+            okCount++;
+            return {
+              caseNumber: fallbackCard.caseNumber,
+              label: compact(raw.label || fallbackCard.label, 28),
+              category: compact(raw.category || fallbackCard.category, 16),
+              treatmentType: compact(raw.treatmentType || fallbackCard.treatmentType, 16),
+              patternOrLogic: compact(raw.patternOrLogic || fallbackCard.patternOrLogic, 36),
+              keyEvidence: compact(raw.keyEvidence || fallbackCard.keyEvidence, 54),
+              aiRiskTags: Array.isArray(raw.aiRiskTags) && raw.aiRiskTags.length
+                ? raw.aiRiskTags.map((tag) => compact(tag, 18)).slice(0, 4)
+                : fallbackCard.aiRiskTags,
+            };
+          }
+        } catch (error) {
+          // Log fallback silently below
+        }
+        fallbackCount++;
+        return fallbackCard;
+      })
+    )
+  );
+
+  if (span1) span1.end();
 
   return {
-    caseCards: flashResults.map((result) => result.card),
+    caseCards,
     strengthSignals,
+    okCount,
+    fallbackCount,
   };
 }
 
@@ -448,100 +541,483 @@ function profileTooLong(profile: DoctorReviewDraft): boolean {
   return JSON.stringify(profile).length > 2600;
 }
 
-async function synthesizeWithPro({
+async function runSingleFlashSynthesis({
   signals,
   caseCards,
   windowDays,
   calls,
+  trace,
 }: {
   signals: DraftMedicalSignals;
   caseCards: DraftCaseCard[];
   windowDays: number;
   calls: DraftCallDiagnostic[];
+  trace: any;
 }): Promise<DoctorReviewDraft> {
-  const model = getDeepSeekSmartModel();
-  const result = await callDeepSeekJson<DoctorReviewDraft>({
-    model,
-    maxTokens: 3200,
-    timeoutMs: 180_000,
-    repairJson: true,
-    retryOnEmpty: true,
-    jsonMode: false,
-    messages: [
-      {
-        role: "system",
-        content: [
-          "你是中医临床工作画像分析员，输出给管理员用于理解医生的临床工作模式。",
-          "重点是医学画像，不是行政统计，也不是审计报告。",
-          "只基于给定 AGGREGATE_SIGNALS 与 CASE_CARDS，不要发明病例、比例或诊疗事实。",
-          "不要评价医生临床判断对错。语气使用：可见、倾向、可讨论、可留意。",
-          "不要建议医生扩大病种范围；病例结构只作为观察背景，不作为能力评价。",
-          "输出紧凑、具体、能帮助管理员与医生沟通。",
-          "不要在输出文案中写数量、比例、百分比或类似“几例/多少条”的表达。",
-          "只输出合法 JSON，不要 markdown。",
-          "字段必须为：clinicalSummary:string; mainCaseTypes:string[]; treatmentStyle:string[]; aiMedicalRiskThemes:string[]; strengths:string[]; discussionDirections:string[]; conversationReference:string[]。",
-          "数组每项不超过 24 个汉字；clinicalSummary 最多 2 句；每个数组最多 4 项。",
-          "conversationReference必须给2-4条可直接对话的话术，不要留空。",
-        ].join("\n"),
-      },
-      {
-        role: "user",
-        content: [
-          `WINDOW_DAYS=${windowDays}`,
-          "AGGREGATE_SIGNALS",
-          serializeSignals(signals),
-          "",
-          "CASE_CARDS",
-          serializeCaseCards(caseCards),
-          "",
-          "请输出这六个医学部分：主要病例类型、诊疗思路与治疗风格、AI反复关注的医学风险、可取之处、可讨论方向、对话参考。",
-          "这些内容最终会以“描述性分析”和“复盘与沟通”展示，请保持医生可快速阅读的中文表达。",
-        ].join("\n"),
-      },
-    ],
-  });
-  pushDiagnostic(calls, "pro_synthesis", result);
-  return result.data;
+  const span = trace ? trace.span({ name: "stage2-flash-single-synth" }) : null;
+  const sTime = Date.now();
+  const model = getDeepSeekFastModel();
+
+  try {
+    const result = await callDeepSeekJson<DoctorReviewDraft>({
+      model,
+      maxTokens: 2500,
+      timeoutMs: 90_000,
+      repairJson: true,
+      retryOnEmpty: true,
+      jsonMode: false,
+      messages: [
+        {
+          role: "system",
+          content: [
+            "你是中医临床工作画像分析员，输出给管理员用于理解医生的临床工作模式。",
+            "重点是医学画像，不是行政统计，也不是审计报告。",
+            "只基于给定 AGGREGATE_SIGNALS 与 CASE_CARDS，不要发明病例、比例或诊疗事实。",
+            "不要在输出文案中写数量、比例、百分比或类似“几例/多少条”的表达。",
+            "只输出合法 JSON，不要 markdown。",
+            "字段必须为：clinicalSummary:string; mainCaseTypes:string[]; treatmentStyle:string[]; aiMedicalRiskThemes:string[]; strengths:string[]; discussionDirections:string[]; conversationReference:string[]。",
+            "数组每项不超过 24 个汉字；clinicalSummary 最多 2 句；每个数组最多 4 项。",
+            "conversationReference必须给2-4条可直接对话的话术，不要留空。",
+          ].join("\n"),
+        },
+        {
+          role: "user",
+          content: [
+            `WINDOW_DAYS=${windowDays}`,
+            "AGGREGATE_SIGNALS",
+            serializeSignals(signals),
+            "",
+            "CASE_CARDS",
+            serializeCaseCards(caseCards),
+          ].join("\n"),
+        },
+      ],
+    });
+
+    pushDiagnostic(calls, "flash_single_synth", result);
+
+    if (span && result.usage) {
+      logGenerationToLangfuse({
+        parent: span,
+        name: "flash-single-synth",
+        model: result.model,
+        startTime: sTime,
+        endTime: Date.now(),
+        usage: result.usage,
+      });
+    }
+
+    const parseResult = doctorReviewDraftSchema.safeParse(result.data);
+    if (parseResult.success) {
+      if (span) span.end();
+      return parseResult.data;
+    }
+  } catch (err) {
+    // Fall back to deterministic draft placeholder
+  }
+
+  if (span) span.end();
+  return buildFallbackDraft();
 }
 
-async function cleanupWithFlash(profile: DoctorReviewDraft, calls: DraftCallDiagnostic[]): Promise<DoctorReviewDraft> {
-  const result = await callDeepSeekJson<DoctorReviewDraft>({
-    model: getDeepSeekFastModel(),
-    maxTokens: 1200,
-    timeoutMs: 90_000,
-    repairJson: true,
-    retryOnEmpty: true,
-    jsonMode: false,
-    messages: [
-      {
-        role: "system",
-        content: [
-          "你只负责压缩 JSON 文案，不改变含义，不添加医学事实。",
-          "保留相同字段。clinicalSummary 最多2句；数组每项不超过24个汉字；每个数组最多4项。",
-          "只输出合法 JSON。",
-        ].join("\n"),
-      },
-      { role: "user", content: JSON.stringify(profile) },
-    ],
-  });
-  pushDiagnostic(calls, "flash_cleanup", result);
-  return result.data;
+async function runBatchSynthesis({
+  signals,
+  caseCards,
+  windowDays,
+  calls,
+  trace,
+}: {
+  signals: DraftMedicalSignals;
+  caseCards: DraftCaseCard[];
+  windowDays: number;
+  calls: DraftCallDiagnostic[];
+  trace: any;
+}): Promise<DoctorReviewDraft[]> {
+  const span = trace ? trace.span({ name: "stage2a-flash-batch-synth" }) : null;
+  const limit = pLimit(4);
+  const batches: DraftCaseCard[][] = [];
+  const batchSize = 12;
+  for (let i = 0; i < caseCards.length; i += batchSize) {
+    batches.push(caseCards.slice(i, i + batchSize));
+  }
+
+  const model = getDeepSeekFastModel();
+
+  const partialDrafts = await Promise.all(
+    batches.map((batch, batchIdx) =>
+      limit(async () => {
+        const sTime = Date.now();
+        try {
+          const result = await callDeepSeekJson<DoctorReviewDraft>({
+            model,
+            maxTokens: 1800,
+            timeoutMs: 75_000,
+            repairJson: true,
+            retryOnEmpty: true,
+            jsonMode: false,
+            messages: [
+              {
+                role: "system",
+                content: [
+                  "你是中医临床工作工作模式分析员。现在处理的是医生一部分病案的批次分析。",
+                  "重点是分析本批次病例的诊疗特点并输出草稿段落，不要在文案中写数量、比例或百分比。",
+                  "只输出合法 JSON，不要 markdown。",
+                  "字段必须为：clinicalSummary:string; mainCaseTypes:string[]; treatmentStyle:string[]; aiMedicalRiskThemes:string[]; strengths:string[]; discussionDirections:string[]; conversationReference:string[]。",
+                  "每项数组最多不超过 4 项，每项不超过 24 个汉字；clinicalSummary 最多 2 句。",
+                ].join("\n"),
+              },
+              {
+                role: "user",
+                content: [
+                  `WINDOW_DAYS=${windowDays}`,
+                  `BATCH_NUMBER=${batchIdx + 1}/${batches.length}`,
+                  "AGGREGATE_SIGNALS",
+                  serializeSignals(signals),
+                  "",
+                  "BATCH_CASE_CARDS",
+                  serializeCaseCards(batch),
+                ].join("\n"),
+              },
+            ],
+          });
+
+          pushDiagnostic(calls, "flash_batch_synth", result);
+
+          if (span && result.usage) {
+            logGenerationToLangfuse({
+              parent: span,
+              name: "flash-batch-synth",
+              model: result.model,
+              startTime: sTime,
+              endTime: Date.now(),
+              usage: result.usage,
+              metadata: { batchIndex: batchIdx },
+            });
+          }
+
+          const parseResult = doctorReviewDraftSchema.safeParse(result.data);
+          if (parseResult.success) {
+            return parseResult.data;
+          }
+        } catch (error) {
+          // Fall back below
+        }
+        return buildFallbackDraft();
+      })
+    )
+  );
+
+  if (span) span.end();
+  return partialDrafts;
+}
+
+async function runConsolidatedMerge({
+  signals,
+  partialDrafts,
+  calls,
+  trace,
+}: {
+  signals: DraftMedicalSignals;
+  partialDrafts: DoctorReviewDraft[];
+  calls: DraftCallDiagnostic[];
+  trace: any;
+}): Promise<DoctorReviewDraft> {
+  const span = trace ? trace.span({ name: "stage2b-flash-merge" }) : null;
+  const sTime = Date.now();
+  const model = getDeepSeekFastModel();
+
+  try {
+    const result = await callDeepSeekJson<DoctorReviewDraft>({
+      model,
+      maxTokens: 2500,
+      timeoutMs: 90_000,
+      repairJson: true,
+      retryOnEmpty: true,
+      jsonMode: false,
+      messages: [
+        {
+          role: "system",
+          content: [
+            "你是中医临床工作画像合并员。你的任务是将多个批次的临床诊断分析草稿合并为一份精简的、统一的画像草稿。",
+            "合并时，去除重复和累赘的词汇，使语言自然并紧凑。不要在输出文案中写数量、比例或百分比。",
+            "只输出合法 JSON，不要 markdown。",
+            "字段必须为：clinicalSummary:string; mainCaseTypes:string[]; treatmentStyle:string[]; aiMedicalRiskThemes:string[]; strengths:string[]; discussionDirections:string[]; conversationReference:string[]。",
+            "每项数组最多不超过 4 项，每项不超过 24 个汉字；clinicalSummary 最多 2 句。",
+            "conversationReference必须给2-4条可直接对话的话术，不要留空。",
+          ].join("\n"),
+        },
+        {
+          role: "user",
+          content: [
+            "AGGREGATE_SIGNALS",
+            serializeSignals(signals),
+            "",
+            "PARTIAL_DRAFTS_TO_MERGE",
+            JSON.stringify(partialDrafts),
+          ].join("\n"),
+        },
+      ],
+    });
+
+    pushDiagnostic(calls, "flash_merge", result);
+
+    if (span && result.usage) {
+      logGenerationToLangfuse({
+        parent: span,
+        name: "flash-merge",
+        model: result.model,
+        startTime: sTime,
+        endTime: Date.now(),
+        usage: result.usage,
+      });
+    }
+
+    const parseResult = doctorReviewDraftSchema.safeParse(result.data);
+    if (parseResult.success) {
+      if (span) span.end();
+      return parseResult.data;
+    }
+  } catch (error) {
+    // Fallback below
+  }
+
+  if (span) span.end();
+  if (partialDrafts.length > 0) {
+    return partialDrafts[0];
+  }
+  return buildFallbackDraft();
+}
+
+async function runProCreativeReview({
+  signals,
+  consolidatedDraft,
+  windowDays,
+  calls,
+  trace,
+}: {
+  signals: DraftMedicalSignals;
+  consolidatedDraft: DoctorReviewDraft;
+  windowDays: number;
+  calls: DraftCallDiagnostic[];
+  trace: any;
+}): Promise<DoctorReviewDraft> {
+  const span = trace ? trace.span({ name: "stage3-pro-review" }) : null;
+  const sTime = Date.now();
+  const model = getDeepSeekSmartModel();
+
+  try {
+    const result = await callDeepSeekJson<DoctorReviewDraft>({
+      model,
+      maxTokens: 3200,
+      timeoutMs: 90_000, // Strict 90s timeout
+      repairJson: true,
+      retryOnEmpty: true,
+      jsonMode: false,
+      messages: [
+        {
+          role: "system",
+          content: [
+            "你是资深中医专家与临床工作画像润色员，负责给临床工作台管理员输出最能触达中医师灵魂的临床风格与复盘话术。",
+            "不要修改原画像中的医学事实和诊断倾向，主要进行语言润色、语气提升和专业化表达。",
+            "语气使用：可见、倾向、可讨论、可留意，不要批评和说教。不要在文案中写数量、比例或百分比。",
+            "只输出合法 JSON，不要 markdown。",
+            "字段必须为：clinicalSummary:string; mainCaseTypes:string[]; treatmentStyle:string[]; aiMedicalRiskThemes:string[]; strengths:string[]; discussionDirections:string[]; conversationReference:string[]。",
+            "每项数组最多不超过 4 项，每项不超过 24 个汉字；clinicalSummary 最多 2 句。",
+            "conversationReference必须给2-4条可直接对话的话术，不要留空。",
+          ].join("\n"),
+        },
+        {
+          role: "user",
+          content: [
+            `WINDOW_DAYS=${windowDays}`,
+            "AGGREGATE_SIGNALS",
+            serializeSignals(signals),
+            "",
+            "CONSOLIDATED_DRAFT_INPUT",
+            JSON.stringify(consolidatedDraft),
+            "",
+            "请对上述画像草案进行高级医学润色，确保产出最专业、最能帮助管理员与医师展开技术复盘的最终中文文案。",
+          ].join("\n"),
+        },
+      ],
+    });
+
+    pushDiagnostic(calls, "pro_review", result);
+
+    if (span && result.usage) {
+      logGenerationToLangfuse({
+        parent: span,
+        name: "pro-review",
+        model: result.model,
+        startTime: sTime,
+        endTime: Date.now(),
+        usage: result.usage,
+      });
+    }
+
+    const parseResult = doctorReviewDraftSchema.safeParse(result.data);
+    if (parseResult.success) {
+      if (span) span.end();
+      return parseResult.data;
+    }
+  } catch (error) {
+    console.warn("[stage3:pro-review] Failed or timed out. Falling back to consolidated draft.", error);
+  }
+
+  if (span) span.end();
+  return consolidatedDraft;
+}
+
+async function cleanupWithFlash(
+  profile: DoctorReviewDraft,
+  calls: DraftCallDiagnostic[],
+  trace: any,
+): Promise<DoctorReviewDraft> {
+  const span = trace ? trace.span({ name: "stage4-cleanup" }) : null;
+  const sTime = Date.now();
+  const model = getDeepSeekFastModel();
+
+  try {
+    const result = await callDeepSeekJson<DoctorReviewDraft>({
+      model,
+      maxTokens: 1200,
+      timeoutMs: 90_000,
+      repairJson: true,
+      retryOnEmpty: true,
+      jsonMode: false,
+      messages: [
+        {
+          role: "system",
+          content: [
+            "你只负责压缩 JSON 文案，不改变含义，不添加医学事实。",
+            "保留相同字段。clinicalSummary 最多2句；数组每项不超过24个汉字；每个数组最多4项。",
+            "只输出合法 JSON。",
+          ].join("\n"),
+        },
+        { role: "user", content: JSON.stringify(profile) },
+      ],
+    });
+
+    pushDiagnostic(calls, "flash_cleanup", result);
+
+    if (span && result.usage) {
+      logGenerationToLangfuse({
+        parent: span,
+        name: "flash-cleanup",
+        model: result.model,
+        startTime: sTime,
+        endTime: Date.now(),
+        usage: result.usage,
+      });
+    }
+
+    const parseResult = doctorReviewDraftSchema.safeParse(result.data);
+    if (parseResult.success) {
+      if (span) span.end();
+      return parseResult.data;
+    }
+  } catch (error) {
+    // Fall back to original
+  }
+
+  if (span) span.end();
+  return profile;
 }
 
 export async function runDoctorReviewDraft({
   rows,
   windowDays,
+  doctorId,
 }: {
   rows: DoctorReviewDraftRow[];
   windowDays: number;
+  doctorId?: string;
 }): Promise<DoctorReviewDraftResult> {
-  const calls: DraftCallDiagnostic[] = [];
-  const { caseCards, strengthSignals } = await buildFlashCaseCards(rows, calls);
-  const signals = buildDraftMedicalSignals(caseCards, strengthSignals);
-  let draft = await synthesizeWithPro({ signals, caseCards, windowDays, calls });
+  const globalStart = Date.now();
+  console.log(`[evaluate-doctors] doctorId=${doctorId ?? "unknown"} windowDays=${windowDays}`);
 
+  // Setup Langfuse trace
+  const langfuse = getLangfuse();
+  const trace = langfuse
+    ? langfuse.trace({
+        name: "doctor-evaluation",
+        userId: doctorId,
+        metadata: {
+          windowDays,
+          sampleSize: rows.length,
+        },
+      })
+    : null;
+
+  const calls: DraftCallDiagnostic[] = [];
+
+  // Stage 1: Flash case cards
+  const s1Start = Date.now();
+  const { caseCards, strengthSignals, okCount, fallbackCount } = await buildFlashCaseCards(rows, calls, trace);
+  const s1Duration = ((Date.now() - s1Start) / 1000).toFixed(1);
+  console.log(`[stage1:flash-case-cards] N=${rows.length} limit=6 ok=${okCount} fallback=${fallbackCount} → ${s1Duration}s`);
+
+  // Compute aggregate signals
+  const signals = buildDraftMedicalSignals(caseCards, strengthSignals);
+
+  // Synthesize draft
+  let draft: DoctorReviewDraft;
+  if (rows.length <= 12) {
+    // Short circuit: Single Flash synthesis + Stage 3
+    const singleStart = Date.now();
+    const flashDraft = await runSingleFlashSynthesis({ signals, caseCards, windowDays, calls, trace });
+    const singleDuration = ((Date.now() - singleStart) / 1000).toFixed(1);
+    console.log(`[stage2:flash-single-synth] N=${rows.length} → ${singleDuration}s`);
+
+    const proStart = Date.now();
+    const inputChars = JSON.stringify(flashDraft).length;
+    draft = await runProCreativeReview({ signals, consolidatedDraft: flashDraft, windowDays, calls, trace });
+    const proDuration = ((Date.now() - proStart) / 1000).toFixed(1);
+    console.log(`[stage3:pro-review] inputChars=${inputChars} → ${proDuration}s`);
+  } else {
+    // Stage 2a: Batched synthesis
+    const s2aStart = Date.now();
+    const partialDrafts = await runBatchSynthesis({ signals, caseCards, windowDays, calls, trace });
+    const s2aDuration = ((Date.now() - s2aStart) / 1000).toFixed(1);
+    const batchesCount = Math.ceil(caseCards.length / 12);
+    console.log(`[stage2a:flash-batch-synth] batches=${batchesCount} size=12 limit=4 → ${s2aDuration}s`);
+
+    // Stage 2b: Merged synthesis
+    const s2bStart = Date.now();
+    const consolidatedDraft = await runConsolidatedMerge({ signals, partialDrafts, calls, trace });
+    const s2bDuration = ((Date.now() - s2bStart) / 1000).toFixed(1);
+    console.log(`[stage2b:flash-merge] partials=${partialDrafts.length} → ${s2bDuration}s`);
+
+    // Stage 3: Pro creative review
+    const proStart = Date.now();
+    const inputChars = JSON.stringify(consolidatedDraft).length;
+    draft = await runProCreativeReview({ signals, consolidatedDraft, windowDays, calls, trace });
+    const proDuration = ((Date.now() - proStart) / 1000).toFixed(1);
+    console.log(`[stage3:pro-review] inputChars=${inputChars} → ${proDuration}s`);
+  }
+
+  // Stage 4: Flash cleanup
+  const s4Start = Date.now();
+  const draftSize = JSON.stringify(draft).length;
   if (profileTooLong(draft)) {
-    draft = await cleanupWithFlash(draft, calls);
+    draft = await cleanupWithFlash(draft, calls, trace);
+    const s4Duration = ((Date.now() - s4Start) / 1000).toFixed(1);
+    console.log(`[stage4:flash-cleanup] size=${draftSize} → ${s4Duration}s`);
+  } else {
+    console.log(`[stage4:flash-cleanup] skipped (size=${draftSize})`);
+  }
+
+  const totalDuration = ((Date.now() - globalStart) / 1000).toFixed(1);
+  console.log(`[evaluate-doctors] total=${totalDuration}s model=flash+pro`);
+
+  if (trace) {
+    // Flush trace to Langfuse in background
+    trace.update({
+      output: {
+        draftSize: JSON.stringify(draft).length,
+        totalDurationSeconds: Number(totalDuration),
+      }
+    });
   }
 
   return {
