@@ -512,7 +512,7 @@
 /* ---------- Form section ---------- */
 
 .form-section {
-  max-width: 1100px;
+  max-width: 100%;
   margin: 0 auto 7px;
 }
 
@@ -930,7 +930,7 @@ button.case-linkage__item:hover {
 /* ---------- Result section ---------- */
 
 .result-section-wrap {
-  max-width: 1100px;
+  max-width: 100%;
   margin: 0 auto;
 }
 
@@ -1158,7 +1158,7 @@ button.case-linkage__item:hover {
 /* ---------- Feedback card ---------- */
 
 .feedback-section {
-  max-width: 1100px;
+  max-width: 100%;
   margin: 10px auto 0;
 }
 
@@ -1591,12 +1591,11 @@ button.case-linkage__item:hover {
 }
 
 @media (min-width: 1280px) {
-  .workbench__header-inner {
-    max-width: 100%;
-  }
-
-  .workbench__main {
-    max-width: 100%;
+  .workbench__header-inner,
+  .view-as-banner,
+  .workbench__main,
+  .workbench-footer {
+    max-width: 1600px;
   }
 
   .workbench__body {
