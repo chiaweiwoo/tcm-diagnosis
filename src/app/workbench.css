@@ -1201,6 +1201,33 @@ mark.critical-highlight {
   font-style: italic;
 }
 
+/* ---------- Non-clinical notes footnote ---------- */
+
+.non-clinical-notes {
+  margin-top: 8px;
+  padding: 8px 16px;
+  background: var(--bg);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.non-clinical-notes__label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.03em;
+  margin-bottom: 2px;
+}
+
+.non-clinical-notes__item {
+  font-size: 11px;
+  color: var(--text-muted);
+  opacity: 0.75;
+}
+
 /* ---------- Feedback card ---------- */
 
 .feedback-section {

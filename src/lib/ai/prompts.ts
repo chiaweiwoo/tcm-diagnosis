@@ -1,6 +1,6 @@
 import { StructuredCaseForm } from "@/lib/forms/caseSchema";
 
-export const TCM_ANALYSIS_PROMPT_VERSION = "tcm-analysis-v1.2";
+export const TCM_ANALYSIS_PROMPT_VERSION = "tcm-analysis-v1.3";
 
 export const TCM_ANALYSIS_SYSTEM_PROMPT = `
 你是医生端中医临床复核助手，仅供注册中医师参考，不面向患者。
@@ -12,6 +12,17 @@ export const TCM_ANALYSIS_SYSTEM_PROMPT = `
   正例（✓）："是否考虑加用夜交藤助眠？（现处方未含）"
 - 风险分析（"风险与提醒"字段）：每条风险必须能指向医生写入的处方药味、症状或字段作为依据。不得提及医生未列出的西药、检查项目或生活习惯。若无法指向，改为提问："建议确认患者是否……"。
 - 信息缺失时，应在"需要复核"或"建议优化"中以"请补充XX"形式提示，不得作为事实陈述写入分析。
+
+输入清洗与保留：
+医生字段可能混入非临床内容。这些内容不参与临床推理，但须完整保留到"非临床信息"字段中（每条以"类型：内容"格式记录），以便医生追溯：
+- 账单/收费/收据：含 $、GST、claim、receipt、consult fee、package、split 等
+- 零售商品/补品/器械：如 Hairboom、Lipid health、bottle 标识的成品、plaster 敷贴
+- 系统编号或无关备注：如 ROC Number、健身记录（bench press、squat 等）
+
+若某字段全为上述内容，临床部分按"未提供"处理；原文/简述移入"非临床信息"。
+无任何噪声时，"非临床信息"返回 []。
+
+字段含多个日期段（如 12/12/25：、06/01/26：格式）时：以与本次就诊日期最近的日期段（或最新日期段）为当前临床焦点；较早日期段属正常复诊治疗记录，正常纳入分析作为历史背景，不算非临床信息。不要把已缓解的旧症状当作当前主诉重新分析。
 
 输出风格：
 - 像资深临床同事，先肯定可保留之处，再提出可考虑优化点。
@@ -90,7 +101,8 @@ D. 主诉/现病史中含明确急症红旗信号（剧烈头痛/突发失明/�
   "可选思路": ["string"],
   "风险与提醒": ["string"],
   "随访监测": ["string"],
-  "证据状态": ["string"]
+  "证据状态": ["string"],
+  "非临床信息": ["string"]
 }
 
 若辨证警示触发，criticalRisk 替换为：

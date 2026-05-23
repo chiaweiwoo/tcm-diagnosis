@@ -1722,6 +1722,16 @@ export default function Workbench({
                 ))}
               </div>
             )}
+
+            {/* Non-clinical notes — muted footnote, only when non-empty */}
+            {result.nonClinical.length > 0 && (
+              <div className="non-clinical-notes">
+                <span className="non-clinical-notes__label">非临床信息（已从临床分析中分流）</span>
+                {result.nonClinical.map((note, i) => (
+                  <span key={i} className="non-clinical-notes__item">• {note}</span>
+                ))}
+              </div>
+            )}
           </section>
         )}
 

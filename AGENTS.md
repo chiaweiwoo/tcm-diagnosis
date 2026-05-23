@@ -528,6 +528,9 @@ Committing a `.sql` file to `supabase/migrations/` has no effect on the live DB.
 **DeepSeek returns malformed JSON**
 Expected — repair is built in. Check `repairedJson: true` in logs. If repair triggers consistently, the prompt output format needs tightening.
 
+**AI references a billing line, supplement, or gym record as if it were clinical data**
+The `输入清洗与保留` block in `TCM_ANALYSIS_SYSTEM_PROMPT` (v1.3+) was either edited out or a new noise pattern appeared that isn't covered. Fix: add the new pattern variant to the `[忽略类]` list in the prompt and bump the `TCM_ANALYSIS_PROMPT_VERSION`. Noise content should appear in `非临床信息`, not in `风险与提醒` or `建议优化`.
+
 **Admin pages can't see brand CSS variables**
 Brand tokens (`--brand`, etc.) must be defined in `globals.css`, not only in `workbench.css`. `workbench.css` only loads on `/` route.
 

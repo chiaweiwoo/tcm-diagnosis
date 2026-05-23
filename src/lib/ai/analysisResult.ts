@@ -24,6 +24,7 @@ export type AnalysisJson = {
   风险与提醒?: unknown;
   随访监测?: unknown;
   证据状态?: unknown;
+  非临床信息?: unknown;
 };
 
 export type ResultSection = {
@@ -47,6 +48,7 @@ export type AnalysisResult = {
   groups: ResultGroup[];
   cautions: string[];   // 风险与提醒
   evidence: string[];   // 证据状态
+  nonClinical: string[]; // 非临床信息
 };
 
 type GroupSpec = {
@@ -179,6 +181,7 @@ export function buildAnalysisResult(data: AnalysisJson, prescriptionType: Prescr
     ],
     cautions: withFallback(data.风险与提醒, "请结合面诊与必要检查复核后执行。"),
     evidence: withFallback(data.证据状态, "基于临床经验与通用知识，尚未接入外部文献检索。"),
+    nonClinical: normalizeStringList(data.非临床信息),
   };
 }
 
@@ -199,6 +202,7 @@ export function ensureAnalysisResult(
     groups?: unknown;
     cautions?: unknown;
     evidence?: unknown;
+    nonClinical?: unknown;
   };
 
   if (Array.isArray(record.groups)) {
@@ -212,6 +216,7 @@ export function ensureAnalysisResult(
       groups: normalizeStoredGroups(record.groups),
       cautions: withFallback(record.cautions, "请结合面诊与必要检查复核后执行。"),
       evidence: withFallback(record.evidence, "基于临床经验与通用知识，尚未接入外部文献检索。"),
+      nonClinical: normalizeStringList(record.nonClinical),
     };
   }
 

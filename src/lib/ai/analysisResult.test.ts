@@ -162,3 +162,36 @@ describe("ensureAnalysisResult", () => {
     expect(result?.keyPoints).toEqual(["结论A"]);
   });
 });
+
+describe("非临床信息", () => {
+  it("returns populated nonClinical array when field is present", () => {
+    const result = buildAnalysisResult(
+      {
+        重点结论: ["保留方案"],
+        非临床信息: ["账单备注：$1000 split to 4 receipts", "零售商品：Hairboom x1"],
+      },
+      "方药",
+    );
+    expect(result.nonClinical).toEqual([
+      "账单备注：$1000 split to 4 receipts",
+      "零售商品：Hairboom x1",
+    ]);
+  });
+
+  it("returns empty array when 非临床信息 is absent", () => {
+    const result = buildAnalysisResult({ 重点结论: ["结论A"] }, "针灸");
+    expect(result.nonClinical).toEqual([]);
+  });
+
+  it("ensureAnalysisResult preserves nonClinical from stored result", () => {
+    const result = ensureAnalysisResult({
+      title: "方药研判",
+      keyPoints: ["先看这一点"],
+      groups: [],
+      cautions: [],
+      evidence: [],
+      nonClinical: ["系统编号：ROC R00008685597"],
+    });
+    expect(result?.nonClinical).toEqual(["系统编号：ROC R00008685597"]);
+  });
+});
