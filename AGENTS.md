@@ -567,8 +567,7 @@ Two independent failure modes — both must be correct:
 
 ## Documentation Direction
 
-- `README.md` is in simplified Chinese. Technical terms (env vars, CLI commands, routes, model names) stay in English.
-- Keep README minimal. Do not add sections unless the user asks.
+- `README.md` is in English following standard open-source best practices. Chinese UI terms (field names, section labels) may appear inline where they are the canonical name, but all prose, headings, and explanations are in English.
 - Update README when user-visible behavior meaningfully changes.
 - Update AGENTS.md whenever architecture, security rules, or calibration workflow changes.
 

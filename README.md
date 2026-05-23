@@ -1,75 +1,233 @@
-# 临床复核伙伴
+# 临床复核伙伴 — TCM Clinical Review Workbench
 
-> 面向中医师的临床工作台
-> **Live: [tcm.chiawei.me](https://tcm.chiawei.me)**
+[![CI](https://github.com/chiaweiwoo/tcm-diagnosis/actions/workflows/ci.yml/badge.svg)](https://github.com/chiaweiwoo/tcm-diagnosis/actions/workflows/ci.yml)
+[![Live](https://img.shields.io/badge/live-tcm.chiawei.me-blue)](https://tcm.chiawei.me)
 
-医生填写结构化病案表单（9 个临床字段），系统即时给出中医临床复核建议，并自动保存可回顾的诊次历史。
+A doctor-facing workbench that helps registered TCM practitioners review structured clinical cases with AI-assisted analysis. Doctors fill in a 9-field Chinese medicine form; the system returns an instant clinical review in simplified Chinese and persists a searchable consultation history.
 
-结果以三栏呈现：判断（当前思路）/ 方案（建议优化）/ 随访监测，顶部附重点结论与风险提醒。所有临床字段在分析后仍可继续编辑与保存；若表单内容与上次分析快照存在差异，工作台会显示”分析结果可能已过时”提示，提醒医师重新分析。`病案编号 Case ID`、`随访病案编号 Follow-up Case ID` 与”给AI回馈”通过右上角 `保存` 提交。
+> **Not patient-facing.** Access is restricted to allowlisted doctors only.
 
-## 技术栈
+---
 
-| 层 | 技术 |
+## Features
+
+- **Structured 9-field form** — chief complaint, current illness, past history, physical exam (tongue + pulse required), diagnosis, pattern (证型), and prescription (herbal, acupuncture, or integrative)
+- **AI clinical review** — three-column output: 判断 (assessment) / 方案 (treatment plan) / 随访监测 (follow-up), plus 重点结论 (key conclusions) and 风险与提醒 (risk alerts)
+- **辨证警示 diagnostic alert** — fires when AI detects critical inconsistencies (diagnosis↔symptom mismatch, pattern↔prescription 寒热矛盾, missed red-flag symptoms)
+- **Stale-analysis warning** — banner appears when form inputs diverge from the last analyzed snapshot
+- **Consultation history** — auto-saved, paginated, with Case ID / Follow-up Case ID / AI feedback fields
+- **Admin tools** — doctor allowlist management, per-doctor clinical profiling, fleet-wide AI output audit
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
 |---|---|
-| Frontend | Next.js + TypeScript，部署于 Vercel |
-| UI | 自定义 CSS + lucide-react |
-| AI | DeepSeek（服务端路由，仅后端调用）|
-| 认证与数据 | Supabase（Google OAuth、允许名单、JSONB 病案存储、日志）|
-| 测试与 CI | GitHub Actions + Vitest |
+| Framework | Next.js 16 (App Router) + TypeScript |
+| UI | Custom CSS (`workbench.css`, `admin.css`) + `lucide-react` |
+| Validation | Zod |
+| Auth & Database | Supabase (Google OAuth, Row Level Security, JSONB storage) |
+| AI Provider | DeepSeek (server-side only — never exposed to the browser) |
+| Observability | Langfuse (tokens + latency only — no clinical text) |
+| CI | GitHub Actions (Node 24, Vitest + Next.js build) |
+| Deployment | Vercel |
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 24 (matches CI)
+- A [Supabase](https://supabase.com) project with Google OAuth enabled
+- A [DeepSeek](https://platform.deepseek.com) API key
+- (Optional) A [Langfuse](https://cloud.langfuse.com) project for observability
+
+### Installation
+
+```bash
+git clone https://github.com/chiaweiwoo/tcm-diagnosis.git
+cd tcm-diagnosis
+npm install
+```
+
+### Environment Variables
+
+Copy the example file and fill in your values:
+
+```bash
+cp .env.local.example .env.local
+```
+
+| Variable | Required | Description |
+|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | ✅ | Your Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅ | Supabase anon (public) key |
+| `SUPABASE_SERVICE_ROLE_KEY` | ✅ | Supabase service role key — server-side only, never exposed to browser |
+| `DEEPSEEK_API_KEY` | ✅ | DeepSeek API key — server-side only |
+| `DEEPSEEK_MODEL_FAST` | ✅ | Fast model name (e.g. `deepseek-v4-flash`) |
+| `ASSESSMENT_API_KEY` | ✅ | Shared secret for CLI scripts and cron routes to call `/api/analyze`. Generate with `openssl rand -hex 32`. Must match the value in Vercel env vars and GitHub Actions secrets. |
+| `ALLOWED_DOCTOR_EMAILS` | ⚠️ | Comma-separated fallback allowlist when Supabase is unreachable. Primary access is managed via the `doctor_allowlist` table. |
+| `LANGFUSE_PUBLIC_KEY` | Optional | Langfuse public key for token/cost observability |
+| `LANGFUSE_SECRET_KEY` | Optional | Langfuse secret key |
+| `LANGFUSE_BASE_URL` | Optional | Defaults to `https://jp.cloud.langfuse.com` |
+| `DEV_AUTH_BYPASS` | Dev only | Set to `true` to skip Google OAuth locally. **Never reaches production** — guarded by `NODE_ENV` check. |
+| `DEV_AUTH_EMAIL` | Dev only | Email used when `DEV_AUTH_BYPASS=true`. Must be on the allowlist. |
+
+### Run Locally
+
+```bash
+npm run dev       # http://localhost:3000
+npm run test      # Vitest unit tests
+npm run build     # Verify production build
+```
+
+---
+
+## Architecture
+
+```
+Doctor (browser)
+  └── POST /api/analyze              → DeepSeek flash → clinical review JSON
+  └── /api/consultations/*           → Supabase (save / load / delete history)
+  └── GET  /api/me/profile           → descriptive clinical profile (admin-only fields stripped)
+
+Admin (is_admin = true)
+  └── /admin/users                   → doctor list with 30-day stats
+  └── /admin/users/[doctorId]        → consultation list + clinical profile (2-tab view)
+  └── /admin/output-audits           → fleet-wide AI output audit results
+
+GitHub Actions (ASSESSMENT_API_KEY auth)
+  └── POST /api/cron/evaluate-doctors     → bulk per-doctor profile evaluation
+  └── POST /api/cron/output-audit         → fleet-wide AI output audit
+```
+
+**Security invariants:**
+- No DeepSeek or service role keys ever reach the browser
+- All API routes require either a valid Supabase session cookie or `X-Assessment-Key` header
+- Admin routes additionally require `is_admin = true` on `doctor_allowlist`
+- Row Level Security on `consultations` enforces per-doctor data isolation at the database level
+- Clinical text never leaves Supabase (Langfuse receives tokens and metadata only)
+
+---
 
 ## API Routes
 
-| Route | 用途 |
-|---|---|
-| `POST /api/analyze` | 接收结构化病案表单，生成临床复核建议（支持在 Request Body 中传递可选的 `maxTokens` 整数参数以防止复杂病案截断） |
-| `GET /api/consultations` | 列出当前医师的历史记录 |
-| `POST /api/consultations` | 新建病案记录 |
-| `GET /api/consultations/[id]` | 读取单条病案 |
-| `PATCH /api/consultations/[id]` | 更新病案字段（临床输入、分析结果、Case ID、Follow-up Case ID、给AI回馈） |
-| `DELETE /api/consultations/[id]` | 删除单条病案 |
-| `GET /auth/callback` | Google OAuth 回调与允许名单验证 |
-| `GET /auth/signout` | 登出并跳转登录页 |
+| Route | Auth | Description |
+|---|---|---|
+| `POST /api/analyze` | Session or API key | Submit structured case form, returns clinical review JSON |
+| `GET /api/consultations` | Session | List current doctor's consultation history |
+| `POST /api/consultations` | Session | Create new consultation record |
+| `GET /api/consultations/[id]` | Session | Fetch single consultation |
+| `PATCH /api/consultations/[id]` | Session | Update clinical inputs, analysis result, Case ID, feedback |
+| `DELETE /api/consultations/[id]` | Session | Delete consultation |
+| `GET /api/me/profile` | Session | Fetch descriptive clinical profile (admin-only fields stripped) |
+| `GET /auth/callback` | — | Google OAuth callback + allowlist check |
+| `GET /auth/signout` | — | Sign out and redirect to login |
 
-## 本地开发
+---
 
-正常开发需要 Google OAuth。如需本地 UI 调试，可在 `.env.local` 启用开发绕过：
+## Doctor Management
 
-```env
-DEV_AUTH_BYPASS=true
-DEV_AUTH_EMAIL=you@example.com
-```
-
-绕过仍会校验允许名单，且在生产和预览环境永远无效。
-
-参考 `.env.local.example` 配置所有必填环境变量（Supabase、DeepSeek API Key 等）。
+All onboarding is admin-driven via CLI — there is no self-signup flow.
 
 ```bash
-npm install
-npm run dev    # http://localhost:3000
-npm run test   # Vitest
-npm run build  # 本地构建验证
+# Add a doctor (creates auth.users row if absent + upserts doctor_allowlist)
+npm run allowlist:add -- --email doctor@example.com
+
+# Add a doctor with admin privileges
+npm run allowlist:add -- --email doctor@example.com --admin
+
+# Deactivate a doctor (soft-remove — auth.users row preserved)
+npm run allowlist:add -- --email doctor@example.com --remove
+
+# Seed test consultations from data/seed-cases.json (gitignored)
+npm run seed:cases -- --email doctor@example.com [--reset] [--yes]
 ```
 
-## AI 输出质量评估
+---
 
-两类按需评估，均由管理员手动触发：
+## AI Evaluation Tools
 
-**临床画像（per-doctor）** — 通过 GitHub Actions 或 CLI 触发，分析医师近 14 天的病案输入习惯；管理员在 `/admin/users/[doctorId]` → 临床画像 标签页查看结果。结果仅供管理员参考。
+Both pipelines are **on-demand only** — no automated schedule.
 
-**AI 输出审查（fleet-wide）** — 管理员在 `/admin/output-audits` 点击"运行新审查"，对全体医师的 AI 输出进行系统审查，发现提示词层面的问题。
+### Per-Doctor Clinical Profile
 
-批量运行：在 GitHub Actions → Evaluate Doctors → Run workflow 手动触发（可指定单个医师邮箱或 UUID），也可本地运行：
+Analyzes a doctor's input patterns and clinical tendencies over the last 14 days. Results are visible to admins at `/admin/users/[doctorId]` → 临床画像 tab.
 
 ```bash
+# Run for all doctors
 npm run evaluate
+
+# Run for a specific doctor
 npm run evaluate -- --email doctor@example.com --windowDays 14
 ```
 
-## 历史数据导入
+Or trigger via **GitHub Actions → Evaluate Doctors → Run workflow**.
 
-支持从 Odoo Excel 导出文件（如 `nova_data_may.xls`）批量清洗并导入病案历史数据。执行步骤：
+### Fleet-wide AI Output Audit
 
-1. **清洗数据**：运行 `python scratch/clean_historical_data.py`，清洗、重构字段并生成 Zod 校验合规的 JSON、CSV 以及 SQL 插入脚本。
-2. **写入数据库**：运行 `node --env-file=.env.local scratch/ingest_ardy_data.mjs`，在写入前自动创建本地 JSON 备份，删除旧历史记录（保留今日测试病案），并恢复临床反馈意见（Feedback）。
-3. **批量临床分析**：运行 `node --env-file=.env.local scratch/analyze_batch_historical.mjs`，通过 `/api/analyze` 批量运行 DeepSeek 临床复核，并将分析结果与时间戳回填至对应病案行（使用 `maxTokens: 2500` 防止长内容截断）。
-4. **验证结果**：运行 `node --env-file=.env.local scratch/check_ardy_rows.mjs` 验证导入行数、今日边界及日期链完整性。
+Reviews AI output quality across all doctors to surface prompt-level issues. Admins trigger it from `/admin/output-audits` or via **GitHub Actions → AI Output Audit → Run workflow**.
+
+For local consistency testing (run the same case N times, compare output stability):
+
+```bash
+node scratch/consistency_check.mjs
+node scratch/consistency_check.mjs --runs 5 --email doctor@example.com
+# BASE_URL=https://tcm.chiawei.me node scratch/consistency_check.mjs
+```
+
+---
+
+## Historical Data Ingestion
+
+Supports bulk import from Odoo Excel exports (e.g. `nova_data_may.xls`).
+
+```bash
+# 1. Clean and restructure raw export
+python scratch/clean_historical_data.py
+
+# 2. Insert into database (creates local JSON backup first)
+node --env-file=.env.local scratch/ingest_ardy_data.mjs
+
+# 3. Batch-analyze all imported draft records
+node --env-file=.env.local scratch/analyze_batch_historical.mjs
+
+# 4. Verify row counts, date boundaries, and draft→analyzed conversions
+node --env-file=.env.local scratch/check_ardy_rows.mjs
+```
+
+> **Always take a Supabase SQL snapshot backup before running ingestion.** The ingest script creates a local JSON backup under `output/` (gitignored) but a server-side backup is the safer first step.
+
+---
+
+## Deployment
+
+The app deploys automatically to Vercel on push to `main`.
+
+**Required Vercel environment variables** (mirror your `.env.local` — omit dev-only keys):
+
+- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
+- `DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL_FAST`
+- `ASSESSMENT_API_KEY`
+- `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` (optional)
+
+**Required GitHub Actions secrets:**
+
+| Secret | Used by |
+|---|---|
+| `ASSESSMENT_API_KEY` | All cron/evaluation workflows |
+| `ASSESS_BASE_URL` | All cron/evaluation workflows (e.g. `https://tcm.chiawei.me`) |
+
+---
+
+## Database Migrations
+
+Migrations live in `supabase/migrations/`. **Committing a migration file does not apply it** — every file must be run manually in the Supabase SQL Editor.
+
+---
+
+## Contributing
+
+This project uses a **single branch (`main`) workflow** — no feature branches, no pull requests. All changes commit directly to `main`.
