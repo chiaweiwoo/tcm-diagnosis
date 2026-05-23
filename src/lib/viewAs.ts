@@ -1,4 +1,4 @@
-import { apiError } from "@/lib/apiResponses";
+import { apiError, type ApiErrorCode } from "@/lib/apiResponses";
 import { isAdminDoctorEmail, isAllowedDoctorEmail, normalizeDoctorEmail } from "@/lib/auth";
 import { getCurrentDoctor } from "@/lib/currentDoctor";
 import { getServiceRoleClient } from "@/lib/supabase/server";
@@ -15,9 +15,9 @@ export type ViewAsContext = {
 
 export class ViewAsError extends Error {
   status: number;
-  code: string;
+  code: ApiErrorCode;
 
-  constructor(status: number, code: string, message: string) {
+  constructor(status: number, code: ApiErrorCode, message: string) {
     super(message);
     this.status = status;
     this.code = code;

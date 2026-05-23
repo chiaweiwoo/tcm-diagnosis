@@ -10,6 +10,9 @@ export type ApiErrorCode =
   | "DRAFT_TOO_LONG"
   | "VALIDATION_BLOCKED"
   | "AI_REQUEST_FAILED"
+  | "VIEW_AS_FORBIDDEN"
+  | "VIEW_AS_TARGET_NOT_FOUND"
+  | "VIEW_AS_READ_ONLY"
   | "INTERNAL_ERROR";
 
 export type ApiErrorBody = {
