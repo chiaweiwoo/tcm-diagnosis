@@ -1034,7 +1034,7 @@ export default function Workbench({
       setSaveStatus("saved");
       setSavedAt(new Date(record.updated_at));
       showToast("已加载病案。", "success");
-      router.replace(`/?id=${id}`, { scroll: false });
+      router.replace(buildUrl({ id }), { scroll: false });
     } catch {
       showToast("读取病案记录失败。", "error");
     }
