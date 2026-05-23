@@ -1614,6 +1614,11 @@ button.case-linkage__item:hover {
     scrollbar-width: thin;
     scrollbar-color: var(--border) transparent;
   }
+
+  .workbench__main--preview .workbench__sidebar {
+    top: 129px;
+    max-height: calc(100vh - 149px);
+  }
 }
 
 /* ---- Responsive: brand subtitle class (hidden on small screens) ---- */

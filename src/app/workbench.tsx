@@ -1335,7 +1335,7 @@ export default function Workbench({
       {/* Form */}
       {viewAs ? <ViewAsBanner doctorId={viewAs.doctorId} email={viewAs.email} /> : null}
 
-      <main className="workbench__main">
+      <main className={`workbench__main ${viewAs ? "workbench__main--preview" : ""}`}>
         <div className="workbench__body">
 
           {/* Left sidebar — doctor's own clinical profile (descriptive subset) */}
