@@ -54,7 +54,7 @@ if (isNaN(windowDays) || windowDays <= 0 || windowDays > 90) {
 
 const client = createClient(supabaseUrl, serviceKey, {
   auth: { persistSession: false },
-  realtime: { transport: ws },
+  realtime: { transport: ws as any },
 });
 
 // 3. Resolve active doctor target(s)
