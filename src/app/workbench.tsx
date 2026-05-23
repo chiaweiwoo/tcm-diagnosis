@@ -1661,7 +1661,11 @@ export default function Workbench({
                 <ResultColumn title="重点结论 Conclusion" colorVariant="green" icon={<CheckCircle2 size={15} />}>
                   <div className="result-keypoints">
                     {result.keyPoints.map((kp, i) => (
-                      <p key={i}>{kp}</p>
+                      <p key={i}>
+                        {result.criticalRisk
+                          ? <HighlightedText text={kp} highlights={result.criticalRisk.highlights} />
+                          : kp}
+                      </p>
                     ))}
                   </div>
                 </ResultColumn>
