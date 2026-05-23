@@ -153,7 +153,6 @@ Admin (browser, is_admin=true only)
   └── POST /api/admin/analytics/evaluate/[doctorId] → trigger new doctor profile evaluation (14d window)
   └── GET  /api/admin/analytics/output-audit       → list fleet-wide AI output audits (v3, current)
   └── POST /api/admin/analytics/output-audit       → trigger new AI output audit (v3)
-  └── GET  /api/admin/analytics/session-review     → legacy v1 (reads analytics_output_audits post-migration)
   └── /admin/users                             → doctor list page
   └── /admin/users/[doctorId]                  → 2-tab view: 病案列表 | 临床画像
   └── /admin/output-audits                     → fleet-wide AI output audits (v3, current)
@@ -407,7 +406,6 @@ Prompts: `buildOutputAuditSystemPrompt()` (injects definitions), `OUTPUT_AUDIT_P
 Library: `runOutputAudit()` in `src/lib/analytics/outputAudit.ts`
 Window helper: `buildWindowFromLatestAnalysis(client, days)` in `src/lib/analytics/stats.ts`
 
-**Legacy:** `SESSION_REVIEW_SYSTEM_PROMPT` / `reviewSession()` / `src/lib/analytics/sessionReview.ts` — kept for backward compat; do not use for new runs.
 
 ---
 
@@ -462,12 +460,12 @@ Migrations: `supabase/migrations/` (numbered SQL). **Committing a migration file
 | `doctor_allowlist` | `email`, `is_active`, `is_admin` — access control source of truth |
 | `activity_logs` | Doctor activity events (login, analyze) — no UI for now |
 | `analytics_doctor_evaluations` | Per-doctor profile evaluations. No RLS (admin service_role only). Append-only — no unique constraint once migration 022_doctor_evaluations_append_only is applied. |
-| `analytics_output_audits` | Fleet-wide AI output audits (Goal 1 v2). No RLS. Append-only with optional `prior_review_id` chain. Renamed from `analytics_session_reviews` via migration 028. Old v1 rows (no `categories` key) are backward-compatible. |
+| `analytics_output_audits` | Fleet-wide AI output audits (Goal 1 v3). No RLS. Append-only. Renamed from `analytics_session_reviews` via migration 028. Old v1 rows (no `categories` key) rendered by `LegacyReview` component until pruned. |
 
 > **Unapplied migrations (must be run in Supabase SQL Editor):**
 > - `022_drop_analytics_and_assessments.sql` — drops legacy tables (`analytics_prompt_quality_runs`, etc.)
 > - `022_doctor_evaluations_append_only.sql` — drops unique constraint on `analytics_doctor_evaluations(doctor_id, window_start, window_end)`; adds index. **Required before evaluation re-runs succeed.**
-> - `023_session_reviews_and_eval_cleanup.sql` — drops `output_review` column, creates `analytics_session_reviews`
+> - `023_session_reviews_and_eval_cleanup.sql` — drops `output_review` column, creates `analytics_session_reviews` (prerequisite for 028)
 > - `028_rename_session_reviews_to_output_audits.sql` — renames `analytics_session_reviews` → `analytics_output_audits`. **Must run before new audit runs or the admin page can load data.**
 
 `consultations`: doctor reads use user-scoped Supabase client (anon key + session JWT); RLS enforces isolation. Admin routes use service_role (bypasses RLS). Never expose service_role key to browser.
@@ -596,8 +594,8 @@ Do not say done until the changed path is verified, not merely coded.
 2. External citation retrieval layer
 3. **`022_drop_analytics_and_assessments.sql`** — apply in production (drops legacy analytics/assessment tables)
 4. **`022_doctor_evaluations_append_only.sql`** — apply in production (drops unique constraint, adds index; blocks evaluate-doctors until applied)
-5. **`023_session_reviews_and_eval_cleanup.sql`** — apply in production (drops `output_review` column, creates `analytics_session_reviews`)
-6. **`028_rename_session_reviews_to_output_audits.sql`** — apply in production (renames table; required before new audits can write or the admin page can load)
+5. **`023_session_reviews_and_eval_cleanup.sql`** — apply in production (drops `output_review` column, creates `analytics_session_reviews`; prerequisite for 028)
+6. **`028_rename_session_reviews_to_output_audits.sql`** — apply in production (renames `analytics_session_reviews` → `analytics_output_audits`; required before new audits can write or the admin page can load)
 7. Phase 2: doctor-facing surface (doctorFacingHint removed from v1.1 schema; revisit if needed)
 8. SGT timezone alignment in `buildWindow` — 14-day on-demand window makes boundary precision a non-issue; reopen if needed
 9. AI Output Audit pipeline: records where `analysis_stale=true` have mismatched form_data/analysis_result — may cause false "hallucination" findings. Consider filtering these records.

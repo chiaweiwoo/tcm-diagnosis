@@ -56,7 +56,7 @@ npm run build  # 本地构建验证
 
 **临床画像（per-doctor）** — 通过 GitHub Actions 或 CLI 触发，分析医师近 14 天的病案输入习惯；管理员在 `/admin/users/[doctorId]` → 临床画像 标签页查看结果。结果仅供管理员参考。
 
-**提示词评估（fleet-wide）** — 管理员在 `/admin/prompt-reviews` 点击"运行新审查"，对全体医师的 AI 输出进行系统审查，追踪提示词问题与改进效果。
+**AI 输出审查（fleet-wide）** — 管理员在 `/admin/output-audits` 点击"运行新审查"，对全体医师的 AI 输出进行系统审查，发现提示词层面的问题。
 
 批量运行：在 GitHub Actions → Evaluate Doctors → Run workflow 手动触发（可指定单个医师邮箱或 UUID），也可本地运行：
 
