@@ -1590,7 +1590,7 @@ button.case-linkage__item:hover {
   padding: 0 0 0 4px;
 }
 
-@media (min-width: 1280px) {
+@media (min-width: 1024px) {
   .workbench__header-inner,
   .view-as-banner,
   .workbench__main,
