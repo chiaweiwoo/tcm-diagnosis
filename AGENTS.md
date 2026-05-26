@@ -531,6 +531,13 @@ Logging must not block doctor-facing responses (use `after()` from Next.js).
 - After editing Chinese prompts/docs/UI strings, inspect the file with UTF-8 output and search for mojibake markers such as `???`, `â€`, `æ`, `ç`, `ä¸`, or `�`.
 - Do not commit garbled Chinese text. If a file already contains mojibake, repair it in the same commit that touches that area.
 
+**Tiny Chinese UI / option changes**
+- Keep the diff proportional. For simple label or option additions, first find the source of truth and change only that plus the direct display/placeholder logic.
+- Do not touch broad interaction tests unless they fail or the source-of-truth contract test must change. For example, adding `推拿` to `PRESCRIPTION_TYPES` should update the enum/source constant, direct placeholder if needed, and the schema enum test if useful; avoid broad workbench test churn unless required.
+- Use `apply_patch` for Chinese text. Do not use PowerShell, Node, or Python mechanical rewrites on Chinese files for tiny edits.
+- If a test/doc/UI file becomes garbled because of your edit, stop after the first failed repair, restore that touched file from git, and reapply only the intended minimal patch.
+- Verification should be narrow: inspect `git diff`, search touched files for mojibake markers, run the smallest relevant targeted test, and run `npm.cmd run build` only when TypeScript or UI rendering could be affected.
+
 **Push rejected (non-fast-forward)**
 ```
 git fetch origin main && git rebase origin/main && git push origin HEAD:main
