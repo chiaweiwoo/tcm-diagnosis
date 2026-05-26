@@ -133,7 +133,7 @@ describe("Workbench rendering", () => {
     expect(screen.getByText(/处方 Treatment/)).toBeInTheDocument();
   });
 
-  it("renders prescription type segmented control with all 3 options", async () => {
+  it("renders prescription type segmented control with all 4 options", async () => {
     render(<Workbench />);
     await waitFor(() => screen.getByText("方药"));
 

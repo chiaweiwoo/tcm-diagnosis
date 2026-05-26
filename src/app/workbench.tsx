@@ -1581,6 +1581,8 @@ export default function Workbench({
                 placeholder={
                   form.prescriptionType === "针灸"
                     ? "例：百会、太冲、风池，平补平泻，留针20分钟"
+                    : form.prescriptionType === "推拿"
+                    ? "例：颈肩腰背推拿松解，配合滚法、按揉、点压与牵伸"
                     : form.prescriptionType === "综合调理"
                     ? "例：穴位 + 方药 + 生活调摄建议"
                     : "例：天麻钩藤饮加减，天麻10g 钩藤15g…"

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const PRESCRIPTION_TYPES = ["方药", "针灸", "综合调理"] as const;
+export const PRESCRIPTION_TYPES = ["方药", "针灸", "推拿", "综合调理"] as const;
 export type PrescriptionType = (typeof PRESCRIPTION_TYPES)[number];
 
 export const SEX_VALUES = ["男", "女"] as const;

@@ -18,11 +18,12 @@ describe("structuredCaseSchema", () => {
   it("accepts each valid prescriptionType string", () => {
     expect(parse({ ...MINIMAL_VALID, prescriptionType: "方药" }).success).toBe(true);
     expect(parse({ ...MINIMAL_VALID, prescriptionType: "针灸" }).success).toBe(true);
+    expect(parse({ ...MINIMAL_VALID, prescriptionType: "推拿" }).success).toBe(true);
     expect(parse({ ...MINIMAL_VALID, prescriptionType: "综合调理" }).success).toBe(true);
   });
 
   it("rejects unknown prescription type value", () => {
-    expect(parse({ ...MINIMAL_VALID, prescriptionType: "推拿" }).success).toBe(false);
+    expect(parse({ ...MINIMAL_VALID, prescriptionType: "拔罐" }).success).toBe(false);
   });
 
   it("rejects array prescriptionType", () => {
