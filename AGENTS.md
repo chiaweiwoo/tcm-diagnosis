@@ -84,6 +84,48 @@ Email is retained only as a denormalized display field. Never use it as a join k
 
 Per-doctor tables (`consultations`) must have Row Level Security policies that restrict reads to `doctor_id = auth.uid()`. Admin routes use service_role to bypass RLS — but only those routes. The database itself must refuse cross-doctor reads even if application code asks. A missed `.eq("doctor_id", ...)` in a future PR must not be able to cause a data leak.
 
+### 11a. Supabase access-control baseline (`public` schema)
+
+The `public` schema is hardened against Supabase Data API default changes. Preserve this baseline:
+
+- Every current `public` table has explicit grants for `anon`, `authenticated`, and `service_role`.
+- RLS is enabled on `public` tables, and any table under RLS must have at least one intentional policy.
+- Dangerous client privileges are removed from `anon` and `authenticated`: no `DELETE`, `TRUNCATE`, `TRIGGER`, or `REFERENCES`.
+- `anon` is read-only (`SELECT`) on sensitive `public` tables.
+- `authenticated` is further restricted on lower-risk archival/audit-style tables such as `consultations_bk_260523`, `analytics_output_audits`, `assessment_runs`, and `error_logs`.
+
+New table checklist:
+
+- Add explicit grants for `anon`, `authenticated`, and `service_role`.
+- Enable RLS.
+- Add at least one intentional policy before relying on the table in app/runtime code.
+
+Verification queries:
+
+```sql
+-- Grants by table for anon/authenticated/service_role in public
+select table_name, grantee, privilege_type
+from information_schema.role_table_grants
+where table_schema = 'public'
+  and grantee in ('anon', 'authenticated', 'service_role')
+order by table_name, grantee, privilege_type;
+
+-- RLS status + policy count for public tables
+select
+  c.relname as table_name,
+  c.relrowsecurity as rls_enabled,
+  count(p.policyname) as policy_count
+from pg_class c
+join pg_namespace n on n.oid = c.relnamespace
+left join pg_policies p
+  on p.schemaname = n.nspname
+ and p.tablename = c.relname
+where n.nspname = 'public'
+  and c.relkind = 'r'
+group by c.relname, c.relrowsecurity
+order by c.relname;
+```
+
 ### 12. Model selection — DeepSeek by default, smart model only with written justification
 
 - **Clinical analysis is DeepSeek-only.** Chinese clinical content, established prompts. Never route clinical content through any other provider.
