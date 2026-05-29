@@ -254,7 +254,7 @@ Case-review discussion agenda pre-computed weekly and surfaced inline under each
 **Watermark trigger:** only recompute if `MAX(analyzed_at)` > stored `source_last_record_at` or prompt version changes. Weekly cron skips unchanged doctors.
 
 **Key files:**
-- `src/lib/nudge/discussionPrompts.ts` -- `DISCUSSION_SYSTEM_PROMPT`, `DISCUSSION_PROMPT_VERSION = "discussion-v1"`
+- `src/lib/nudge/discussionPrompts.ts` -- `DISCUSSION_SYSTEM_PROMPT`, `DISCUSSION_PROMPT_VERSION = "discussion-v1.1"`
 - `src/lib/nudge/computeDiscussion.ts` -- `computeDiscussionForDoctor()`, `computeDiscussionsForActiveDoctors()`
 - `src/app/api/cron/discussion-agenda/route.ts` -- fleet-wide weekly pre-compute POST (X-Assessment-Key auth), `maxDuration=300`
 - `src/app/api/admin/users/[doctorId]/discussion/route.ts` -- admin read GET (admin auth, 1h cache)
