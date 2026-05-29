@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
+import { Eye, EyeOff } from "lucide-react";
 import type { DoctorRow } from "./page";
 
 function formatSGT(iso: string | null) {
@@ -41,9 +42,10 @@ export function UsersList({ doctors }: { doctors: DoctorRow[] }) {
 
       <div className="users-list">
         <div className="users-list-head">
-          <span>邮箱</span>
-          <span>角色</span>
-          <span>最近分析</span>
+          <span className="users-head__email">邮箱</span>
+          <span className="users-head__role">角色</span>
+          <span className="users-head__date">最近分析</span>
+          <span className="users-head__actions">操作</span>
         </div>
 
         {filtered.length === 0 ? (
@@ -53,12 +55,14 @@ export function UsersList({ doctors }: { doctors: DoctorRow[] }) {
         ) : (
           filtered.map((doc) =>
             doc.doctorId ? (
-              <Link
-                key={doc.email}
-                href={`/admin/users/${doc.doctorId}`}
-                className="users-row users-row--link"
-              >
-                <span className="users-row__email">{doc.email}</span>
+              <div key={doc.email} className="users-row">
+                <Link
+                  href={`/admin/users/${doc.doctorId}`}
+                  className="users-row__email users-row__email--link"
+                  title="查看医生详情与画像"
+                >
+                  {doc.email}
+                </Link>
                 <span>
                   {doc.isAdmin ? (
                     <span className="status-pill user-role-admin">管理员</span>
@@ -67,7 +71,16 @@ export function UsersList({ doctors }: { doctors: DoctorRow[] }) {
                   )}
                 </span>
                 <span className="users-row__date">{formatSGT(doc.lastActive)}</span>
-              </Link>
+                <span className="users-row__actions">
+                  <Link
+                    href={`/?viewAs=${doc.doctorId}`}
+                    className="users-row__action-btn"
+                    title="以该医生身份预览工作台（只读）"
+                  >
+                    <Eye size={16} />
+                  </Link>
+                </span>
+              </div>
             ) : (
               <div key={doc.email} className="users-row users-row--inactive">
                 <span className="users-row__email">{doc.email}</span>
@@ -80,6 +93,14 @@ export function UsersList({ doctors }: { doctors: DoctorRow[] }) {
                 </span>
                 <span className="users-row__date">
                   <span className="users-unregistered">未注册</span>
+                </span>
+                <span className="users-row__actions">
+                  <span
+                    className="users-row__action-btn users-row__action-btn--disabled"
+                    title="未注册，无法预览"
+                  >
+                    <EyeOff size={16} />
+                  </span>
                 </span>
               </div>
             ),

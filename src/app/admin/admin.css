@@ -2782,7 +2782,7 @@ details[open] .sample-details__toggle::before {
 
 .users-list-head {
   display: grid;
-  grid-template-columns: 1fr 100px 140px;
+  grid-template-columns: 1fr 100px 140px 80px;
   padding: 8px 16px;
   background: var(--bg, #FAFAF8);
   border-bottom: 1px solid var(--border, #EAE6E2);
@@ -2795,7 +2795,7 @@ details[open] .sample-details__toggle::before {
 
 .users-row {
   display: grid;
-  grid-template-columns: 1fr 100px 140px;
+  grid-template-columns: 1fr 100px 140px 80px;
   align-items: center;
   padding: 11px 16px;
   border-bottom: 1px solid var(--border, #EAE6E2);
@@ -2809,11 +2809,7 @@ details[open] .sample-details__toggle::before {
   border-bottom: none;
 }
 
-.users-row--link {
-  cursor: pointer;
-}
-
-.users-row--link:hover {
+.users-row:hover {
   background: var(--bg, #FAFAF8);
 }
 
@@ -2828,10 +2824,55 @@ details[open] .sample-details__toggle::before {
   white-space: nowrap;
 }
 
+.users-row__email--link {
+  color: var(--brand, #9B2226);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.users-row__email--link:hover {
+  color: var(--brand-dark, #6F1D1B);
+  text-decoration: underline;
+}
+
 .users-row__date {
   font-size: 13px;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
+}
+
+.users-head__actions,
+.users-row__actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.users-row__action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  color: var(--brand, #9B2226);
+  background: var(--brand-light, #FDF0F0);
+  transition: all 0.15s;
+  cursor: pointer;
+  border: none;
+}
+
+.users-row__action-btn:hover {
+  background: var(--brand, #9B2226);
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(155, 34, 38, 0.15);
+}
+
+.users-row__action-btn--disabled {
+  background: #F0EDE9;
+  color: var(--text-muted, #8E8377);
+  cursor: not-allowed;
 }
 
 .users-unregistered {
@@ -2842,14 +2883,9 @@ details[open] .sample-details__toggle::before {
 
 @media (max-width: 480px) {
   .users-list-head {
-    grid-template-columns: 1fr 100px;
+    grid-template-columns: 1fr 80px 40px;
   }
-  .users-list-head span:last-child {
-    display: none;
-  }
-  .users-row {
-    grid-template-columns: 1fr 100px;
-  }
+  .users-head__date,
   .users-row__date {
     display: none;
   }
