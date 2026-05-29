@@ -197,7 +197,8 @@ Admin (browser, is_admin=true only)
   └── GET  /api/admin/analytics/output-audit       → list fleet-wide AI output audits (v3, current)
   └── POST /api/admin/analytics/output-audit       → trigger new AI output audit (v3)
   └── /admin/users                             → doctor list page
-  └── /admin/users/[doctorId]                  → per-doctor consultation list (read-only)
+  └── /admin/users/[doctorId]                  → per-doctor consultation list (read-only) [sub-nav: 病案列表]
+  └── /admin/users/[doctorId]/profile          → doctor profile snapshot — deterministic metrics, no AI [sub-nav: 评估快照]
   └── /admin/output-audits                     → fleet-wide AI output audits (v3, current)
 
 GH Actions (ASSESSMENT_API_KEY auth)
@@ -266,6 +267,31 @@ Case-review discussion agenda pre-computed weekly and surfaced inline under each
 RLS: Admin-only. Bypassed by `service_role` (no grants to authenticated or anon).
 
 **Invariant 8:** case metrics -> DeepSeek (permitted). Langfuse receives tokens/cost/latency only.
+
+---
+
+## Doctor Profile Snapshot
+
+On-demand, admin-only snapshot of deterministic metrics per doctor. Computed fresh on each page load — no caching, no stored state, no AI calls.
+
+**Page:** `/admin/users/[doctorId]/profile` — server component, calls `computeDoctorProfile()` directly with service_role client.
+
+**Three metric groups:**
+1. **质量信号** — rates over all analyzed cases: `criticalRiskRate` (辨证警示触发), `nonClinicalRate` (非临床信息出现), `realCautionsRate` (风险有实质内容，非fallback)
+2. **AI响应深度** — per-section mean item count + zero-count rate: 建议优化, 可选思路, 可取之处, 需要复核, 风险与提醒, 随访监测
+3. **输入完整度** — per-field average character count: 7 clinical fields
+
+**Low-sample warning:** when `totalAnalyzed < LOW_SAMPLE_THRESHOLD` (20), a yellow banner recommends accumulating more cases before drawing conclusions.
+
+**Key files:**
+- `src/lib/analytics/doctorProfile.ts` — `computeDoctorProfile(client, doctorId)`, `LOW_SAMPLE_THRESHOLD`, pure helper functions (`computeMean`, `computeZeroRate`, `isCautionsFallbackOnly`)
+- `src/lib/analytics/doctorProfile.test.ts` — unit tests for pure helpers
+- `src/app/admin/users/[doctorId]/profile/page.tsx` — server page (renders snapshot)
+- `src/app/admin/users/[doctorId]/DoctorSubNav.tsx` — client sub-nav (病案列表 | 评估快照)
+
+**No DB table, no migration needed.** All data comes from `consultations.analysis_result` JSONB and `consultations.form_data` JSONB via service_role.
+
+**Fallback detection:** cautions-only-fallback = `cautions.length === 1 && cautions[0] === "请结合面诊与必要检查复核后执行。"`. Real cautions are counted when this condition is false.
 
 ---
 
@@ -376,9 +402,13 @@ Admin nav (2 tabs, `src/app/admin/AdminNav.tsx`):
 
 `AdminNav` is a client component (needs `usePathname()` for active link highlighting). Admin layout is a server component.
 
-Per-doctor read-only view (`/admin/users/[doctorId]`) — consultation list only
+Per-doctor read-only view (`/admin/users/[doctorId]`) — two sub-nav tabs:
 - **病案列表** — compact paginated table of consultation records for that doctor.
-- The old `临床画像` tab and its trigger flow are retired.
+- **评估快照** (`/admin/users/[doctorId]/profile`) — deterministic metrics snapshot computed on-demand from `analysis_result` JSONB. No AI calls, no stored state.
+
+Sub-nav: `src/app/admin/users/[doctorId]/DoctorSubNav.tsx` (client component, uses `usePathname()`).
+
+The old `临床画像` tab and its trigger flow are retired.
 
 Each consultation row has a **拷贝此病案** button — clones `form_data` only to admin's own account.
 Clone inserts a new draft consultation under admin's UUID with `model_meta = { cloned_from_doctor_email: "..." }`.
