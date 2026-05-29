@@ -2782,7 +2782,8 @@ details[open] .sample-details__toggle::before {
 
 .users-list-head {
   display: grid;
-  grid-template-columns: 320px 260px 90px 175px 1fr;
+  grid-template-columns: fit-content(640px) 1fr max-content max-content max-content;
+  column-gap: 20px;
   padding: 8px 16px;
   background: var(--bg, #FAFAF8);
   border-bottom: 1px solid var(--border, #EAE6E2);
@@ -2795,7 +2796,8 @@ details[open] .sample-details__toggle::before {
 
 .users-row {
   display: grid;
-  grid-template-columns: 320px 260px 90px 175px 1fr;
+  grid-template-columns: fit-content(640px) 1fr max-content max-content max-content;
+  column-gap: 20px;
   align-items: center;
   padding: 11px 16px;
   border-bottom: 1px solid var(--border, #EAE6E2);
