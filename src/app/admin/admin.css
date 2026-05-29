@@ -2782,7 +2782,7 @@ details[open] .sample-details__toggle::before {
 
 .users-list-head {
   display: grid;
-  grid-template-columns: 1fr 100px 140px 80px;
+  grid-template-columns: 1fr 110px 100px 170px 80px;
   padding: 8px 16px;
   background: var(--bg, #FAFAF8);
   border-bottom: 1px solid var(--border, #EAE6E2);
@@ -2795,7 +2795,7 @@ details[open] .sample-details__toggle::before {
 
 .users-row {
   display: grid;
-  grid-template-columns: 1fr 100px 140px 80px;
+  grid-template-columns: 1fr 110px 100px 170px 80px;
   align-items: center;
   padding: 11px 16px;
   border-bottom: 1px solid var(--border, #EAE6E2);
@@ -2849,6 +2849,35 @@ details[open] .sample-details__toggle::before {
   font-variant-numeric: tabular-nums;
 }
 
+.users-row__spark {
+  display: flex;
+  align-items: center;
+  padding-right: 8px;
+}
+
+.spark-wrap {
+  display: flex;
+  align-items: flex-end;
+  gap: 1.5px;
+  height: 22px;
+  width: 100%;
+}
+
+.spark-bar {
+  flex: 1;
+  background: var(--brand, #9B2226);
+  border-radius: 1px 1px 0 0;
+  opacity: 0.6;
+  min-width: 1px;
+  transition: opacity 0.1s;
+}
+
+.spark-bar--zero {
+  background: var(--border, #EAE6E2);
+  opacity: 1;
+  border-radius: 1px;
+}
+
 .users-head__actions,
 .users-row__actions {
   display: flex;
@@ -2893,6 +2922,8 @@ details[open] .sample-details__toggle::before {
   .users-list-head {
     grid-template-columns: 1fr 80px 40px;
   }
+  .users-head__spark,
+  .users-row__spark,
   .users-head__date,
   .users-row__date {
     display: none;
@@ -3585,7 +3616,7 @@ details[open] .sample-details__toggle::before {
 
 .eye-confirm-popup {
   position: absolute;
-  top: calc(100% + 6px);
+  bottom: calc(100% + 6px);
   right: 0;
   z-index: 50;
   background: var(--surface, #fff);

@@ -13,7 +13,26 @@ function formatSGT(iso: string | null) {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
   });
+}
+
+function Sparkline({ counts }: { counts: number[] }) {
+  const max = Math.max(...counts, 1);
+  return (
+    <div className="spark-wrap">
+      {counts.map((c, i) => (
+        <div
+          key={i}
+          className={`spark-bar${c === 0 ? " spark-bar--zero" : ""}`}
+          style={{ height: c === 0 ? "2px" : `${Math.max(Math.round((c / max) * 100), 15)}%` }}
+          title={`${c} 条`}
+        />
+      ))}
+    </div>
+  );
 }
 
 export function UsersList({ doctors }: { doctors: DoctorRow[] }) {
@@ -76,6 +95,7 @@ export function UsersList({ doctors }: { doctors: DoctorRow[] }) {
       <div className="users-list">
         <div className="users-list-head">
           <span className="users-head__email">邮箱</span>
+          <span className="users-head__spark">近30天</span>
           <span className="users-head__role">角色</span>
           <span className="users-head__date">最近分析</span>
           <span className="users-head__actions">操作</span>
@@ -94,6 +114,9 @@ export function UsersList({ doctors }: { doctors: DoctorRow[] }) {
                   onClick={() => void handleRowClick(doc.doctorId!)}
                 >
                   <span className="users-row__email">{doc.email}</span>
+                  <span className="users-row__spark">
+                    <Sparkline counts={doc.dailyCounts} />
+                  </span>
                   <span>
                     {doc.isAdmin ? (
                       <span className="status-pill user-role-admin">管理员</span>
@@ -138,6 +161,7 @@ export function UsersList({ doctors }: { doctors: DoctorRow[] }) {
               <div key={doc.email} className="users-row-wrap">
                 <div className="users-row users-row--inactive">
                   <span className="users-row__email">{doc.email}</span>
+                  <span className="users-row__spark" />
                   <span>
                     {doc.isAdmin ? (
                       <span className="status-pill user-role-admin">管理员</span>

@@ -6,21 +6,51 @@ export type DoctorRow = {
   email: string;
   isAdmin: boolean;
   lastActive: string | null;
+  dailyCounts: number[]; // 30 entries: index 0 = 30 days ago, index 29 = today (SGT)
 };
+
+function sgtDayStr(date: Date): string {
+  return date.toLocaleDateString("en-CA", { timeZone: "Asia/Singapore" });
+}
+
+function buildDailyCounts(doctorId: string, sparkMap: Map<string, Map<string, number>>): number[] {
+  const now = Date.now();
+  return Array.from({ length: 30 }, (_, i) => {
+    const d = new Date(now - (29 - i) * 24 * 60 * 60 * 1000);
+    return sparkMap.get(doctorId)?.get(sgtDayStr(d)) ?? 0;
+  });
+}
 
 async function loadDoctors(): Promise<DoctorRow[]> {
   const admin = getServiceRoleClient();
 
-  const [allowlistResult, usersResult] = await Promise.all([
+  const windowStart = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+  const [allowlistResult, usersResult, sparkResult] = await Promise.all([
     admin
       .from("doctor_allowlist")
       .select("email,is_admin,is_active")
       .eq("is_active", true)
       .order("email"),
     admin.auth.admin.listUsers({ perPage: 1000 }),
+    admin
+      .from("consultations")
+      .select("doctor_id,analyzed_at")
+      .not("analyzed_at", "is", null)
+      .gte("analyzed_at", windowStart.toISOString()),
   ]);
 
   if (allowlistResult.error || usersResult.error) return [];
+
+  // Build sparkline map: doctorId -> SGT day string -> count
+  const sparkMap = new Map<string, Map<string, number>>();
+  for (const row of sparkResult.data ?? []) {
+    if (!row.doctor_id || !row.analyzed_at) continue;
+    const day = sgtDayStr(new Date(row.analyzed_at));
+    if (!sparkMap.has(row.doctor_id)) sparkMap.set(row.doctor_id, new Map());
+    const m = sparkMap.get(row.doctor_id)!;
+    m.set(day, (m.get(day) ?? 0) + 1);
+  }
 
   const emailToId = new Map(
     usersResult.data.users.map((u) => [u.email?.toLowerCase() ?? "", u.id]),
@@ -37,6 +67,7 @@ async function loadDoctors(): Promise<DoctorRow[]> {
           email,
           isAdmin: row.is_admin ?? false,
           lastActive: null,
+          dailyCounts: Array(30).fill(0) as number[],
         };
       }
 
@@ -54,6 +85,7 @@ async function loadDoctors(): Promise<DoctorRow[]> {
         email,
         isAdmin: row.is_admin ?? false,
         lastActive: lastResult.data?.analyzed_at ?? null,
+        dailyCounts: buildDailyCounts(doctorId, sparkMap),
       };
     }),
   );

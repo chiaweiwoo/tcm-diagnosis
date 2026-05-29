@@ -246,8 +246,7 @@ On-demand, admin-only snapshot of deterministic metrics per doctor. Loaded via A
 **API:** `GET /api/admin/users/[doctorId]/profile` — admin auth required; calls `computeDoctorProfile()` + `findFlaggedCases()` in parallel; returns `{ snapshot, flagged, clusters }`.
 
 **Layout:**
-1. **质量信号** — three aggregate rates: `criticalRiskRate`, `nonClinicalRate`, `realCautionsRate`
-2. **待关注病案** — flagged case list grouped by rule (see rules below); each row click opens workbench in new tab
+1. **待关注病案** — flagged case list grouped by rule (see rules below); each row click opens workbench in new tab. The three signal rates (`criticalRiskRate`, `nonClinicalRate`, `realCautionsRate`) are no longer shown as standalone cards — `criticalRiskRate` appears inline as "触发率 X%" beside its group header, `nonClinicalRate` as "出现率 X%". `realCautionsRate` is retired from the UI entirely.
 
 **Flagged case rules (priority order; each case counted once):**
 | # | Rule | Threshold | Cap | Min N |
@@ -256,8 +255,9 @@ On-demand, admin-only snapshot of deterministic metrics per doctor. Loaded via A
 | 2 | 非临床信息混入 | boolean | 5 | always |
 | 3 | 需要复核 项目偏多 | > doctor's own P90 | 10 | 20 |
 | 4 | 体查记录偏短 | < doctor's own P10 | 5 | 20 |
-| 5 | 现病史记录偏短 | < doctor's own P10 | 5 | 20 |
 | + | 处方高度重复 | DeepSeek Flash clusters ≥ 3 equivalent prescriptions (top 3) | — | 20 |
+
+Note: rule 5 (现病史记录偏短) has been removed from the UI `RULE_ORDER` — the data is still computed by `findFlaggedCases()` but no longer displayed.
 
 When `totalAnalyzed < LOW_SAMPLE_THRESHOLD` (20), only boolean rules (1 & 2) fire; percentile and clustering rules are skipped with a note in the section header.
 
@@ -382,7 +382,7 @@ Admin entry point: `⚙` icon (Settings2) in workbench header, visible only when
 Admin guard: `src/app/admin/layout.tsx` — server-side, redirects to `/?reason=not_admin` if not admin.
 
 Admin nav (2 tabs, `src/app/admin/AdminNav.tsx`):
-- **用户** — `/admin/users` — doctor list with 30-day stats; row click opens profile overlay
+- **用户** — `/admin/users` — doctor list with 30-day activity sparkline, last-analysis timestamp (date + time, SGT), and role badge; row click opens profile overlay
 - **AI 输出审查** — `/admin/output-audits` — fleet-wide AI output audits (v3)
 
 `/admin` redirects to `/admin/users`.
