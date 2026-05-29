@@ -66,7 +66,7 @@ function DiscussionOverlay({
         )}
 
         <div className="disc-overlay-desc">
-          AI 分析该医生近14天病案中的高频诊断组合，自动生成以下议题供资深医师在督导或病案回顾时参考。每项议题附有病案依据与建议跟进问法。
+          <span className="disc-overlay-desc-goal">督导目标：</span>识别该医生近期反复出现的诊疗模式，引导其说明临床思路——目的不是评判对错，而是及早发现思维盲点，防止习惯性偏差影响疗效。每项议题均来自近14天真实病案，附有案例依据与建议跟进问法。
         </div>
 
         <div className="disc-overlay-body">
