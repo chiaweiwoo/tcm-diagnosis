@@ -4256,3 +4256,177 @@ details[open] .sample-details__toggle::before {
   color: var(--text-muted, #6B7280);
   margin-top: 4px;
 }
+
+/* Header strip — compact 3-rate row */
+.profile-strip {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 0;
+}
+
+.profile-strip .profile-signal-row {
+  flex: 1 1 200px;
+  border-bottom: none;
+  border-right: 1px solid var(--border, #EAE6E2);
+  padding: 12px 16px;
+}
+
+.profile-strip .profile-signal-row:last-child {
+  border-right: none;
+}
+
+/* Section head note */
+.profile-section__head-note {
+  font-weight: 400;
+  font-size: 11px;
+  color: var(--text-muted, #6B7280);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* Flagged cases */
+.profile-flags {
+  display: flex;
+  flex-direction: column;
+}
+
+.profile-flags-empty {
+  padding: 20px 16px;
+  font-size: 13px;
+  color: var(--text-muted, #6B7280);
+}
+
+.profile-flag-group {
+  border-bottom: 1px solid var(--border, #EAE6E2);
+}
+
+.profile-flag-group:last-child {
+  border-bottom: none;
+}
+
+.profile-flag-group--critical .profile-flag-head {
+  background: #FEF2F2;
+}
+
+.profile-flag-group--critical .profile-flag-label {
+  color: #DC2626;
+}
+
+.profile-flag-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--bg, #FAFAF8);
+  border-bottom: 1px solid var(--border, #EAE6E2);
+}
+
+.profile-flag-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text, #1A1A1A);
+  flex: 1;
+}
+
+.profile-flag-count {
+  font-size: 11px;
+  color: var(--text-muted, #6B7280);
+}
+
+.profile-flag-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border, #EAE6E2);
+}
+
+.profile-flag-row:last-child {
+  border-bottom: none;
+}
+
+.profile-flag-name {
+  font-size: 13px;
+  color: var(--text, #1A1A1A);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-flag-evidence {
+  font-size: 12px;
+  color: var(--text-muted, #6B7280);
+  background: var(--bg, #FAFAF8);
+  border-radius: 4px;
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+
+.profile-flag-date {
+  font-size: 12px;
+  color: var(--text-muted, #6B7280);
+  white-space: nowrap;
+}
+
+.profile-flag-link {
+  font-size: 12px;
+  color: var(--brand, #9B2226);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.profile-flag-link:hover {
+  text-decoration: underline;
+}
+
+/* Prescription clusters */
+.profile-cluster-wrap {
+  border-top: 1px solid var(--border, #EAE6E2);
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.profile-cluster-section-head {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted, #6B7280);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 2px;
+}
+
+.profile-cluster-group {
+  background: #FFFBEB;
+  border: 1px solid #FCD34D;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.profile-cluster-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  border-bottom: 1px solid #FCD34D;
+}
+
+.profile-cluster-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #92400E;
+  flex: 1;
+}
+
+.profile-cluster-n {
+  font-size: 12px;
+  color: #B45309;
+}
+
+.profile-cluster-body {
+  padding: 8px 14px;
+}
