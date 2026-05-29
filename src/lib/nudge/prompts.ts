@@ -5,7 +5,7 @@
  * Invariant 8: examples come from the doctor's own cautions (permitted DeepSeek recipient).
  */
 
-export const RISK_NUDGE_PROMPT_VERSION = "risk-nudge-v1";
+export const RISK_NUDGE_PROMPT_VERSION = "risk-nudge-v1.1";
 
 export const RISK_NUDGE_SYSTEM_PROMPT = `你是中医临床助手，协助医生快速识别AI反复提醒的临床风险点。
 

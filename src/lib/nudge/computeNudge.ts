@@ -94,12 +94,15 @@ export async function needsRecompute(
 
   const { data, error } = await client
     .from("doctor_risk_nudges")
-    .select("source_last_record_at")
+    .select("source_last_record_at, prompt_version")
     .eq("doctor_id", doctorId)
     .maybeSingle();
 
   if (error || !data) return true; // no row → must compute
   if (!data.source_last_record_at) return true;
+
+  // Recompute if prompt version changed (e.g. description field added)
+  if ((data.prompt_version as string | null) !== RISK_NUDGE_PROMPT_VERSION) return true;
 
   const stored = new Date(data.source_last_record_at as string);
   return latest > stored;
