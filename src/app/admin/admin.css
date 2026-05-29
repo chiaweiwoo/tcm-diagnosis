@@ -2784,7 +2784,7 @@ details[open] .sample-details__toggle::before {
 
 .users-list-head {
   display: grid;
-  grid-template-columns: 320px 100px 90px 175px 60px;
+  grid-template-columns: 320px 180px 90px 175px 60px;
   padding: 8px 16px;
   background: var(--bg, #FAFAF8);
   border-bottom: 1px solid var(--border, #EAE6E2);
@@ -2797,7 +2797,7 @@ details[open] .sample-details__toggle::before {
 
 .users-row {
   display: grid;
-  grid-template-columns: 320px 100px 90px 175px 60px;
+  grid-template-columns: 320px 180px 90px 175px 60px;
   align-items: center;
   padding: 11px 16px;
   border-bottom: 1px solid var(--border, #EAE6E2);
@@ -2860,8 +2860,8 @@ details[open] .sample-details__toggle::before {
 .spark-wrap {
   display: flex;
   align-items: flex-end;
-  gap: 1.5px;
-  height: 22px;
+  gap: 2px;
+  height: 30px;
   width: 100%;
 }
 
