@@ -133,16 +133,18 @@ order by c.relname;
 - **Any commit that introduces a smart model (Claude, GPT, etc.) must include a written justification in the commit body explaining why DeepSeek Pro was insufficient, with concrete examples.**
 - **No `ANTHROPIC_API_KEY` in this project.**
 
-### 13. Doctor-facing profile data — descriptive subset only
+### 13. Doctor-facing sidebar — Risk Nudge card (replaces 我的画像)
 
-The workbench (`/`) displays the doctor's own clinical profile in the left sidebar (`我的画像`).
+The workbench (`/`) left sidebar now shows `⚠️ AI 反复提醒的风险点` — the doctor's own recurring AI caution themes.
 
-- **Endpoint:** `GET /api/me/profile` — requires valid session, uses service_role to read `analytics_doctor_evaluations`.
-- **Descriptive subset** (may be shown to the doctor): `profileSummary`, `keyObservations`, `treatmentStyle`, `aiRecurringThemes` (theme + frequency only, no caseNumbers).
-- **Analytical subset** (admin-only, must NEVER appear in doctor-facing responses): `strengths`, `gaps`, `guidancePoints`, `patientDistribution`, `fieldCompleteness`.
-- The server strips analytical fields before returning. Never return raw `doctor_profile` JSONB to a doctor session.
-- `aiRecurringThemes.caseNumbers` is also stripped — case-level granularity is admin-only.
-- Cache: `Cache-Control: private, max-age=300, stale-while-revalidate=600`. Profile only updates when admin triggers a new evaluation.
+- **Component:** `src/app/RiskNudgePanel.tsx` (replaces `MyProfilePanel.tsx` in the sidebar; `MyProfilePanel` retained but orphaned from doctor UI).
+- **Read endpoint:** `GET /api/me/nudge` — requires valid session; supports `X-View-As` for admin preview.
+- **Data source:** `doctor_risk_nudges` table (one row per doctor, upsert on `doctor_id` PK).
+- **What is shown:** `themes[].key` (TCM-native label ≤10字) + relative frequency bar (`weight` 0–1). **No counts, no %, no verbatim text in bar area.**
+- **Row-hover popup:** shows label `示例：` + up to 5 verbatim caution excerpts from the doctor's own analyzed cases.
+- **Raw counts never leave the server** — only `weight = count / max` is sent.
+- Cache: `Cache-Control: private, max-age=300, stale-while-revalidate=600`.
+- `GET /api/me/profile` and `MyProfilePanel.tsx` retained (not deleted) — used by admin eval display. Do not delete unless admin UI is updated.
 
 ---
 
@@ -186,7 +188,8 @@ Doctor (browser)
   └── POST /api/analyze                        → DeepSeek flash model → clinical review JSON (3-column layout)
   └── /api/consultations/*                     → Supabase (save / load / delete history)
   └── POST /api/consultations/[id]/clone       → clone another doctor's consultation to own account (admin only)
-  └── GET  /api/me/profile                     → descriptive profile subset (strips analytical fields, invariant 13)
+  └── GET  /api/me/nudge                       → risk-nudge card (weight-only, examples; invariant 13)
+  └── GET  /api/me/profile                     → descriptive profile subset (orphaned from doctor UI; used by admin)
 
 Admin (browser, is_admin=true only)
   └── GET  /api/admin/users                    → doctor list with 30-day stats
@@ -199,13 +202,44 @@ Admin (browser, is_admin=true only)
   └── /admin/users/[doctorId]                  → 2-tab view: 病案列表 | 临床画像
   └── /admin/output-audits                     → fleet-wide AI output audits (v3, current)
 
-GH Actions (ASSESSMENT_API_KEY auth, workflow_dispatch only — no schedule)
-  └── npx tsx scripts/evaluate-local.ts        → per-doctor profile evaluation (7d window, skips empty doctors)
-                                                  triggerable via workflow_dispatch with required email/ID
+GH Actions (ASSESSMENT_API_KEY auth)
+  └── workflow_dispatch: npx tsx scripts/evaluate-local.ts → per-doctor profile evaluation (7d window)
+  └── POST /api/cron/risk-nudge daily 03:00 SGT / 19:00 UTC  (FIRST scheduled workflow in project)
+        → computeNudgesForActiveDoctors → upsert doctor_risk_nudges per active doctor
+  └── npm run nudge -- --email <e>             → on-demand single-doctor nudge (--force to bypass watermark)
 
 Workbench header (admin only):
   └── ⚙ Settings2 icon → /admin → redirects to /admin/users
 ```
+
+---
+
+## Doctor Risk Nudge
+
+Recurring AI caution aggregation surfaced in the workbench left sidebar.
+
+**Two-stage pipeline:**
+1. **Deterministic bucketing** (always runs; the floor): cautions from `analysis_result.cautions` + `风险与提醒` in a 14-day window back from `MAX(analyzed_at)` are keyword-matched to 8 fixed buckets. Buckets with >=3 occurrences are surfaced, sorted by count desc.
+2. **DeepSeek flash rephrasing** (polish; optional): AI rephrases labels into TCM-native short labels (<=10 chars) and selects verbatim examples. **If AI fails, deterministic labels are used as-is. The nudge is never empty due to AI outage.**
+
+**Watermark trigger:** only recompute if `MAX(analyzed_at)` > stored `source_last_record_at`. Daily cron skips unchanged doctors.
+
+**Key files:**
+- `src/lib/nudge/buckets.ts` -- 8 bucket definitions, `bucketCautions()`, `RECURRENCE_FLOOR=3`, `WINDOW_DAYS=14`
+- `src/lib/nudge/prompts.ts` -- `RISK_NUDGE_SYSTEM_PROMPT`, `RISK_NUDGE_PROMPT_VERSION = "risk-nudge-v1"`
+- `src/lib/nudge/computeNudge.ts` -- `computeNudgeForDoctor()`, `computeNudgesForActiveDoctors()`
+- `src/app/api/cron/risk-nudge/route.ts` -- fleet-wide cron POST (X-Assessment-Key auth), `maxDuration=300`
+- `src/app/api/me/nudge/route.ts` -- doctor read GET (session auth + X-View-As)
+- `src/app/RiskNudgePanel.tsx` -- UI component (shimmer / empty / data + row-hover popup)
+- `scripts/compute-nudge.ts` -- CLI: `npm run nudge -- --email ...` / `--doctorId ...` / `--force`
+- `.github/workflows/risk-nudge.yml` -- daily at `0 19 * * *` (03:00 SGT) -- FIRST scheduled workflow
+
+**Database:** `public.doctor_risk_nudges` -- one row per doctor, PK `doctor_id`.
+RLS: doctor reads own row. `authenticated`: SELECT (RLS-gated). `service_role`: all. `anon`: nothing.
+
+> WARNING: **Unapplied migration: `029_doctor_risk_nudges.sql`** -- apply in Supabase SQL Editor before first `npm run nudge` or cron run.
+
+**Invariant 8:** caution text -> DeepSeek (permitted). Langfuse receives tokens/cost/latency only.
 
 ---
 
