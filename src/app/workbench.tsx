@@ -12,7 +12,7 @@ import {
   Plus,
   Save,
   Search,
-  Settings2,
+  LayoutDashboard,
   Trash2,
   X,
 } from "lucide-react";
@@ -1346,7 +1346,7 @@ export default function Workbench({
             )}
             {isAdmin && (
               <a className="btn btn--ghost btn--sm" href="/admin" title="后台管理">
-                <Settings2 size={15} />
+                <LayoutDashboard size={15} />
                 <span className="sr-only">后台管理</span>
               </a>
             )}
