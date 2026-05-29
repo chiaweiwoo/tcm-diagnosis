@@ -17,8 +17,8 @@ A doctor-facing workbench that helps registered TCM practitioners review structu
 - **Stale-analysis warning** — banner appears when form inputs diverge from the last analyzed snapshot
 - **Consultation history** — auto-saved, paginated, with Case ID / Follow-up Case ID / AI feedback fields
 - **Doctor Risk Nudge** — workbench left sidebar aggregator showing recurring AI caution themes (weight-only, no counts) with verbatim hover popup
-- **Doctor Discussion Agenda** — inline expander in the admin users list showing 4-card weekly discussion items for each doctor
-- **Admin tools** — doctor allowlist management, per-doctor consultation review, fleet-wide AI output audit, inline discussion agenda
+- **Doctor Profile Snapshot** — admin overlay (opens on doctor row click) with quality-signal rates and flagged-case list grouped by rule (critical alerts, non-clinical noise, short exam records, high-review-count cases, near-duplicate prescriptions); on-demand cached per doctor
+- **Admin tools** — doctor allowlist management, doctor profile overlay, 30-day activity sparkline per doctor, fleet-wide AI output audit, impersonation preview (`/?viewAs=<doctorId>`) for non-self doctors
 
 ---
 
@@ -96,14 +96,12 @@ Doctor (browser)
   └── GET  /api/me/nudge             → dr_nudge themes + verbatim examples (doctor RLS-gated)
 
 Admin (is_admin = true)
-  └── /admin/users                   → doctor list with 30-day stats and inline discussion agendas
-  └── /admin/users/[doctorId]        → consultation list (read-only)
-  └── GET  /api/admin/users/[doctorId]/discussion → fetch doctor pre-computed discussion items (admin-only)
+  └── /admin/users                   → doctor list with 30-day activity sparkline; row click opens profile overlay
+  └── GET  /api/admin/users/[doctorId]/profile → snapshot + flagged cases (on-demand cached)
   └── /admin/output-audits           → fleet-wide AI output audit results
 
 GitHub Actions (ASSESSMENT_API_KEY auth)
-  └── POST /api/cron/dr_nudge             → daily SGT 03:00 SGT (19:00 UTC) computation (cron)
-  └── POST /api/cron/dr_discussion        → weekly SGT Sunday 03:00 SGT (19:00 UTC) computation (cron)
+  └── POST /api/cron/dr_nudge             → daily 03:00 SGT (19:00 UTC) computation
   └── POST /api/cron/output-audit         → fleet-wide AI output audit
 ```
 
@@ -151,22 +149,19 @@ npm run allowlist:add -- --email doctor@example.com --remove
 
 ## Background Jobs
 
-The active doctor-facing/admin-facing background jobs are:
+The active doctor-facing/admin-facing background job is:
 
-- `npm run dr_nudge -- --email doctor@example.com`
-- `npm run dr_discussion -- --email doctor@example.com`
+- `npm run dr_nudge -- --email doctor@example.com` (or `--doctorId <uuid>`; add `--force` to bypass the watermark)
 
-Or run them fleet-wide with no doctor target:
+Or run it fleet-wide with no doctor target:
 
 ```bash
 npm run dr_nudge
-npm run dr_discussion
 ```
 
-The corresponding GitHub Actions workflows are:
+The corresponding GitHub Actions workflow is:
 
-- `dr_nudge` → `POST /api/cron/dr_nudge`
-- `dr_discussion` → `POST /api/cron/dr_discussion`
+- `dr_nudge` → `POST /api/cron/dr_nudge` (daily 03:00 SGT)
 
 ### Fleet-wide AI Output Audit
 
