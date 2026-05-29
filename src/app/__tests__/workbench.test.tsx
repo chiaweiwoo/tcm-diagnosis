@@ -14,7 +14,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 // Stub sidebar panel so its fetch calls don't interfere with workbench test mocks
-vi.mock("../MyProfilePanel", () => ({ default: () => null }));
+vi.mock("../RiskNudgePanel", () => ({ default: () => null }));
 
 // ---------------------------------------------------------------------------
 // Mock fetch globally

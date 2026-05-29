@@ -21,7 +21,7 @@ import { ReactNode, memo, useCallback, useEffect, useMemo, useRef, useState } fr
 import { StructuredCaseForm, structuredCaseSchema, PRESCRIPTION_TYPES, SEX_VALUES } from "@/lib/forms/caseSchema";
 import { AnalysisResult, ensureAnalysisResult, normalizePrescriptionType } from "@/lib/ai/analysisResult";
 import { BRANDING } from "@/lib/branding";
-import MyProfilePanel from "./MyProfilePanel";
+import RiskNudgePanel from "./RiskNudgePanel";
 import { ViewAsBanner } from "./ViewAsBanner";
 import "./workbench.css";
 
@@ -1372,10 +1372,9 @@ export default function Workbench({
       <main className={`workbench__main ${viewAs ? "workbench__main--preview" : ""}`}>
         <div className="workbench__body">
 
-          {/* Left sidebar — doctor's own clinical profile (descriptive subset) */}
+          {/* Left sidebar — recurring AI risk nudge card */}
           <aside className="workbench__sidebar workbench__sidebar--left">
-            <div className="sidebar-section-title">我的画像</div>
-            <MyProfilePanel viewAsDoctorId={viewAs?.doctorId} />
+            <RiskNudgePanel viewAsDoctorId={viewAs?.doctorId} />
           </aside>
 
           {/* Center — main form + results (unchanged) */}
