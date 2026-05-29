@@ -2778,6 +2778,8 @@ details[open] .sample-details__toggle::before {
   border-radius: 10px;
   overflow: hidden;
   background: var(--surface, #fff);
+  width: fit-content;
+  max-width: 100%;
 }
 
 .users-list-head {
