@@ -389,7 +389,13 @@ Admin nav (2 tabs, `src/app/admin/AdminNav.tsx`):
 
 `AdminNav` is a client component (needs `usePathname()` for active link highlighting). Admin layout is a server component.
 
-**Doctor profile overlay** (no sub-pages): clicking a doctor row in `/admin/users` opens a fixed modal (`ProfileOverlay.tsx`) with quality signal rates + flagged case list. Inactive rows (no `doctorId`) are not clickable. Eye icon keeps its confirm popup (stopPropagation prevents row click).
+**Doctor profile overlay** (no sub-pages): clicking a doctor row in `/admin/users` opens a fixed modal (`ProfileOverlay.tsx`) with a short description caption + flagged case list. Inactive rows (no `doctorId`) are not clickable. Eye icon keeps its confirm popup (stopPropagation prevents row click).
+
+**Self-aware admin row** (`UsersList.tsx` + `ProfileOverlay.tsx`): the current admin's `auth.users.id` is resolved server-side in `users/page.tsx` and passed down as `currentDoctorId`.
+- The impersonation eye icon is hidden on the admin's own row (can't preview self).
+- When the admin opens their own profile overlay and clicks a flagged case, the new tab opens `/` (normal workbench) instead of `/?viewAs=<self>` (impersonation).
+
+**Table layout** (`admin.css`): all `.users-row` / `.users-list-head` grids share the same `grid-template-columns: 320px 1fr 80px 175px 60px` (email / sparkline / role / date / actions). The sparkline is `1fr` so it grows with viewport width while the other columns stay fixed — required because each row is its own grid container, so any content-dependent track (`max-content`, `fit-content`) would break vertical column alignment across rows.
 
 **No per-doctor sub-pages** — `/admin/users/[doctorId]` and `/admin/users/[doctorId]/profile` have been removed. The discussion agenda feature is retired entirely.
 
@@ -398,7 +404,7 @@ Clone case affordance: `POST /api/consultations/[id]/clone` — clones `form_dat
 Token usage: tracked in Langfuse only. No admin page for it.
 Activity logs: written to Supabase `activity_logs` but no admin UI page for now.
 
-Only `chiaweiwoo123@gmail.com` is seeded as admin.
+Seeded admins: `chiaweiwoo123@gmail.com`, `ardytcm@gmail.com`. Add more via `npm run allowlist:add -- --email <e> --admin`.
 
 ---
 
