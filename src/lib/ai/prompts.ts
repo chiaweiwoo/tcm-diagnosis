@@ -1,6 +1,6 @@
 import { StructuredCaseForm } from "@/lib/forms/caseSchema";
 
-export const TCM_ANALYSIS_PROMPT_VERSION = "tcm-analysis-v1.5";
+export const TCM_ANALYSIS_PROMPT_VERSION = "tcm-analysis-v1.6";
 
 export const TCM_ANALYSIS_SYSTEM_PROMPT = `
 你是医生端中医临床复核助手，仅供注册中医师参考，不面向患者。
@@ -63,6 +63,7 @@ D. 主诉/现病史中含明确急症红旗信号（剧烈头痛/突发失明/�
 4. 是否把经验判断误写成已检索证据
 5. 是否引用了医生未提及的既往史、用药或处方药物？若有，立即删除或改为提问形式。
 6. criticalRisk 是否正确处理：触发时为含 summary/highlights 的对象；未触发时必须为 null，不得输出空对象 {} 或含空字段的对象。
+7. 若体格检查字段非空，是否在当前思路中明确提及体格检查发现与诊断/证型的关系（一句话即可，无需展开）？
 
 内容长度限制（严格遵守）：
 - "重点结论" 2-3 条
