@@ -272,24 +272,37 @@ RLS: Admin-only. Bypassed by `service_role` (no grants to authenticated or anon)
 
 ## Doctor Profile Snapshot
 
-On-demand, admin-only snapshot of deterministic metrics per doctor. Computed fresh on each page load — no caching, no stored state, no AI calls.
+On-demand, admin-only snapshot of deterministic metrics per doctor. Computed fresh on each page load — no caching, no stored state.
 
-**Page:** `/admin/users/[doctorId]/profile` — server component, calls `computeDoctorProfile()` directly with service_role client.
+**Page:** `/admin/users/[doctorId]/profile` — server component, calls `computeDoctorProfile()` and `findFlaggedCases()` in parallel with service_role client.
 
-**Three metric groups:**
-1. **质量信号** — rates over all analyzed cases: `criticalRiskRate` (辨证警示触发), `nonClinicalRate` (非临床信息出现), `realCautionsRate` (风险有实质内容，非fallback)
-2. **AI响应深度** — per-section mean item count + zero-count rate: 建议优化, 可选思路, 可取之处, 需要复核, 风险与提醒, 随访监测
-3. **输入完整度** — per-field average character count: 7 clinical fields
+**Layout:**
+1. **Header strip** — three aggregate rates: `criticalRiskRate`, `nonClinicalRate`, `realCautionsRate`
+2. **待关注病案** — flagged case list grouped by rule (see rules below)
 
-**Low-sample warning:** when `totalAnalyzed < LOW_SAMPLE_THRESHOLD` (20), a yellow banner recommends accumulating more cases before drawing conclusions.
+**Flagged case rules (priority order; each case counted once):**
+| # | Rule | Threshold | Cap | Min N |
+|---|---|---|---|---|
+| 1 | AI 触发辨证警示 | boolean | 10 | always |
+| 2 | 非临床信息混入 | boolean | 5 | always |
+| 3 | 需要复核 项目偏多 | > doctor's own P90 | 10 | 20 |
+| 4 | 体查记录偏短 | < doctor's own P10 | 5 | 20 |
+| 5 | 现病史记录偏短 | < doctor's own P10 | 5 | 20 |
+| + | 处方高度重复 | DeepSeek Flash clusters ≥ 3 equivalent prescriptions (top 3) | — | 20 |
+
+When `totalAnalyzed < LOW_SAMPLE_THRESHOLD` (20), only boolean rules (1 & 2) fire; percentile and clustering rules are skipped with a note in the section header.
 
 **Key files:**
-- `src/lib/analytics/doctorProfile.ts` — `computeDoctorProfile(client, doctorId)`, `LOW_SAMPLE_THRESHOLD`, pure helper functions (`computeMean`, `computeZeroRate`, `isCautionsFallbackOnly`)
-- `src/lib/analytics/doctorProfile.test.ts` — unit tests for pure helpers
-- `src/app/admin/users/[doctorId]/profile/page.tsx` — server page (renders snapshot)
+- `src/lib/analytics/doctorProfile.ts` — `computeDoctorProfile()`, `findFlaggedCases()`, `computePercentile()`, `LOW_SAMPLE_THRESHOLD`
+- `src/lib/analytics/clusterPrescriptions.ts` — DeepSeek Flash call for prescription clustering (fail-open)
+- `src/lib/analytics/profilePrompts.ts` — `PRESC_CLUSTER_SYSTEM_PROMPT`, `PRESC_CLUSTER_PROMPT_VERSION`
+- `src/lib/analytics/doctorProfile.test.ts` — 13 unit tests (mean, zeroRate, percentile, fallback detection)
+- `src/app/admin/users/[doctorId]/profile/page.tsx` — server page
 - `src/app/admin/users/[doctorId]/DoctorSubNav.tsx` — client sub-nav (病案列表 | 评估快照)
 
-**No DB table, no migration needed.** All data comes from `consultations.analysis_result` JSONB and `consultations.form_data` JSONB via service_role.
+**No DB table, no migration needed.** All data from `consultations.analysis_result` JSONB and `consultations.form_data` JSONB via service_role.
+
+**Invariant 8:** prescription text → DeepSeek (permitted). Langfuse not wired for clustering call.
 
 **Fallback detection:** cautions-only-fallback = `cautions.length === 1 && cautions[0] === "请结合面诊与必要检查复核后执行。"`. Real cautions are counted when this condition is false.
 
