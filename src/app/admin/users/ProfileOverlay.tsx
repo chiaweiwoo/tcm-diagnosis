@@ -24,11 +24,13 @@ function FlagGroup({
   cases,
   doctorId,
   rateLabel,
+  isSelf,
 }: {
   ruleKey: RuleKey;
   cases: FlaggedCase[];
   doctorId: string;
   rateLabel?: string;
+  isSelf: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   if (cases.length === 0) return null;
@@ -48,7 +50,7 @@ function FlagGroup({
         <div
           key={c.id}
           className="profile-flag-row profile-flag-row--clickable"
-          onClick={() => window.open(`/?viewAs=${doctorId}`, "_blank")}
+          onClick={() => window.open(isSelf ? "/" : `/?viewAs=${doctorId}`, "_blank")}
           title="在新标签页中查看医生工作台"
         >
           <span className="profile-flag-date">{c.date}</span>
@@ -79,9 +81,11 @@ function ClusterGroup({ cluster }: { cluster: PrescriptionCluster }) {
 function ProfileBody({
   doctorId,
   data,
+  isSelf,
 }: {
   doctorId: string;
   data: ProfileData | "loading" | "error";
+  isSelf: boolean;
 }) {
   if (data === "loading") {
     return (
@@ -137,6 +141,7 @@ function ProfileBody({
             ruleKey={ruleKey}
             cases={byRule.get(ruleKey) ?? []}
             doctorId={doctorId}
+            isSelf={isSelf}
             rateLabel={
               ruleKey === "criticalRisk"
                 ? `触发率 ${(snapshot.criticalRiskRate * 100).toFixed(1)}%`
@@ -178,11 +183,13 @@ export function ProfileOverlay({
   doctorId,
   doctorEmail,
   data,
+  isSelf,
   onClose,
 }: {
   doctorId: string;
   doctorEmail: string;
   data: ProfileData | "loading" | "error";
+  isSelf: boolean;
   onClose: () => void;
 }) {
   useEffect(() => {
@@ -209,7 +216,7 @@ export function ProfileOverlay({
             <X size={15} />
           </button>
         </div>
-        <ProfileBody doctorId={doctorId} data={data} />
+        <ProfileBody doctorId={doctorId} data={data} isSelf={isSelf} />
       </div>
     </div>
   );

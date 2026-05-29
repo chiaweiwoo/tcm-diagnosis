@@ -35,7 +35,13 @@ function Sparkline({ counts }: { counts: number[] }) {
   );
 }
 
-export function UsersList({ doctors }: { doctors: DoctorRow[] }) {
+export function UsersList({
+  doctors,
+  currentDoctorId,
+}: {
+  doctors: DoctorRow[];
+  currentDoctorId: string | null;
+}) {
   const [query, setQuery] = useState("");
   const [confirmPreviewId, setConfirmPreviewId] = useState<string | null>(null);
   const [overlayDoctorId, setOverlayDoctorId] = useState<string | null>(null);
@@ -126,34 +132,36 @@ export function UsersList({ doctors }: { doctors: DoctorRow[] }) {
                   </span>
                   <span className="users-row__date">{formatSGT(doc.lastActive)}</span>
                   <span className="users-row__actions">
-                    <span className="eye-confirm-wrap">
-                      <button
-                        className={`users-row__action-btn${confirmPreviewId === doc.doctorId ? " eye-btn--active" : ""}`}
-                        title="以该医生身份预览工作台（只读）"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setConfirmPreviewId(
-                            confirmPreviewId === doc.doctorId ? null : doc.doctorId
-                          );
-                        }}
-                      >
-                        <Eye size={16} />
-                      </button>
-                      {confirmPreviewId === doc.doctorId && (
-                        <div className="eye-confirm-popup" onClick={(e) => e.stopPropagation()}>
-                          <span className="eye-confirm-label">进入只读预览</span>
-                          <Link href={`/?viewAs=${doc.doctorId}`} className="eye-confirm-ok">
-                            确认
-                          </Link>
-                          <button
-                            className="eye-confirm-cancel"
-                            onClick={() => setConfirmPreviewId(null)}
-                          >
-                            取消
-                          </button>
-                        </div>
-                      )}
-                    </span>
+                    {doc.doctorId !== currentDoctorId && (
+                      <span className="eye-confirm-wrap">
+                        <button
+                          className={`users-row__action-btn${confirmPreviewId === doc.doctorId ? " eye-btn--active" : ""}`}
+                          title="以该医生身份预览工作台（只读）"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setConfirmPreviewId(
+                              confirmPreviewId === doc.doctorId ? null : doc.doctorId
+                            );
+                          }}
+                        >
+                          <Eye size={16} />
+                        </button>
+                        {confirmPreviewId === doc.doctorId && (
+                          <div className="eye-confirm-popup" onClick={(e) => e.stopPropagation()}>
+                            <span className="eye-confirm-label">进入只读预览</span>
+                            <Link href={`/?viewAs=${doc.doctorId}`} className="eye-confirm-ok">
+                              确认
+                            </Link>
+                            <button
+                              className="eye-confirm-cancel"
+                              onClick={() => setConfirmPreviewId(null)}
+                            >
+                              取消
+                            </button>
+                          </div>
+                        )}
+                      </span>
+                    )}
                   </span>
                 </div>
               </div>
@@ -192,6 +200,7 @@ export function UsersList({ doctors }: { doctors: DoctorRow[] }) {
           doctorId={overlayDoctorId}
           doctorEmail={overlayDoctor.email}
           data={profiles[overlayDoctorId] ?? "loading"}
+          isSelf={overlayDoctorId === currentDoctorId}
           onClose={() => setOverlayDoctorId(null)}
         />
       )}

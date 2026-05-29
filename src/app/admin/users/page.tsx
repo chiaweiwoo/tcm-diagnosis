@@ -1,4 +1,5 @@
-import { getServiceRoleClient } from "@/lib/supabase/server";
+import { createServerSupabaseClient, getServiceRoleClient } from "@/lib/supabase/server";
+import { getDevBypassDoctorEmail } from "@/lib/auth";
 import { UsersList } from "./UsersList";
 
 export type DoctorRow = {
@@ -91,8 +92,20 @@ async function loadDoctors(): Promise<DoctorRow[]> {
   );
 }
 
+async function getCurrentDoctorId(): Promise<string | null> {
+  const bypassEmail = getDevBypassDoctorEmail();
+  if (bypassEmail) {
+    const admin = getServiceRoleClient();
+    const { data } = await admin.auth.admin.listUsers({ perPage: 1000 });
+    return data?.users.find((u) => u.email?.toLowerCase() === bypassEmail.toLowerCase())?.id ?? null;
+  }
+  const supabase = await createServerSupabaseClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  return user?.id ?? null;
+}
+
 export default async function UsersPage() {
-  const doctors = await loadDoctors();
+  const [doctors, currentDoctorId] = await Promise.all([loadDoctors(), getCurrentDoctorId()]);
 
   return (
     <main className="admin-page">
@@ -111,7 +124,7 @@ export default async function UsersPage() {
           </p>
         </div>
       ) : (
-        <UsersList doctors={doctors} />
+        <UsersList doctors={doctors} currentDoctorId={currentDoctorId} />
       )}
     </main>
   );
