@@ -1,7 +1,7 @@
 /**
  * Analytics utilities.
  *
- * buildWindow — shared by evaluateDoctor and the evaluate-doctors cron.
+ * buildWindow — shared analytics date-window helper.
  * buildWindowFromLatestAnalysis — anchors window to the most recent analyzed_at
  *   across the entire fleet. Used by the output audit so the window always covers
  *   real activity even if no one has analyzed today.

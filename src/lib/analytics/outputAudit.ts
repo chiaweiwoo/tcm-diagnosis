@@ -15,7 +15,7 @@ import { callDeepSeekJson, getDeepSeekFastModel } from "@/lib/ai/deepseek";
 import { buildOutputAuditSystemPrompt, OUTPUT_AUDIT_PROMPT_VERSION } from "./prompts";
 import { TCM_ANALYSIS_PROMPT_VERSION } from "@/lib/ai/prompts";
 import { buildWindowFromLatestAnalysis } from "./stats";
-import { serializeConsultationsCompact } from "./evaluation";
+import { serializeConsultationsCompact } from "./serializeConsultationsCompact";
 import { getLangfuse } from "@/lib/langfuse";
 
 // ---------------------------------------------------------------------------

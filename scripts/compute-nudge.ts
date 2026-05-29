@@ -9,7 +9,7 @@
  *
  * Requires: .env.local with NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY + DEEPSEEK_API_KEY
  * Run: node --env-file=.env.local node_modules/.bin/tsx scripts/compute-nudge.ts --email ...
- *      OR: npm run nudge -- --email ...
+ *      OR: npm run dr_nudge -- --email ...
  */
 
 import { createClient } from "@supabase/supabase-js";
@@ -61,11 +61,11 @@ async function resolveUuidByEmail(targetEmail: string): Promise<string> {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
-  console.log("=== Doctor Risk Nudge CLI ===\n");
+  console.log("=== dr_nudge CLI ===\n");
 
   if (!email && !doctorId) {
     // No target — run fleet-wide
-    console.log("No --email or --doctorId specified. Running fleet-wide...\n");
+    console.log("No --email or --doctorId specified. Running fleet-wide sequentially...\n");
     const result = await computeNudgesForActiveDoctors(admin);
     console.log(`✓ Computed: ${result.computed.length} doctor(s)`);
     if (result.computed.length) console.log("  ", result.computed.join(", "));

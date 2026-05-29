@@ -1,30 +1,33 @@
-name: Doctor Risk Nudge
+name: dr_nudge
 
 on:
-  # First scheduled workflow in this project — daily at 03:00 SGT (19:00 UTC)
   schedule:
     - cron: "0 19 * * *"
-  # Also triggerable manually for ad-hoc runs
   workflow_dispatch:
 
 jobs:
-  nudge:
+  dr_nudge:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Trigger risk-nudge computation
+      - name: Trigger dr_nudge computation
         run: |
+          ROUTE="${{ secrets.ASSESS_BASE_URL }}/api/cron/dr_nudge"
+          echo "Route: $ROUTE"
+
           STATUS=$(curl -s --max-time 290 -o /tmp/result.json -w "%{http_code}" \
-            -X POST "${{ secrets.ASSESS_BASE_URL }}/api/cron/risk-nudge" \
+            -X POST "$ROUTE" \
             -H "X-Assessment-Key: ${{ secrets.ASSESSMENT_API_KEY }}")
 
+          echo "HTTP status: $STATUS"
+          echo "Response body:"
           cat /tmp/result.json
-          echo ""
+          echo
 
           if [ "$STATUS" -eq 200 ]; then
-            echo "Risk nudge computation completed successfully."
+            echo "dr_nudge completed successfully."
             exit 0
           else
-            echo "HTTP $STATUS — risk nudge computation failed."
+            echo "dr_nudge failed."
             exit 1
           fi

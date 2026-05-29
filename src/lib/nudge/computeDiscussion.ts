@@ -4,8 +4,8 @@
  *   1. Aggregation of 14-day diagnosis × pattern × modality counts (N >= 2)
  *   2. DeepSeek Flash generation of constructive discussion cards
  *
- * Robustness guarantee: if AI fails for any reason, system evaluation guidance points
- * are reshaped into fallback discussion cards.
+ * Robustness guarantee: if AI fails for any reason, deterministic case-group prompts
+ * are generated as fallback discussion cards.
  *
  * Invariant 8: aggregated case metrics sent to DeepSeek (permitted).
  *              Langfuse receives tokens/cost/latency ONLY — never clinical text or questions.
@@ -131,34 +131,21 @@ export function parseAiOutput(text: string): AiDiscussionItem[] {
   }
 }
 
-/** Reshapes stored evaluation guidance points into discussion items (graceful fallback). */
+/** Build deterministic discussion items directly from case groups (graceful fallback). */
 export function buildFallbackItems(
-  guidancePoints: Array<{ text: string; score: number }> | null,
   caseGroups: CaseGroup[],
 ): DiscussionItem[] {
-  const points = guidancePoints ?? [];
-
-  function findAnchor(question: string) {
-    const q = question.toLowerCase();
-    const matched = caseGroups.find((g) => {
-      const d = (g.diagnosis ?? "").toLowerCase();
-      return q.includes(d) || d.split(/[/\s]/).some((t) => t.length > 1 && q.includes(t));
-    });
-    return matched ?? null;
-  }
-
-  return points
-    .map((g) => {
-      const anchor = findAnchor(g.text);
-      return {
-        question: g.text,
-        caseAnchor: anchor ? `${anchor.diagnosis} ${anchor.n} 例` : null,
-        caseGroup: anchor ? `${anchor.diagnosis}×${anchor.pattern}×${anchor.modality}` : null,
-        reasoning: "系统评估发现的可讨论临床建议",
-        followUp: null,
-        n: anchor ? anchor.n : 0,
-      };
-    })
+  return caseGroups
+    .map((group) => ({
+      question: `最近反复出现的“${group.diagnosis} / ${group.pattern} / ${group.modality}”病例，是否还可以再总结一条更稳定的辨证抓手？`,
+      caseAnchor: `${group.diagnosis} ${group.n} 例`,
+      caseGroup: `${group.diagnosis}×${group.pattern}×${group.modality}`,
+      reasoning: `近14天内这一组病例重复出现 ${group.n} 次，适合优先做一次集中复盘。`,
+      followUp: group.complaints?.[0]
+        ? `可先从“${group.complaints[0]}”这类主诉切入，回看辨证与处置是否足够一致。`
+        : "可先回看同组病例的主诉、辨证与处置是否保持一致。",
+      n: group.n,
+    }))
     .slice(0, 4);
 }
 
@@ -166,7 +153,7 @@ export function buildFallbackItems(
 
 /**
  * Compute and upsert the discussion agenda row for a single doctor.
- * Graceful degradation: AI failure → shapes evaluation guidance points.
+ * Graceful degradation: AI failure → fall back to deterministic case-group prompts.
  */
 export async function computeDiscussionForDoctor(
   client: SupabaseClient,
@@ -261,24 +248,9 @@ export async function computeDiscussionForDoctor(
     .sort((a, b) => b.n - a.n)
     .slice(0, 20);
 
-  // Step 5: fetch latest system evaluation guidance points
-  const { data: evalRow, error: evalErr } = await client
-    .from("analytics_doctor_evaluations")
-    .select("doctor_profile")
-    .eq("doctor_id", doctorId)
-    .order("window_end", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  const evalProfile = evalRow?.doctor_profile as Record<string, any> | null;
-  const guidancePoints = Array.isArray(evalProfile?.guidancePoints)
-    ? (evalProfile.guidancePoints as Array<{ text: string; score: number }>)
-    : null;
-
-  // Step 6: check if we have any case groups to discuss
+  // Step 5: check if we have any case groups to discuss
   if (sortedGroups.length === 0) {
-    // No groups with N>=2. Gracefully reshape guidance points directly without AI.
-    const fallbackItems = buildFallbackItems(guidancePoints, sortedGroups);
+    const fallbackItems: DiscussionItem[] = [];
     await client.from("doctor_discussion_agenda").upsert(
       {
         doctor_id: doctorId,
@@ -296,23 +268,17 @@ export async function computeDiscussionForDoctor(
     return { status: fallbackItems.length > 0 ? "computed" : "no-themes", itemCount: fallbackItems.length };
   }
 
-  // Step 7: build AI input
+  // Step 6: build AI input
   const groupLines = sortedGroups.map(
     (g) => `${g.diagnosis} × ${g.pattern} × ${g.modality}: ${g.n}例`,
   );
-  const evalGuidance = (guidancePoints ?? [])
-    .map((g) => `- ${g.text}（评估信号强度 ${g.score}）`)
-    .join("\n");
 
   const aiInput = [
     `=== 14天病案聚合（共 ${consultations.length} 例记录） ===`,
     groupLines.join("\n"),
-    "",
-    "=== 系统评估发现的可讨论方向 ===",
-    evalGuidance || "(无)",
   ].join("\n");
 
-  // Step 8: call AI for discussion agenda generation (graceful fallback)
+  // Step 7: call AI for discussion agenda generation (graceful fallback)
   const model = getDeepSeekFastModel();
   let items: DiscussionItem[];
   let usedModel: string | null = null;
@@ -346,15 +312,14 @@ export async function computeDiscussionForDoctor(
 
     // If AI successfully parsed 0 items, fall back to reshaping
     if (items.length === 0) {
-      items = buildFallbackItems(guidancePoints, sortedGroups);
+      items = buildFallbackItems(sortedGroups);
     }
   } catch (err) {
     console.error("AI Discussion generation failed:", err);
-    // AI failed — use fallback reshaping (never empty on AI failure if guidance exists)
-    items = buildFallbackItems(guidancePoints, sortedGroups);
+    items = buildFallbackItems(sortedGroups);
   }
 
-  // Step 9: upsert into DB
+  // Step 8: upsert into DB
   const { error: upsertError } = await client.from("doctor_discussion_agenda").upsert(
     {
       doctor_id: doctorId,
@@ -374,13 +339,13 @@ export async function computeDiscussionForDoctor(
     throw new Error(`computeDiscussionForDoctor: supabase upsert failed: ${upsertError.message}`);
   }
 
-  // Step 10: Langfuse — tokens/cost/latency ONLY (invariant 8: no clinical/agenda text)
+  // Step 9: Langfuse — tokens/cost/latency ONLY (invariant 8: no clinical/agenda text)
   try {
     const lf = getLangfuse();
     if (lf && aiUsage) {
-      const trace = lf.trace({ name: "discussion-agenda", userId: doctorId });
+      const trace = lf.trace({ name: "dr_discussion", userId: doctorId });
       trace.generation({
-        name: "discussion-agenda-flash",
+        name: "dr_discussion-flash",
         model,
         usage: {
           input: aiUsage.prompt_tokens ?? 0,
@@ -424,39 +389,61 @@ export async function computeDiscussionsForActiveDoctors(
   const computed: string[] = [];
   const skipped: string[] = [];
 
+  console.log(`[dr_discussion] Starting fleet-wide computation for ${allowlist.length} active doctors...`);
+
   for (const { email } of allowlist) {
+    console.log(`\n[dr_discussion] Processing doctor: ${email}`);
     try {
       // Resolve UUID by email
       const { data: usersData, error: userErr } = await client.auth.admin.listUsers({
         page: 1,
         perPage: 1000,
       });
-      if (userErr) continue;
+      if (userErr) {
+        console.error(`  ❌ Failed to list users to resolve ID: ${userErr.message}`);
+        skipped.push(email);
+        continue;
+      }
 
       const user = usersData.users.find(
         (u) => u.email?.toLowerCase().trim() === email.toLowerCase().trim(),
       );
       if (!user) {
+        console.warn(`  ⚠️ No registered user found in auth.users matching email.`);
         skipped.push(email);
         continue;
       }
+
+      console.log(`  Resolved UUID: ${user.id}`);
 
       const latest = await getLatestAnalyzedAt(client, user.id);
       if (!latest) {
+        console.log(`  → Skipped: No analyzed consultations found.`);
         skipped.push(email);
         continue;
       }
 
+      console.log(`  Latest analyzed case at: ${latest.toISOString()}`);
+
       const result = await computeDiscussionForDoctor(client, user.id);
+      console.log(`  → Result status: ${result.status}`);
+
       if (result.status === "skipped") {
+        console.log(`  → Skipped: Watermark unchanged.`);
         skipped.push(email);
       } else {
+        console.log(`  ✓ Successfully computed: ${result.itemCount ?? 0} items generated.`);
         computed.push(email);
       }
-    } catch {
+    } catch (err) {
+      console.error(`  ❌ Error processing ${email}:`, err instanceof Error ? err.message : String(err));
       skipped.push(email);
     }
   }
+
+  console.log(`\n[dr_discussion] Fleet-wide computation completed.`);
+  console.log(`  - Computed: ${computed.length} doctors (${computed.join(", ") || "none"})`);
+  console.log(`  - Skipped:  ${skipped.length} doctors (${skipped.join(", ") || "none"})`);
 
   return { computed, skipped };
 }

@@ -37,7 +37,7 @@ Neither → 401. Enforced by `src/lib/apiAuth.ts` called at the top of both rout
 
 `/api/admin/*` routes require a valid Supabase session AND `is_admin = true` on `doctor_allowlist`. Returns 403 otherwise.
 
-The manual workflow uses the `scripts/evaluate-local.ts` process runner triggered via GitHub Actions workflow_dispatch with required doctor email/ID parameters. GitHub Actions secret name is `ASSESSMENT_API_KEY`.
+`ASSESSMENT_API_KEY` must also be present in GitHub Actions secrets for the cron workflows that call `/api/cron/dr_nudge`, `/api/cron/dr_discussion`, and `/api/cron/output-audit`.
 
 ### 4. DEV_AUTH_BYPASS must never reach production
 
@@ -129,7 +129,7 @@ order by c.relname;
 ### 12. Model selection — DeepSeek by default, smart model only with written justification
 
 - **Clinical analysis is DeepSeek-only.** Chinese clinical content, established prompts. Never route clinical content through any other provider.
-- **Doctor evaluation (Goal 1+2) uses DeepSeek.** Use Flash (`DEEPSEEK_MODEL_FAST`). Escalate to Pro (`deepseek-reasoner`) only if tone or quality demonstrably fails.
+- **Background jobs in this repo use DeepSeek.** Use Flash (`DEEPSEEK_MODEL_FAST`) for `dr_nudge`, `dr_discussion`, and output audit generation unless a documented reason requires escalation.
 - **Any commit that introduces a smart model (Claude, GPT, etc.) must include a written justification in the commit body explaining why DeepSeek Pro was insufficient, with concrete examples.**
 - **No `ANTHROPIC_API_KEY` in this project.**
 
@@ -137,14 +137,14 @@ order by c.relname;
 
 The workbench (`/`) left sidebar now shows `⚠️ AI 反复提醒的风险点` — the doctor's own recurring AI caution themes.
 
-- **Component:** `src/app/RiskNudgePanel.tsx` (replaces `MyProfilePanel.tsx` in the sidebar; `MyProfilePanel` retained but orphaned from doctor UI).
+- **Component:** `src/app/RiskNudgePanel.tsx`.
 - **Read endpoint:** `GET /api/me/nudge` — requires valid session; supports `X-View-As` for admin preview.
 - **Data source:** `doctor_risk_nudges` table (one row per doctor, upsert on `doctor_id` PK).
 - **What is shown:** `themes[].key` (TCM-native label ≤10字) + dynamic clinical description `themes[].description` (LLM-generated or database fallback, no frontend hardcoding) + relative frequency bar (`weight` 0–1). **No counts, no %, no verbatim text in bar area.**
 - **Row-hover popup:** shows label `示例：` + up to 5 verbatim caution excerpts from the doctor's own analyzed cases.
 - **Raw counts never leave the server** — only `weight = count / max` is sent.
 - Cache: `Cache-Control: private, max-age=300, stale-while-revalidate=600`.
-- `GET /api/me/profile` and `MyProfilePanel.tsx` retained (not deleted) — used by admin eval display. Do not delete unless admin UI is updated.
+- The old doctor profile sidebar and `/api/me/profile` are retired.
 
 ---
 
@@ -188,25 +188,25 @@ Doctor (browser)
   └── POST /api/analyze                        → DeepSeek flash model → clinical review JSON (3-column layout)
   └── /api/consultations/*                     → Supabase (save / load / delete history)
   └── POST /api/consultations/[id]/clone       → clone another doctor's consultation to own account (admin only)
-  └── GET  /api/me/nudge                       → risk-nudge card (weight-only, examples; invariant 13)
-  └── GET  /api/me/profile                     → descriptive profile subset (orphaned from doctor UI; used by admin)
+  └── GET  /api/me/nudge                       → dr_nudge card (weight-only, examples; invariant 13)
 
 Admin (browser, is_admin=true only)
   └── GET  /api/admin/users                    → doctor list with 30-day stats
   └── GET  /api/admin/users/[doctorId]/consultations → per-doctor consultation list (service_role)
-  └── GET  /api/admin/analytics/evaluate/[doctorId] → latest doctor profile evaluation
-  └── POST /api/admin/analytics/evaluate/[doctorId] → trigger new doctor profile evaluation (14d window)
+  └── GET  /api/admin/users/[doctorId]/discussion     → latest precomputed discussion agenda
   └── GET  /api/admin/analytics/output-audit       → list fleet-wide AI output audits (v3, current)
   └── POST /api/admin/analytics/output-audit       → trigger new AI output audit (v3)
   └── /admin/users                             → doctor list page
-  └── /admin/users/[doctorId]                  → 2-tab view: 病案列表 | 临床画像
+  └── /admin/users/[doctorId]                  → per-doctor consultation list (read-only)
   └── /admin/output-audits                     → fleet-wide AI output audits (v3, current)
 
 GH Actions (ASSESSMENT_API_KEY auth)
-  └── workflow_dispatch: npx tsx scripts/evaluate-local.ts → per-doctor profile evaluation (7d window)
-  └── POST /api/cron/risk-nudge daily 03:00 SGT / 19:00 UTC  (FIRST scheduled workflow in project)
+  └── POST /api/cron/dr_nudge daily 03:00 SGT / 19:00 UTC
         → computeNudgesForActiveDoctors → upsert doctor_risk_nudges per active doctor
-  └── npm run nudge -- --email <e>             → on-demand single-doctor nudge (--force to bypass watermark)
+  └── POST /api/cron/dr_discussion weekly Sunday 03:00 SGT / 19:00 UTC
+        → computeDiscussionsForActiveDoctors → upsert doctor_discussion_agenda per active doctor
+  └── npm run dr_nudge -- --email <e>          → on-demand single-doctor nudge (--force to bypass watermark)
+  └── npm run dr_discussion -- --email <e>     → on-demand single-doctor discussion (--force to bypass watermark)
 
 Workbench header (admin only):
   └── ⚙ Settings2 icon → /admin → redirects to /admin/users
@@ -228,16 +228,16 @@ Recurring AI caution aggregation surfaced in the workbench left sidebar.
 - `src/lib/nudge/buckets.ts` -- 8 bucket definitions, `bucketCautions()`, `RECURRENCE_FLOOR=3`, `WINDOW_DAYS=14`
 - `src/lib/nudge/prompts.ts` -- `RISK_NUDGE_SYSTEM_PROMPT`, `RISK_NUDGE_PROMPT_VERSION = "risk-nudge-v1"`
 - `src/lib/nudge/computeNudge.ts` -- `computeNudgeForDoctor()`, `computeNudgesForActiveDoctors()`
-- `src/app/api/cron/risk-nudge/route.ts` -- fleet-wide cron POST (X-Assessment-Key auth), `maxDuration=300`
+- `src/app/api/cron/dr_nudge/route.ts` -- fleet-wide cron POST (X-Assessment-Key auth), `maxDuration=300`
 - `src/app/api/me/nudge/route.ts` -- doctor read GET (session auth + X-View-As)
 - `src/app/RiskNudgePanel.tsx` -- UI component (shimmer / empty / data + row-hover popup)
-- `scripts/compute-nudge.ts` -- CLI: `npm run nudge -- --email ...` / `--doctorId ...` / `--force`
-- `.github/workflows/risk-nudge.yml` -- daily at `0 19 * * *` (03:00 SGT) -- FIRST scheduled workflow
+- `scripts/compute-nudge.ts` -- CLI: `npm run dr_nudge -- --email ...` / `--doctorId ...` / `--force`
+- `.github/workflows/dr_nudge.yml` -- daily at `0 19 * * *` (03:00 SGT)
 
 **Database:** `public.doctor_risk_nudges` -- one row per doctor, PK `doctor_id`.
 RLS: doctor reads own row. `authenticated`: SELECT (RLS-gated). `service_role`: all. `anon`: nothing.
 
-> WARNING: **Unapplied migration: `029_doctor_risk_nudges.sql` and `030_doctor_discussion_agenda.sql`** -- apply in Supabase SQL Editor before first `npm run nudge` or `npm run discussion` run.
+> WARNING: **Unapplied migration: `029_doctor_risk_nudges.sql` and `030_doctor_discussion_agenda.sql`** -- apply in Supabase SQL Editor before first `npm run dr_nudge` or `npm run dr_discussion` run.
 
 **Invariant 8:** caution text -> DeepSeek (permitted). Langfuse receives tokens/cost/latency only.
 
@@ -249,18 +249,18 @@ Case-review discussion agenda pre-computed weekly and surfaced inline under each
 
 **Two-stage pipeline:**
 1. **Deterministic aggregation** (always runs; the floor): 14-day consultations window ending at `MAX(analyzed_at)` are grouped by `diagnosis × pattern × modality`. Groups with N >= 2 are surfaced, sorted by count desc, and noise cases are excluded via regex.
-2. **DeepSeek Flash generation** (polish; optional): AI generates up to 4 constructive discussion items, consisting of: clinical question (≤28字), case anchor ("诊断 N 例"), case group, 精简背景 (≤30字), and 跟进问法 (≤25字) for the senior reviewer to ask. **If AI fails, system evaluation guidance points are reshaped into fallback cards dynamically. The agenda is never empty due to AI outage if evaluation data exists.**
+2. **DeepSeek Flash generation** (polish; optional): AI generates up to 4 constructive discussion items, consisting of: clinical question (≤28字), case anchor ("诊断 N 例"), case group, 精简背景 (≤30字), and 跟进问法 (≤25字) for the senior reviewer to ask. **If AI fails, deterministic case-group prompts are used as fallback cards.**
 
 **Watermark trigger:** only recompute if `MAX(analyzed_at)` > stored `source_last_record_at` or prompt version changes. Weekly cron skips unchanged doctors.
 
 **Key files:**
 - `src/lib/nudge/discussionPrompts.ts` -- `DISCUSSION_SYSTEM_PROMPT`, `DISCUSSION_PROMPT_VERSION = "discussion-v1.1"`
 - `src/lib/nudge/computeDiscussion.ts` -- `computeDiscussionForDoctor()`, `computeDiscussionsForActiveDoctors()`
-- `src/app/api/cron/discussion-agenda/route.ts` -- fleet-wide weekly pre-compute POST (X-Assessment-Key auth), `maxDuration=300`
+- `src/app/api/cron/dr_discussion/route.ts` -- fleet-wide weekly pre-compute POST (X-Assessment-Key auth), `maxDuration=300`
 - `src/app/api/admin/users/[doctorId]/discussion/route.ts` -- admin read GET (admin auth, 1h cache)
 - `src/app/admin/users/UsersList.tsx` -- UI component (inline expander accordion, full skeletons, map caching)
-- `scripts/compute-discussion.ts` -- CLI: `npm run discussion -- --email ...` / `--doctorId ...` / `--force`
-- `.github/workflows/discussion-agenda.yml` -- weekly SGT Sunday 03:00 SGT (19:00 UTC) -- SECOND scheduled workflow
+- `scripts/compute-discussion.ts` -- CLI: `npm run dr_discussion -- --email ...` / `--doctorId ...` / `--force`
+- `.github/workflows/dr_discussion.yml` -- weekly SGT Sunday 03:00 SGT (19:00 UTC)
 
 **Database:** `public.doctor_discussion_agenda` -- one row per doctor, PK `doctor_id`.
 RLS: Admin-only. Bypassed by `service_role` (no grants to authenticated or anon).
@@ -376,11 +376,9 @@ Admin nav (2 tabs, `src/app/admin/AdminNav.tsx`):
 
 `AdminNav` is a client component (needs `usePathname()` for active link highlighting). Admin layout is a server component.
 
-Per-doctor read-only view (`/admin/users/[doctorId]`) — 2-tab view: 病案列表 | 临床画像
-- **病案列表** — compact paginated table (15/page) of consultation records. Auto-refreshes seamlessly in the background every 10 seconds via Next.js `router.refresh()` in `DoctorTabs.tsx` to keep the list of consultations up to date.
-- **临床画像** — `doctorProfile` from `analytics_doctor_evaluations`; includes 运行评估 button (14-day window, append-only).
-  - **Caching**: The `/api/admin/analytics/evaluate/[doctorId]` endpoint returns a private browser cache header (`Cache-Control: private, max-age=60, stale-while-revalidate=120`) to cache the static review results efficiently.
-  - **Real-Time Time-Series**: The lightweight `/api/admin/analytics/evaluate/[doctorId]/timeseries` endpoint polls client-side every 10 seconds inside `TimeSeriesCard` to ensure the daily case count chart reflects active doctor submissions in real time.
+Per-doctor read-only view (`/admin/users/[doctorId]`) — consultation list only
+- **病案列表** — compact paginated table of consultation records for that doctor.
+- The old `临床画像` tab and its trigger flow are retired.
 
 Each consultation row has a **拷贝此病案** button — clones `form_data` only to admin's own account.
 Clone inserts a new draft consultation under admin's UUID with `model_meta = { cloned_from_doctor_email: "..." }`.
@@ -393,90 +391,17 @@ Only `chiaweiwoo123@gmail.com` is seeded as admin.
 
 ---
 
-## Doctor Evaluation (Goal 2 — medical doctor review)
+## Legacy Goal 2 status
 
-**On-demand only.** No scheduled cron. Triggered by:
-- Admin UI button on `/admin/users/[doctorId]` → 临床画像 tab
-- GH Actions `workflow_dispatch` (`.github/workflows/evaluate-doctor.yml`) for manual per-doctor runs
-- Local CLI: `npm run evaluate -- --email doctor@example.com` (Requires email or doctorId)
+The old doctor-profile evaluation stack is retired from runtime use:
 
-Route: `POST /api/admin/analytics/evaluate/[doctorId]`
-- Admin session auth required
-- Window: **7 days rolling** (default), append-only (no upsert)
-- Sampling: **Hard cap at 100 cases**. If N > 100, dynamic stratified round-robin sampling is applied across case categories (妇科调理, 皮肤问题, etc.) sorted newest-first, maintaining chronological ascending order for the final selected cases.
-- Empty window → 400 `NO_CONSULTATIONS` with friendly Chinese message
+- removed workflow: `.github/workflows/evaluate-doctor.yml`
+- removed cron route: `/api/cron/evaluate-doctors`
+- removed CLI entrypoints: `npm run evaluate`, `scripts/evaluate-local.ts`, `scripts/evaluate.mjs`
+- removed admin evaluation routes and UI trigger flow
+- removed doctor-facing `/api/me/profile` and `MyProfilePanel.tsx`
 
-Process Runner: `scripts/evaluate-local.ts`
-- Initiated via GitHub Actions workflow or CLI.
-- Requires either `--email` or `--doctorId` target to be specified (fails with validation error otherwise).
-- Automatically resolves target active doctor credentials from the allowlist and auth tables.
-- Executes the full 4-stage pipeline and saves the evaluation record to `analytics_doctor_evaluations` under the doctor's UUID.
-- If the doctor has 0 consultations in the 7-day window, skips cleanly with a friendly message.
-
-### Hardened Pipeline (medical v2.0)
-
-Goal 2 is a doctor-readable clinical review. The canonical evaluator uses a 4-stage batch-and-synthesize pipeline using `p-limit` for strict concurrency control:
-
-1. **Stage 1: Per-row compression (Flash)**:
-   - Compresses each raw consultation into a tiny case card.
-   - Throttled concurrency: `p-limit(6)`.
-   - Fallback: deterministic case card if API fails/timeouts.
-2. **Stage 2a: Batched synthesis (Flash)**:
-   - Groups case cards into batches of 12.
-   - Synthesizes each batch concurrently via `p-limit(4)` into partial drafts.
-   - Short-circuit optimization: If N <= 12, skips Stage 2a and 2b, executes a single Flash synthesis, and proceeds to Stage 3.
-3. **Stage 2b: Consolidated merge (Flash)**:
-   - Consolidates M partial drafts + overall aggregate signals into a single unified draft (single call).
-4. **Stage 3: Pro creative review (Pro)**:
-   - Refines the consolidated draft using DeepSeek Pro for senior professional tone.
-   - **Timeout (90s)**: Strict timeout. If Pro fails or times out, safely falls back to the consolidated Stage 2b Flash draft.
-5. **Stage 4: Length cleanup (Flash)**:
-   - Trims the final profile if the JSON string size exceeds 2600 characters.
-
-**Observability**: Spans (`stage1-flash-case-cards`, `stage2a-flash-batch-synth`, `stage2b-flash-merge`, `stage3-pro-review`, `stage4-cleanup`) trace each step in Langfuse under a single `doctor-evaluation` trace, logging pricing-aware costs, token usage, and latencies with zero clinical text leaking.
-
-- Do not show explicit `x/y`, percentages, or visible frequency counts in the admin profile UI.
-- The visible UI is split into `描述性分析` and `复盘与沟通`.
-- Pie charts / patient distribution are no longer shown in the profile UI; time-series remains as light `近期记录背景`.
-
-The active canonical storage workflow is `.github/workflows/evaluate-doctor.yml`.
-
-### Legacy deterministic pipeline (kept for helpers/tests)
-
-**Stage 1 — Observer** (`analyzeConsultations()`, pure TypeScript, no LLM):
-- `computeFieldCompleteness()` — pastHistory + physicalExam fill rates across ALL rows
-- `computePatientDistribution()` — sex, age buckets (儿童/青年/中年/老年), prescription types
-- `extractThemeCandidates()` → top 5 AI themes by frequency (from sampled cases)
-- `detectGaps()` — dual-evidence rule in code: inputRate < 70% AND aiAskRate ≥ 30%
-- `detectStrengthSignals()` — 4 heuristics: high_completeness, tongue_pulse_consistency, pattern_diversity, detailed_prescription, chief_complaint_specificity
-- Samples up to `MAX_EVAL_CASES=20` cases (stratified by prescription type, most recent first)
-
-**Stage 2 — Narrator** (`narrateFindings()`, LLM — flash model only):
-- Receives compact findings (~30 lines) + case excerpts (one line each)
-- Outputs prose only: profileSummary (3-4 sentences), keyObservations (≤4 bullets), strengths (≤6), gapsNarrative (evidence + guidance per gap), guidancePoints (≤4)
-- Cannot invent field names, rates, gap candidates, or case numbers
-
-**Merge** (`mergeProfile()`): joins Stage 1 structural fields + Stage 2 prose into stored `DoctorProfile`.
-
-`DoctorProfile` schema (v1.3):
-- `profileSummary` (string) — Stage 2
-- `keyObservations` (string[]) — Stage 2, free-form observations
-- `patientDistribution` (object | null) — Stage 1: sex/ageBuckets/prescriptionTypes
-- `fieldCompleteness` (array) — Stage 1, stored but not rendered in UI
-- `aiRecurringThemes` (array) — Stage 1 structure, Stage 2 prose
-- `strengths` (array of `{text}`) — Stage 2
-- `gaps` (array) — Stage 1 rates + Stage 2 evidence/guidanceHint
-- `guidancePoints` (array of `{text}`) — Stage 2
-
-Admin UI panel (`/admin/users/[doctorId]?tab=profile`) card order:
-1. 画像摘要
-2. 描述性分析: 临床观察, 反复提醒的风险点, 近期记录背景
-3. 复盘与沟通: 可取之处, 可讨论方向, 沟通提示
-
-All section titles have a `(?)` help tooltip.
-
-Prompts: `DOCTOR_EVALUATION_SYSTEM_PROMPT` (`doctor-eval-v1.3`) in `src/lib/analytics/prompts.ts`
-Window helper: `buildWindow(days)` in `src/lib/analytics/stats.ts`
+Historical rows in `analytics_doctor_evaluations` are preserved for now as legacy data only. Do not wire new runtime features back to that table unless the product direction explicitly changes.
 
 ## AI Output Audit (Goal 1 — v3, current)
 
@@ -528,13 +453,9 @@ npm run allowlist:add -- --email doctor@example.com [--admin]
 # Remove a doctor (soft-remove: is_active=false, auth.users preserved)
 npm run allowlist:add -- --email doctor@example.com --remove
 
-# Seed test consultations from data/seed-cases.json (gitignored)
-npm run seed:cases -- --email doctor@example.com [--reset] [--yes]
 ```
 
 The doctor can then sign in via Google OAuth — Supabase matches the existing `auth.users` row by email.
-
-`data/seed-cases.json` is gitignored — create locally, never commit. Contains `form_data` objects matching `structuredCaseSchema`. `patientAge` must be a string (HTML form input convention). Seed script calls `/api/analyze` with `X-Assessment-Key` and writes results via service-role.
 
 ---
 
@@ -567,12 +488,11 @@ Migrations: `supabase/migrations/` (numbered SQL). **Committing a migration file
 | `error_logs` | Pipeline errors (no form field values) |
 | `doctor_allowlist` | `email`, `is_active`, `is_admin` — access control source of truth |
 | `activity_logs` | Doctor activity events (login, analyze) — no UI for now |
-| `analytics_doctor_evaluations` | Per-doctor profile evaluations. No RLS (admin service_role only). Append-only — no unique constraint once migration 022_doctor_evaluations_append_only is applied. |
+| `analytics_doctor_evaluations` | Legacy Goal 2 evaluation output. Preserved for historical reference only; no active runtime code should depend on it. |
 | `analytics_output_audits` | Fleet-wide AI output audits (Goal 1 v3). No RLS. Append-only. Renamed from `analytics_session_reviews` via migration 028. Old v1 rows (no `categories` key) rendered by `LegacyReview` component until pruned. |
 
 > **Unapplied migrations (must be run in Supabase SQL Editor):**
 > - `022_drop_analytics_and_assessments.sql` — drops legacy tables (`analytics_prompt_quality_runs`, etc.)
-> - `022_doctor_evaluations_append_only.sql` — drops unique constraint on `analytics_doctor_evaluations(doctor_id, window_start, window_end)`; adds index. **Required before evaluation re-runs succeed.**
 > - `023_session_reviews_and_eval_cleanup.sql` — drops `output_review` column, creates `analytics_session_reviews` (prerequisite for 028)
 > - `028_rename_session_reviews_to_output_audits.sql` — renames `analytics_session_reviews` → `analytics_output_audits`. **Must run before new audit runs or the admin page can load data.**
 
@@ -651,7 +571,7 @@ git stash && git rebase origin/main && git stash pop && git push origin HEAD:mai
 ```
 
 **`ASSESSMENT_API_KEY` missing**
-Add it to `.env.local` and Vercel env vars. Still required for the `/api/analyze` route guard and `/api/cron/evaluate-doctors`.
+Add it to `.env.local` and Vercel env vars. Still required for the `/api/analyze` route guard and the cron routes `/api/cron/dr_nudge`, `/api/cron/dr_discussion`, and `/api/cron/output-audit`.
 
 **GitHub Actions secrets**
 Registered secrets: `ASSESS_BASE_URL` (e.g. `https://your-app.vercel.app`) and `ASSESSMENT_API_KEY`.
@@ -660,8 +580,8 @@ There is no `CRON_SECRET` or `VERCEL_PRODUCTION_URL` — do not reference these.
 **Migration file committed but not applied to production**
 Committing a `.sql` file to `supabase/migrations/` has no effect on the live DB. The error will typically be a Postgres constraint or missing-column error surfaced through the API (e.g. `duplicate key value violates unique constraint`). Fix: open Supabase SQL Editor, run the pending migration manually, then retrigger. Always check the unapplied migrations list in the Database Schema section above before assuming a schema change is live.
 
-**evaluate-doctors returns `skipped:1` with empty doctor**
-`NoConsultationsError` now counts as a skip (not failure). Check that the doctor has analyzed consultations in the last 14 days. `buildWindow` sets `windowEnd` to midnight tomorrow — intentional, includes today's records.
+**`dr_nudge` or `dr_discussion` skips doctors unexpectedly**
+Check that the doctor has analyzed consultations in the recent window and that `source_last_record_at` is not already up to date. Use `--force` in the CLI only when you intentionally want to bypass the watermark.
 
 **DeepSeek returns malformed JSON**
 Expected — repair is built in. Check `repairedJson: true` in logs. If repair triggers consistently, the prompt output format needs tightening.
@@ -707,7 +627,7 @@ Do not say done until the changed path is verified, not merely coded.
 1. Doctor feedback capture — accepted/rejected suggestion tracking
 2. External citation retrieval layer
 3. **`022_drop_analytics_and_assessments.sql`** — apply in production (drops legacy analytics/assessment tables)
-4. **`022_doctor_evaluations_append_only.sql`** — apply in production (drops unique constraint, adds index; blocks evaluate-doctors until applied)
+4. Legacy Goal 2 DB cleanup: only drop `analytics_doctor_evaluations` or related old artifacts in a separate migration after confirming no runtime code reads them
 5. **`023_session_reviews_and_eval_cleanup.sql`** — apply in production (drops `output_review` column, creates `analytics_session_reviews`; prerequisite for 028)
 6. **`028_rename_session_reviews_to_output_audits.sql`** — apply in production (renames `analytics_session_reviews` → `analytics_output_audits`; required before new audits can write or the admin page can load)
 7. Phase 2: doctor-facing surface (doctorFacingHint removed from v1.1 schema; revisit if needed)

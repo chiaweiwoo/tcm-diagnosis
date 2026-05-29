@@ -2,7 +2,7 @@
  * GET /api/me/nudge
  *
  * Returns the doctor's risk-nudge card (AI 反复提醒的风险点).
- * Supports admin X-View-As preview (same pattern as /api/me/profile).
+ * Supports admin X-View-As preview.
  *
  * Raw counts are NEVER sent to the client — only weights (0–1) and examples.
  * Cache: private, 5 min (nudge updates at most once per daily cron run).

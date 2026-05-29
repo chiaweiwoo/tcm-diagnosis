@@ -1,14 +1,10 @@
 import Link from "next/link";
-import { Suspense } from "react";
 import { getServiceRoleClient } from "@/lib/supabase/server";
 import { ConsultationTable } from "./ConsultationTable";
-import { DoctorTabs } from "./DoctorTabs";
-import { EvaluationPanel } from "./EvaluationPanel";
 import type { StructuredCaseForm } from "@/lib/forms/caseSchema";
 
 type RouteContext = {
   params: Promise<{ doctorId: string }>;
-  searchParams: Promise<{ tab?: string }>;
 };
 
 type ConsultationRow = {
@@ -62,9 +58,8 @@ function formatSGT(iso: string) {
   });
 }
 
-export default async function DoctorPage({ params, searchParams }: RouteContext) {
+export default async function DoctorPage({ params }: RouteContext) {
   const { doctorId } = await params;
-  const { tab = "profile" } = await searchParams;
   const { email, records } = await loadData(doctorId);
 
   return (
@@ -86,39 +81,25 @@ export default async function DoctorPage({ params, searchParams }: RouteContext)
         </div>
       </div>
 
-      <Suspense>
-        <DoctorTabs doctorId={doctorId} />
-      </Suspense>
-
-      {tab === "records" && (
-        <>
-          {records.length === 0 ? (
-            <div className="admin-empty">
-              <p>该医生暂无病案记录。</p>
-            </div>
-          ) : (
-            <ConsultationTable
-              rows={records.map((rec) => ({
-                id: rec.id,
-                displayName: buildDisplayName(rec),
-                prescriptionType: rec.form_data
-                  ? (Array.isArray(rec.form_data.prescriptionType)
-                      ? rec.form_data.prescriptionType.join("、")
-                      : rec.form_data.prescriptionType)
-                  : "—",
-                caseId: rec.case_id ?? null,
-                relatedCaseId: rec.related_case_id ?? null,
-                date: formatSGT(rec.created_at),
-              }))}
-            />
-          )}
-        </>
-      )}
-
-      {tab === "profile" && (
-        <Suspense fallback={<div className="eval-loading">加载中…</div>}>
-          <EvaluationPanel doctorId={doctorId} />
-        </Suspense>
+      {records.length === 0 ? (
+        <div className="admin-empty">
+          <p>该医生暂无病案记录。</p>
+        </div>
+      ) : (
+        <ConsultationTable
+          rows={records.map((rec) => ({
+            id: rec.id,
+            displayName: buildDisplayName(rec),
+            prescriptionType: rec.form_data
+              ? (Array.isArray(rec.form_data.prescriptionType)
+                  ? rec.form_data.prescriptionType.join("、")
+                  : rec.form_data.prescriptionType)
+              : "—",
+            caseId: rec.case_id ?? null,
+            relatedCaseId: rec.related_case_id ?? null,
+            date: formatSGT(rec.created_at),
+          }))}
+        />
       )}
     </main>
   );

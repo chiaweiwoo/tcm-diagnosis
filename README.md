@@ -17,8 +17,8 @@ A doctor-facing workbench that helps registered TCM practitioners review structu
 - **Stale-analysis warning** — banner appears when form inputs diverge from the last analyzed snapshot
 - **Consultation history** — auto-saved, paginated, with Case ID / Follow-up Case ID / AI feedback fields
 - **Doctor Risk Nudge** — workbench left sidebar aggregator showing recurring AI caution themes (weight-only, no counts) with verbatim hover popup
-- **Doctor Discussion Agenda** — inline expander in user list table under admin users page showing 4-card clinical review discussion agenda (calculated weekly)
-- **Admin tools** — doctor allowlist management, per-doctor clinical profiling, fleet-wide AI output audit, inline discussion agenda
+- **Doctor Discussion Agenda** — inline expander in the admin users list showing 4-card weekly discussion items for each doctor
+- **Admin tools** — doctor allowlist management, per-doctor consultation review, fleet-wide AI output audit, inline discussion agenda
 
 ---
 
@@ -93,19 +93,17 @@ npm run build     # Verify production build
 Doctor (browser)
   └── POST /api/analyze              → DeepSeek flash → clinical review JSON
   └── /api/consultations/*           → Supabase (save / load / delete history)
-  └── GET  /api/me/nudge             → risk-nudge themes + verbatim examples (doctor RLS-gated)
-  └── GET  /api/me/profile           → descriptive clinical profile (admin-only fields stripped)
+  └── GET  /api/me/nudge             → dr_nudge themes + verbatim examples (doctor RLS-gated)
 
 Admin (is_admin = true)
   └── /admin/users                   → doctor list with 30-day stats and inline discussion agendas
-  └── /admin/users/[doctorId]        → consultation list + clinical profile (2-tab view)
+  └── /admin/users/[doctorId]        → consultation list (read-only)
   └── GET  /api/admin/users/[doctorId]/discussion → fetch doctor pre-computed discussion items (admin-only)
   └── /admin/output-audits           → fleet-wide AI output audit results
 
 GitHub Actions (ASSESSMENT_API_KEY auth)
-  └── npx tsx scripts/evaluate-local.ts   → per-doctor profile evaluation (process runner)
-  └── POST /api/cron/risk-nudge           → daily SGT 03:00 SGT (19:00 UTC) computation (cron)
-  └── POST /api/cron/discussion-agenda    → weekly SGT Sunday 03:00 SGT (19:00 UTC) computation (cron)
+  └── POST /api/cron/dr_nudge             → daily SGT 03:00 SGT (19:00 UTC) computation (cron)
+  └── POST /api/cron/dr_discussion        → weekly SGT Sunday 03:00 SGT (19:00 UTC) computation (cron)
   └── POST /api/cron/output-audit         → fleet-wide AI output audit
 ```
 
@@ -128,7 +126,6 @@ GitHub Actions (ASSESSMENT_API_KEY auth)
 | `GET /api/consultations/[id]` | Session | Fetch single consultation |
 | `PATCH /api/consultations/[id]` | Session | Update clinical inputs, analysis result, Case ID, feedback |
 | `DELETE /api/consultations/[id]` | Session | Delete consultation |
-| `GET /api/me/profile` | Session | Fetch descriptive clinical profile (admin-only fields stripped) |
 | `GET /auth/callback` | — | Google OAuth callback + allowlist check |
 | `GET /auth/signout` | — | Sign out and redirect to login |
 
@@ -148,26 +145,28 @@ npm run allowlist:add -- --email doctor@example.com --admin
 # Deactivate a doctor (soft-remove — auth.users row preserved)
 npm run allowlist:add -- --email doctor@example.com --remove
 
-# Seed test consultations from data/seed-cases.json (gitignored)
-npm run seed:cases -- --email doctor@example.com [--reset] [--yes]
 ```
 
 ---
 
-## AI Evaluation Tools
+## Background Jobs
 
-Both pipelines are **on-demand only** — no automated schedule.
+The active doctor-facing/admin-facing background jobs are:
 
-### Per-Doctor Clinical Profile
+- `npm run dr_nudge -- --email doctor@example.com`
+- `npm run dr_discussion -- --email doctor@example.com`
 
-Analyzes a doctor's input patterns and clinical tendencies over the last 7 days. Results are visible to admins at `/admin/users/[doctorId]` → 临床画像 tab.
+Or run them fleet-wide with no doctor target:
 
 ```bash
-# Run for a specific doctor (Required: --email or --doctorId)
-npm run evaluate -- --email doctor@example.com --windowDays 7
+npm run dr_nudge
+npm run dr_discussion
 ```
 
-Or trigger via **GitHub Actions → Evaluate Doctors → Run workflow**.
+The corresponding GitHub Actions workflows are:
+
+- `dr_nudge` → `POST /api/cron/dr_nudge`
+- `dr_discussion` → `POST /api/cron/dr_discussion`
 
 ### Fleet-wide AI Output Audit
 
@@ -220,14 +219,19 @@ The app deploys automatically to Vercel on push to `main`.
 
 | Secret | Used by |
 |---|---|
-| `ASSESSMENT_API_KEY` | All cron/evaluation workflows |
-| `ASSESS_BASE_URL` | All cron/evaluation workflows (e.g. `https://tcm.chiawei.me`) |
+| `ASSESSMENT_API_KEY` | All cron workflows |
+| `ASSESS_BASE_URL` | All cron workflows (e.g. `https://tcm.chiawei.me`) |
 
 ---
 
 ## Database Migrations
 
 Migrations live in `supabase/migrations/`. **Committing a migration file does not apply it** — every file must be run manually in the Supabase SQL Editor.
+
+Legacy note:
+
+- `analytics_doctor_evaluations` is now treated as legacy/inactive data.
+- This refactor does not drop legacy Goal 2 tables. Clean them up in a separate migration only after confirming no runtime code reads them.
 
 ---
 

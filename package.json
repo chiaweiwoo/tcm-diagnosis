@@ -10,10 +10,8 @@
     "test": "vitest run",
     "check:deepseek": "node scripts/check-deepseek.mjs",
     "allowlist:add": "node --env-file=.env.local scripts/allowlist-add.mjs",
-    "seed:cases": "node --env-file=.env.local scripts/seed-cases.mjs",
-    "evaluate": "npx tsx scripts/evaluate-local.ts",
-    "nudge": "npx tsx scripts/compute-nudge.ts",
-    "discussion": "npx tsx scripts/compute-discussion.ts"
+    "dr_nudge": "npx tsx scripts/compute-nudge.ts",
+    "dr_discussion": "npx tsx scripts/compute-discussion.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",

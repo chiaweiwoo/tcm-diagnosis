@@ -1,5 +1,5 @@
 /**
- * Unit tests for computeDiscussion — deterministic logic and fallback reshaping.
+ * Unit tests for computeDiscussion — deterministic logic and fallback generation.
  */
 import { describe, it, expect, vi } from "vitest";
 import { parseAiOutput, buildFallbackItems, needsDiscussionRecompute } from "../../lib/nudge/computeDiscussion";
@@ -68,11 +68,7 @@ describe("parseAiOutput", () => {
 });
 
 describe("buildFallbackItems", () => {
-  it("reshapes evaluation guidance points into structured discussion items", () => {
-    const guidancePoints = [
-      { text: "建议加强对虚实夹杂证候辨证的准确性", score: 4 },
-      { text: "注意理气药在胃脘痛中的配伍剂量", score: 3 },
-    ];
+  it("builds deterministic discussion items from repeated case groups", () => {
     const caseGroups = [
       {
         diagnosis: "胃脘痛",
@@ -83,25 +79,18 @@ describe("buildFallbackItems", () => {
       },
     ];
 
-    const fallbacks = buildFallbackItems(guidancePoints, caseGroups);
-    expect(fallbacks).toHaveLength(2);
-
-    // First item does not match any diagnosis group, should have null anchor/group but preserve question
-    expect(fallbacks[0].question).toBe("建议加强对虚实夹杂证候辨证的准确性");
-    expect(fallbacks[0].caseAnchor).toBeNull();
-    expect(fallbacks[0].caseGroup).toBeNull();
-    expect(fallbacks[0].n).toBe(0);
-    expect(fallbacks[0].reasoning).toBe("系统评估发现的可讨论临床建议");
-
-    // Second item mentions "胃脘痛" which matches "胃脘痛" in caseGroups
-    expect(fallbacks[1].question).toBe("注意理气药在胃脘痛中的配伍剂量");
-    expect(fallbacks[1].caseAnchor).toBe("胃脘痛 4 例");
-    expect(fallbacks[1].caseGroup).toBe("胃脘痛×肝胃不和×方药");
-    expect(fallbacks[1].n).toBe(4);
+    const fallbacks = buildFallbackItems(caseGroups);
+    expect(fallbacks).toHaveLength(1);
+    expect(fallbacks[0].question).toContain("胃脘痛");
+    expect(fallbacks[0].caseAnchor).toBe("胃脘痛 4 例");
+    expect(fallbacks[0].caseGroup).toBe("胃脘痛×肝胃不和×方药");
+    expect(fallbacks[0].n).toBe(4);
+    expect(fallbacks[0].reasoning).toContain("重复出现 4 次");
+    expect(fallbacks[0].followUp).toContain("胃胀痛两胁胀满");
   });
 
-  it("handles null guidance points gracefully", () => {
-    const fallbacks = buildFallbackItems(null, []);
+  it("handles empty case groups gracefully", () => {
+    const fallbacks = buildFallbackItems([]);
     expect(fallbacks).toHaveLength(0);
   });
 });

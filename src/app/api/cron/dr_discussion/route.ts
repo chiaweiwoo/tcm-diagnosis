@@ -1,11 +1,9 @@
 /**
- * Cron route: POST /api/cron/discussion-agenda
+ * Cron route: POST /api/cron/dr_discussion
  *
  * Triggers the fleet-wide doctor discussion-agenda pre-computation.
  * Auth: X-Assessment-Key header must match ASSESSMENT_API_KEY env var.
- * Schedule: weekly SGT Sunday 03:00 (19:00 UTC) via .github/workflows/discussion-agenda.yml
- *
- * Mirror of /api/cron/risk-nudge pattern.
+ * Schedule: weekly SGT Sunday 03:00 (19:00 UTC) via .github/workflows/dr_discussion.yml
  */
 
 import { type NextRequest, NextResponse } from "next/server";
@@ -33,7 +31,7 @@ export async function POST(req: NextRequest) {
     const message = err instanceof Error ? err.message : String(err);
 
     await logServerEvent({
-      source: "api/cron/discussion-agenda",
+      source: "api/cron/dr_discussion",
       message: "讨论清单计算失败。",
       details: { error: message },
     });

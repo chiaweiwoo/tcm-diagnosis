@@ -64,7 +64,6 @@ export async function getLatestAnalyzedAt(
   client: SupabaseClient,
   doctorId: string,
 ): Promise<Date | null> {
-  // Supabase doesn't support MAX() directly via the JS client; use rpc or ordering trick
   const { data, error } = await client
     .from("consultations")
     .select("analyzed_at")
@@ -111,7 +110,6 @@ export async function needsRecompute(
 /** Parse the AI JSON array output; returns [] on any failure. */
 export function parseAiOutput(text: string): AiThemeOutput[] {
   try {
-    // The AI wraps in an object per json_object mode — unwrap if needed
     const raw = JSON.parse(text);
     const arr: unknown = Array.isArray(raw)
       ? raw
@@ -330,9 +328,9 @@ export async function computeNudgeForDoctor(
   try {
     const lf = getLangfuse();
     if (lf && aiUsage) {
-      const trace = lf.trace({ name: "risk-nudge", userId: doctorId });
+      const trace = lf.trace({ name: "dr_nudge", userId: doctorId });
       trace.generation({
-        name: "risk-nudge-flash",
+        name: "dr_nudge-flash",
         model,
         usage: {
           input: aiUsage.prompt_tokens ?? 0,
@@ -378,39 +376,61 @@ export async function computeNudgesForActiveDoctors(
   const computed: string[] = [];
   const skipped: string[] = [];
 
+  console.log(`[dr_nudge] Starting fleet-wide computation for ${allowlist.length} active doctors...`);
+
   for (const { email } of allowlist) {
+    console.log(`\n[dr_nudge] Processing doctor: ${email}`);
     try {
       // Resolve UUID by email
       const { data: usersData, error: userErr } = await client.auth.admin.listUsers({
         page: 1,
         perPage: 1000,
       });
-      if (userErr) continue;
+      if (userErr) {
+        console.error(`  ❌ Failed to list users to resolve ID: ${userErr.message}`);
+        skipped.push(email);
+        continue;
+      }
 
       const user = usersData.users.find(
         (u) => u.email?.toLowerCase().trim() === email.toLowerCase().trim(),
       );
       if (!user) {
+        console.warn(`  ⚠️ No registered user found in auth.users matching email.`);
         skipped.push(email);
         continue;
       }
+
+      console.log(`  Resolved UUID: ${user.id}`);
 
       const latest = await getLatestAnalyzedAt(client, user.id);
       if (!latest) {
+        console.log(`  → Skipped: No analyzed consultations found.`);
         skipped.push(email);
         continue;
       }
 
+      console.log(`  Latest analyzed case at: ${latest.toISOString()}`);
+
       const result = await computeNudgeForDoctor(client, user.id);
+      console.log(`  → Result status: ${result.status}`);
+      
       if (result.status === "skipped") {
+        console.log(`  → Skipped: Watermark unchanged.`);
         skipped.push(email);
       } else {
+        console.log(`  ✓ Successfully computed: ${result.themeCount ?? 0} themes generated.`);
         computed.push(email);
       }
-    } catch {
+    } catch (err) {
+      console.error(`  ❌ Error processing ${email}:`, err instanceof Error ? err.message : String(err));
       skipped.push(email);
     }
   }
+
+  console.log(`\n[dr_nudge] Fleet-wide computation completed.`);
+  console.log(`  - Computed: ${computed.length} doctors (${computed.join(", ") || "none"})`);
+  console.log(`  - Skipped:  ${skipped.length} doctors (${skipped.join(", ") || "none"})`);
 
   return { computed, skipped };
 }

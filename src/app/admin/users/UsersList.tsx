@@ -204,7 +204,7 @@ export function UsersList({ doctors }: { doctors: DoctorRow[] }) {
                   <Link
                     href={`/admin/users/${doc.doctorId}`}
                     className="users-row__email users-row__email--link"
-                    title="查看医生详情与画像"
+                    title="查看医生病案记录"
                   >
                     {doc.email}
                   </Link>

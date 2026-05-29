@@ -1,12 +1,9 @@
 /**
- * Cron route: POST /api/cron/risk-nudge
+ * Cron route: POST /api/cron/dr_nudge
  *
  * Triggers the fleet-wide doctor risk-nudge computation.
  * Auth: X-Assessment-Key header must match ASSESSMENT_API_KEY env var.
- * Schedule: daily at 03:00 SGT (19:00 UTC) via .github/workflows/risk-nudge.yml
- *           This is the first scheduled (non-dispatch-only) workflow in this project.
- *
- * Mirror of /api/cron/output-audit pattern.
+ * Schedule: daily at 03:00 SGT (19:00 UTC) via .github/workflows/dr_nudge.yml
  */
 
 import { type NextRequest, NextResponse } from "next/server";
@@ -34,7 +31,7 @@ export async function POST(req: NextRequest) {
     const message = err instanceof Error ? err.message : String(err);
 
     await logServerEvent({
-      source: "api/cron/risk-nudge",
+      source: "api/cron/dr_nudge",
       message: "风险提示计算失败。",
       details: { error: message },
     });
