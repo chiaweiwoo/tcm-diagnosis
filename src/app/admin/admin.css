@@ -4063,7 +4063,7 @@ details[open] .sample-details__toggle::before {
 
 .profile-flag-row {
   display: grid;
-  grid-template-columns: 90px 1fr 110px;
+  grid-template-columns: 90px 3fr 7fr;
   align-items: center;
   gap: 10px;
   padding: 8px 16px;
