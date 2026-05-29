@@ -140,7 +140,7 @@ The workbench (`/`) left sidebar now shows `⚠️ AI 反复提醒的风险点` 
 - **Component:** `src/app/RiskNudgePanel.tsx` (replaces `MyProfilePanel.tsx` in the sidebar; `MyProfilePanel` retained but orphaned from doctor UI).
 - **Read endpoint:** `GET /api/me/nudge` — requires valid session; supports `X-View-As` for admin preview.
 - **Data source:** `doctor_risk_nudges` table (one row per doctor, upsert on `doctor_id` PK).
-- **What is shown:** `themes[].key` (TCM-native label ≤10字) + relative frequency bar (`weight` 0–1). **No counts, no %, no verbatim text in bar area.**
+- **What is shown:** `themes[].key` (TCM-native label ≤10字) + dynamic clinical description `themes[].description` (LLM-generated or database fallback, no frontend hardcoding) + relative frequency bar (`weight` 0–1). **No counts, no %, no verbatim text in bar area.**
 - **Row-hover popup:** shows label `示例：` + up to 5 verbatim caution excerpts from the doctor's own analyzed cases.
 - **Raw counts never leave the server** — only `weight = count / max` is sent.
 - Cache: `Cache-Control: private, max-age=300, stale-while-revalidate=600`.
@@ -220,7 +220,7 @@ Recurring AI caution aggregation surfaced in the workbench left sidebar.
 
 **Two-stage pipeline:**
 1. **Deterministic bucketing** (always runs; the floor): cautions from `analysis_result.cautions` + `风险与提醒` in a 14-day window back from `MAX(analyzed_at)` are keyword-matched to 8 fixed buckets. Buckets with >=3 occurrences are surfaced, sorted by count desc.
-2. **DeepSeek flash rephrasing** (polish; optional): AI rephrases labels into TCM-native short labels (<=10 chars) and selects verbatim examples. **If AI fails, deterministic labels are used as-is. The nudge is never empty due to AI outage.**
+2. **DeepSeek flash rephrasing** (polish; optional): AI rephrases labels into TCM-native short labels (<=10 chars), generates professional clinical descriptions (<=30 chars), and selects verbatim examples. **If AI fails, deterministic labels and fallback descriptions are used as-is. The nudge is never empty due to AI outage.**
 
 **Watermark trigger:** only recompute if `MAX(analyzed_at)` > stored `source_last_record_at`. Daily cron skips unchanged doctors.
 

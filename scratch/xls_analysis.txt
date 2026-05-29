@@ -1,0 +1,523 @@
+Excel File Analysis: nova_data.xls
+Sheet names: ['Sheet 1']
+
+================================================================================
+SHEET: Sheet 1 (1867 rows, 12 columns)
+================================================================================
+Columns: ['External ID', 'Age', 'Diagnosis 诊断', 'History of Presenting Complaint 现病史', 'Medical Examination 体格检查', 'Past Medical History 既往史', 'Patient 患者', 'Presenting Complaint 主诉', 'Treatment 治疗描述', 'Order Ref', 'Created on', 'Date']
+
+--- FIRST 20 DATA ROWS ---
+Row 1:
+  External ID: __export__.pos_order_34654
+  Age: 35y 6m 28d
+  Diagnosis 诊断: 膝外侧副韧带炎
+气血瘀滞
+  History of Presenting Complaint 现病史: 复诊，膝外侧疼痛针灸后痊愈。2天前深蹲动作过度，随后出现膝外侧、膝后疼痛，现按压腘窝、膝外侧副韧带时有少许疼痛
+  Medical Examination 体格检查: 局部压痛
+  Past Medical History 既往史: 无
+  Patient 患者: __export__.medical_patient_5063
+  Presenting Complaint 主诉: 膝外侧疼痛多时
+  Treatment 治疗描述: 针刺：局部阿是穴，阳陵泉、委中、委阳
+  Order Ref: NovaHealth/034511
+  Created on: 46165.201527777775
+  Date: 46165.0
+
+Row 2:
+  External ID: __export__.pos_order_34653
+  Age: 35y 6m 28d
+  Diagnosis 诊断: 膝外侧副韧带炎
+气血瘀滞
+  History of Presenting Complaint 现病史: 复诊，膝外侧疼痛针灸后痊愈。2天前深蹲动作过度，随后出现膝外侧、膝后疼痛，现按压腘窝、膝外侧副韧带时有少许疼痛
+  Medical Examination 体格检查: 局部压痛
+  Past Medical History 既往史: 无
+  Patient 患者: __export__.medical_patient_5063
+  Presenting Complaint 主诉: 膝外侧疼痛多时
+  Treatment 治疗描述: 针刺：局部阿是穴，阳陵泉、委中、委阳
+  Order Ref: NovaHealth/034510
+  Created on: 46165.201273148145
+  Date: 46165.0
+
+Row 3:
+  External ID: __export__.pos_order_34652
+  Age: 35y 6m 28d
+  Diagnosis 诊断: 膝外侧副韧带炎
+气血瘀滞
+  History of Presenting Complaint 现病史: 复诊，膝外侧疼痛针灸后痊愈。2天前深蹲动作过度，随后出现膝外侧、膝后疼痛，现按压腘窝、膝外侧副韧带时有少许疼痛
+  Medical Examination 体格检查: 
+  Past Medical History 既往史: 无
+  Patient 患者: __export__.medical_patient_5063
+  Presenting Complaint 主诉: 
+  Treatment 治疗描述: 针刺：局部阿是穴，阳陵泉、委中、委阳
+  Order Ref: NovaHealth/034509
+  Created on: 46165.19369212963
+  Date: 46165.0
+
+Row 4:
+  External ID: __export__.pos_order_34651
+  Age: 45y 0m 8d
+  Diagnosis 诊断: 失眠，肝郁化火
+  History of Presenting Complaint 现病史: 身热颈项燥热，烦躁，入眠困难，多梦，晨起疲乏，抑郁。背部痈色黯
+
+12/12/25：身热燥热，无烦躁，梦少，晨起不疲乏，压力。纳可二便调
+
+06/01/26：入眠少许困难，睡眠间断1-2次，容易复睡，多梦，偶尔神烦燥热，大便不净感
+
+20/01/26：入眠可，无梦，偶尔间断复睡容易，身烦少许，大便不净感。
+
+11/02/26：噩梦膈数日发作，经前烦躁，入眠可，口干肾，多汗，口渴喜冷饮
+
+03/03/26：入眠困难，睡眠间断，口苦，目干涩
+  Medical Examination 体格检查: 
+  Past Medical History 既往史: NA
+  Patient 患者: __export__.medical_patient_4770
+  Presenting Complaint 主诉: 
+  Treatment 治疗描述: 龙胆泻肝5 生地1 玄参1 蒲公英1 黄柏1 桔梗1 知母1 葛根1，5d
+
+她的consult每次可以claim $40
+所以每次issue consult $40
+然后treatment/med就减$10
+
+#不用写药袋！她会自己带
+  Order Ref: NovaHealth/034508
+  Created on: 46165.17407407407
+  Date: 46165.0
+
+Row 5:
+  External ID: __export__.pos_order_34650
+  Age: 34y 4m 8d
+  Diagnosis 诊断: 伤筋
+气血瘀滞
+  History of Presenting Complaint 现病史: 1周前运动时不慎拉伤R肩胛内侧，现感到R肩胛内侧酸楚，头部右转时可诱发少许疼痛
+  Medical Examination 体格检查: R菱形肌压痛
+  Past Medical History 既往史: 无
+  Patient 患者: __export__.medical_patient_4754
+  Presenting Complaint 主诉: R肩胛内侧疼痛1周
+  Treatment 治疗描述: 肩井、肩胛内侧阿是穴、太冲
+  Order Ref: NovaHealth/034507
+  Created on: 46165.172372685185
+  Date: 46165.0
+
+Row 6:
+  External ID: __export__.pos_order_34649
+  Age: 35y 6m 28d
+  Diagnosis 诊断: 膝外侧副韧带炎
+气血瘀滞
+  History of Presenting Complaint 现病史: 复诊，膝外侧疼痛针灸后痊愈。2天前深蹲动作过度，随后出现膝外侧、膝后疼痛，现按压腘窝、膝外侧副韧带时有少许疼痛
+  Medical Examination 体格检查: 局部压痛
+  Past Medical History 既往史: 无
+  Patient 患者: __export__.medical_patient_5063
+  Presenting Complaint 主诉: 膝外侧疼痛多时
+  Treatment 治疗描述: 针刺：局部阿是穴，阳陵泉、委中、委阳
+  Order Ref: NovaHealth/034506
+  Created on: 46165.16836805556
+  Date: 46165.0
+
+Row 7:
+  External ID: __export__.pos_order_34648
+  Age: 31y 6m 6d
+  Diagnosis 诊断: 痹病
+  History of Presenting Complaint 现病史: 平素竞技性floorball，双小腿前缘反复疼痛酸楚，自觉僵硬，运动后加重，夜间尤甚
+  Medical Examination 体格检查: 
+  Past Medical History 既往史: NA
+  Patient 患者: __export__.medical_patient_3763
+  Presenting Complaint 主诉: 
+  Treatment 治疗描述: 针刺阿是
+  Order Ref: NovaHealth/034505
+  Created on: 46165.141539351855
+  Date: 46165.0
+
+Row 8:
+  External ID: __export__.pos_order_34647
+  Age: 54y 2m 7d
+  Diagnosis 诊断: 弹响指
+  History of Presenting Complaint 现病史: 弹响指发作数月
+  Medical Examination 体格检查: 
+  Past Medical History 既往史: NA
+  Patient 患者: __export__.medical_patient_2176
+  Presenting Complaint 主诉: 
+  Treatment 治疗描述: 针刺阿是
+  Order Ref: NovaHealth/034504
+  Created on: 46165.099444444444
+  Date: 46165.0
+
+Row 9:
+  External ID: __export__.pos_order_34646
+  Age: 38y 10m 24d
+  Diagnosis 诊断: 痹病
+  History of Presenting Complaint 现病史: M: 肩关节疼痛1周，上举困难
+S: L下肢麻木，久坐诱发
+  Medical Examination 体格检查: 
+  Past Medical History 既往史: M：高胆固醇，抗凝剂，高血压
+S：NA
+  Patient 患者: __export__.medical_patient_1815
+  Presenting Complaint 主诉: 
+  Treatment 治疗描述: 针刺阿是
+yellow x1
+  Order Ref: NovaHealth/034503
+  Created on: 46165.08195601852
+  Date: 46165.0
+
+Row 10:
+  External ID: __export__.pos_order_34645
+  Age: 34y 8m 26d
+  Diagnosis 诊断: 
+  History of Presenting Complaint 现病史: 面部有陈旧性痤疮疤痕
+  Medical Examination 体格检查: 
+  Past Medical History 既往史: 
+  Patient 患者: __export__.medical_patient_4820
+  Presenting Complaint 主诉: 
+  Treatment 治疗描述: facial acupuncture 11x (90 ea) 
+
+first 6 use IHP 80 (compli)
+  Order Ref: NovaHealth/034502
+  Created on: 46164.459340277775
+  Date: 46164.0
+
+Row 11:
+  External ID: __export__.pos_order_34644
+  Age: 50y 3m 11d
+  Diagnosis 诊断: 颈痹
+  History of Presenting Complaint 现病史: 颈肩僵硬多时，活动尚可，僵硬酸楚
+  Medical Examination 体格检查: 
+  Past Medical History 既往史: Statin(3年)
+  Patient 患者: __export__.medical_patient_4070
+  Presenting Complaint 主诉: 
+  Treatment 治疗描述: 推拿
+  Order Ref: NovaHealth/034501
+  Created on: 46164.434212962966
+  Date: 46164.0
+
+Row 12:
+  External ID: __export__.pos_order_34643
+  Age: 29y 9m 22d
+  Diagnosis 诊断: 筋伤
+（Rotator cuff injury)
+
+
+Follow up  treatment for accidental right shoulder injury during exercise that occurred on 8 April 2026.
+  History of Presenting Complaint 现病史: 9/4/26：双侧肩背疼痛
+Pull-ups. 疼痛VAS 4/10，右侧肩袖Empty can (+). 肩前疼痛。小圆肌、肩胛骨内侧酸痛。ROM正常，但疼痛。
+纳眠可，二便调。舌淡红，苔薄白。脉滑。
+
+14/4/26:
+  Medical Examination 体格检查: 
+  Past Medical History 既往史: 
+  Patient 患者: __export__.medical_patient_5005
+  Presenting Complaint 主诉: 
+  Treatment 治疗描述: 1C/1 SWT bilateral shoulders 2k/8Hz 2bar
+MFR bilateral shoulder F10m
+  Order Ref: NovaHealth/034500
+  Created on: 46164.42726851852
+  Date: 46164.0
+
+Row 13:
+  External ID: __export__.pos_order_34642
+  Age: 33y 3m 26d
+  Diagnosis 诊断: 不孕
+
+肾阳虚
+  History of Presenting Complaint 现病史: 神疲乏力，自行ovulation test未见排卵，月经已经过2周，四肢寒冷，纳可，眠少
+  Medical Examination 体格检查: 舌淡胖苔薄白腻齿痕，脉沉
+  Past Medical History 既往史: PCOS
+  Patient 患者: __export__.medical_patient_2216
+  Presenting Complaint 主诉: 求子
+  Treatment 治疗描述: 毓麟珠加减
+党参 10 g,白术 10 g,茯苓10 g,炙甘草 10 g,熟地黄20 g,白芍10 g,当归20 g,川
+芎 10 g,菟丝子 20 g,鹿角霜 10 g。 
+
+月经干净后开始服药加淫羊藿 10 g,巴戟天 10 g,香附
+10 g,旱莲草 10 g,女贞子 10 g,枸杞子 10 g。5 剂
+
+月经第 12 天开始服药加淫羊藿 10 g,巴戟天 10 g,香附 10 g,丹参 15 g,桃仁 10 g,
+路路通 10 g。5 剂
+
+月经第 18天开始服药加淫羊藿 10 g,巴戟天 10 g,香附 10 g。 5剂
+
+月经第 1 天开始服药
+桃仁 10 g,红花 10 g,熟地黄 20 g,赤芍 10 g,当归 10 g,川芎 10 g,三棱 10 g,莪术 10 g,
+香附 15 g,丹参 15 g,益母草 15 g,淫羊藿 10 g,巴戟天10 g。根据经期长短 3 ~ 5 剂
+
+08/05/26：六味地黄5 巴朝天1 女贞子1 枸杞子1 香附1 熟地黄1 肉苁蓉1 5d
+
+15/05/26：金桂肾气丸5 党参1 香附1 白术1 阿胶1 黄芪1 鸡血藤1 - BD5D
+
+22/05/26：金匮肾气丸5 巴朝天1 菟丝子1 桂枝1 艾叶1 肉苁蓉1 莲子1 党参1 黄芪1 4d
+  Order Ref: NovaHealth/034499
+  Created on: 46164.413460648146
+  Date: 46164.0
+
+Row 14:
+  External ID: __export__.pos_order_34641
+  Age: 26y 10m 1d
+  Diagnosis 诊断: 骶髂关节错位
+  History of Presenting Complaint 现病史: 换着1周前摔伤，L臀部着地，随后咳嗽、打喷嚏时局部疼痛、行走时L下肢拖后感
+  Medical Examination 体格检查: 
+  Past Medical History 既往史: NA
+  Patient 患者: __export__.medical_patient_3371
+  Presenting Complaint 主诉: 
+  Treatment 治疗描述: 推拿
+
+
+All receipt taken
+
+Lipid health x2 $35
+  Order Ref: NovaHealth/034498
+  Created on: 46164.40733796296
+  Date: 46164.0
+
+Row 15:
+  External ID: __export__.pos_order_34640
+  Age: 43y 9m 22d
+  Diagnosis 诊断: 斑秃
+  History of Presenting Complaint 现病史: 脱发
+  Medical Examination 体格检查: 
+  Past Medical History 既往史: NA
+  Patient 患者: __export__.medical_patient_1706
+  Presenting Complaint 主诉: 
+  Treatment 治疗描述: Hairboom x1
+  Order Ref: NovaHealth/034497
+  Created on: 46164.394525462965
+  Date: 46164.0
+
+Row 16:
+  External ID: __export__.pos_order_34639
+  Age: 55y 4m 7d
+  Diagnosis 诊断: 咳喘
+寒痰
+  History of Presenting Complaint 现病史: 感冒2日，咳嗽1日，鼻涕多，前额疼痛，喷嚏多，咽喉堵塞有异物感，咳嗽有哮鸣音，无痰，chesty cough，纳可二便如常，咽痒热甚
+  Medical Examination 体格检查: 舌淡红苔白腻，脉滑
+  Past Medical History 既往史: 小儿哮喘
+  Patient 患者: __export__.medical_patient_2644
+  Presenting Complaint 主诉: 咳嗽1日
+  Treatment 治疗描述: 麻黄1 桂枝1 生姜1 细辛1 姜半夏1 五味子1 白芍1 炙甘草1 瓜蒌皮1 胆南星1 石膏1，7d
+  Order Ref: NovaHealth/034496
+  Created on: 46164.38303240741
+  Date: 46164.0
+
+Row 17:
+  External ID: __export__.pos_order_34638
+  Age: 46y 2m 17d
+  Diagnosis 诊断: 痹症
+  History of Presenting Complaint 现病史: 颈部酸痛反复发作
+  Medical Examination 体格检查: 
+  Past Medical History 既往史: 
+  Patient 患者: __export__.medical_patient_96
+  Presenting Complaint 主诉: 
+  Treatment 治疗描述: 1.颈部推拿
+2.风池、颈夹肌，阿是
+  Order Ref: NovaHealth/034495
+  Created on: 46164.36675925926
+  Date: 46164.0
+
+Row 18:
+  External ID: __export__.pos_order_34637
+  Age: 56y 0m 7d
+  Diagnosis 诊断: 肱二头肌长头肌肌腱炎
+气血瘀滞
+  History of Presenting Complaint 现病史: L肩关节疼痛4周，无明显诱因，后旋动作受限，外展、前举动作严重受限
+  Medical Examination 体格检查: 按压肩前压痛
+  Past Medical History 既往史: 无
+  Patient 患者: __export__.medical_patient_5066
+  Presenting Complaint 主诉: L肩疼痛4周
+  Treatment 治疗描述: 针刺：恢刺法针对阿是穴，手三里、合谷
+  Order Ref: NovaHealth/034494
+  Created on: 46164.36341435185
+  Date: 46164.0
+
+Row 19:
+  External ID: __export__.pos_order_34636
+  Age: 53y 0m 25d
+  Diagnosis 诊断: 胃痛
+胃热肠寒
+  History of Presenting Complaint 现病史: 舌头疼痛2日，口边裂，现疼痛呈破皮痛，反酸，胃胀，放屁多，嗳气多，大便不净感，纳呆
+  Medical Examination 体格检查: 舌淡黯苔少，脉弦滑
+  Past Medical History 既往史: NA高血压
+  Patient 患者: __export__.medical_patient_4772
+  Presenting Complaint 主诉: 舌痛2日
+  Treatment 治疗描述: 沙参麦冬5 姜半夏1 黄芩1 生地1 生姜1 大枣1 甘草1 煅瓦楞子1 枳壳1， 7d
+  Order Ref: NovaHealth/034493
+  Created on: 46164.34793981481
+  Date: 46164.0
+
+Row 20:
+  External ID: __export__.pos_order_34635
+  Age: 27y 3m 3d
+  Diagnosis 诊断: ROC Number : R00008685597
+  History of Presenting Complaint 现病史: 
+  Medical Examination 体格检查: 
+  Past Medical History 既往史: bench press in the gym x2/week, 60kg
+  Patient 患者: __export__.medical_patient_5046
+  Presenting Complaint 主诉: Bilateral wrist pain chronic, PS5/10, on and off, able to lift heavy items, ROM normal. 
+Neck stiffness, sometimes radiates to occipital region, neck strain once every few mths,
+Bilateral hip discomfort, occ when walking
+  Treatment 治疗描述: 1C/1 SWT bilateral wrists 2k/8Hz 2bar 
+MFR neck F10m 
+
+
+
+HPTP Plaster x1
+  Order Ref: NovaHealth/034492
+  Created on: 46164.33736111111
+  Date: 46164.0
+
+--- NOISE AND ANOMALY SCAN ---
+[Row 1 | Col 'Age'] Potential Multi-Visit Record: '35y 6m 28d...'
+[Row 1 | Col 'History of Presenting Complaint 现病史'] Potential Multi-Visit Record: '复诊，膝外侧疼痛针灸后痊愈。2天前深蹲动作过度，随后出现膝外侧、膝后疼痛，现按压腘窝、膝外侧副韧带时有少许疼痛...'
+[Row 2 | Col 'Age'] Potential Multi-Visit Record: '35y 6m 28d...'
+[Row 2 | Col 'History of Presenting Complaint 现病史'] Potential Multi-Visit Record: '复诊，膝外侧疼痛针灸后痊愈。2天前深蹲动作过度，随后出现膝外侧、膝后疼痛，现按压腘窝、膝外侧副韧带时有少许疼痛...'
+[Row 3 | Col 'Age'] Potential Multi-Visit Record: '35y 6m 28d...'
+[Row 3 | Col 'History of Presenting Complaint 现病史'] Potential Multi-Visit Record: '复诊，膝外侧疼痛针灸后痊愈。2天前深蹲动作过度，随后出现膝外侧、膝后疼痛，现按压腘窝、膝外侧副韧带时有少许疼痛...'
+[Row 4 | Col 'Age'] Potential Multi-Visit Record: '45y 0m 8d...'
+[Row 4 | Col 'History of Presenting Complaint 现病史'] Potential Multi-Visit Record: '身热颈项燥热，烦躁，入眠困难，多梦，晨起疲乏，抑郁。背部痈色黯
+
+12/12/25：身热燥热，无烦躁，梦少，晨起不疲乏，压力。纳可二便调
+
+06/01/26：入眠少许困难，睡眠间断1-2次，容易复睡，多梦，偶尔神烦燥热，大便不净感
+
+20/...'
+[Row 4 | Col 'Treatment 治疗描述'] Potential Billing/Admin Noise: '龙胆泻肝5 生地1 玄参1 蒲公英1 黄柏1 桔梗1 知母1 葛根1，5d
+
+她的consult每次可以claim $40
+所以每次issue consult $40
+然后treatment/med就减$10
+
+#不用写药袋！她会自己带...'
+[Row 4 | Col 'Treatment 治疗描述'] Potential Multi-Visit Record: '龙胆泻肝5 生地1 玄参1 蒲公英1 黄柏1 桔梗1 知母1 葛根1，5d
+
+她的consult每次可以claim $40
+所以每次issue consult $40
+然后treatment/med就减$10
+
+#不用写药袋！她会自己带...'
+[Row 5 | Col 'Age'] Potential Multi-Visit Record: '34y 4m 8d...'
+[Row 6 | Col 'Age'] Potential Multi-Visit Record: '35y 6m 28d...'
+[Row 6 | Col 'History of Presenting Complaint 现病史'] Potential Multi-Visit Record: '复诊，膝外侧疼痛针灸后痊愈。2天前深蹲动作过度，随后出现膝外侧、膝后疼痛，现按压腘窝、膝外侧副韧带时有少许疼痛...'
+[Row 7 | Col 'Age'] Potential Multi-Visit Record: '31y 6m 6d...'
+[Row 8 | Col 'Age'] Potential Multi-Visit Record: '54y 2m 7d...'
+[Row 9 | Col 'Age'] Potential Multi-Visit Record: '38y 10m 24d...'
+[Row 10 | Col 'Age'] Potential Multi-Visit Record: '34y 8m 26d...'
+[Row 11 | Col 'Age'] Potential Multi-Visit Record: '50y 3m 11d...'
+[Row 12 | Col 'Age'] Potential Multi-Visit Record: '29y 9m 22d...'
+[Row 13 | Col 'Age'] Potential Multi-Visit Record: '33y 3m 26d...'
+[Row 13 | Col 'Treatment 治疗描述'] Potential Multi-Visit Record: '毓麟珠加减
+党参 10 g,白术 10 g,茯苓10 g,炙甘草 10 g,熟地黄20 g,白芍10 g,当归20 g,川
+芎 10 g,菟丝子 20 g,鹿角霜 10 g。 
+
+月经干净后开始服药加淫羊藿 10 g,巴戟天 10 g,香附...'
+[Row 14 | Col 'Age'] Potential Multi-Visit Record: '26y 10m 1d...'
+[Row 14 | Col 'Treatment 治疗描述'] Potential Billing/Admin Noise: '推拿
+
+
+All receipt taken
+
+Lipid health x2 $35...'
+[Row 15 | Col 'Age'] Potential Multi-Visit Record: '43y 9m 22d...'
+[Row 16 | Col 'Age'] Potential Multi-Visit Record: '55y 4m 7d...'
+[Row 16 | Col 'Treatment 治疗描述'] Potential Multi-Visit Record: '麻黄1 桂枝1 生姜1 细辛1 姜半夏1 五味子1 白芍1 炙甘草1 瓜蒌皮1 胆南星1 石膏1，7d...'
+[Row 17 | Col 'Age'] Potential Multi-Visit Record: '46y 2m 17d...'
+[Row 18 | Col 'Age'] Potential Multi-Visit Record: '56y 0m 7d...'
+[Row 19 | Col 'Age'] Potential Multi-Visit Record: '53y 0m 25d...'
+[Row 19 | Col 'Treatment 治疗描述'] Potential Multi-Visit Record: '沙参麦冬5 姜半夏1 黄芩1 生地1 生姜1 大枣1 甘草1 煅瓦楞子1 枳壳1， 7d...'
+[Row 20 | Col 'Age'] Potential Multi-Visit Record: '27y 3m 3d...'
+[Row 21 | Col 'Age'] Potential Multi-Visit Record: '44y 6m 24d...'
+[Row 22 | Col 'Treatment 治疗描述'] Potential Billing/Admin Noise: '1c/1 eswt right elbow 2000 shots 3.0 bar 8Hz, right elbow 1500 shots 3.5 bar 7Hz
+
+
+
+过后不用收consultation...'
+[Row 41 | Col 'Treatment 治疗描述'] Potential Billing/Admin Noise: 'eswt 1c/1 1000shots 3.0 bar 7Hz
+
+RC: Left palm injury due to accidental slip and fall.(+ Chop)
+100 per time (5+1)
+
+1st f...'
+[Row 44 | Col 'Treatment 治疗描述'] Potential Billing/Admin Noise: '针刺美容
+$80/session bf GST...'
+[Row 46 | Col 'Treatment 治疗描述'] Potential Billing/Admin Noise: 'BM1h
+舊配套剩４次
+先用$500的
+Treatment for right shoulder injury. Follow up in advice
+26/02/26-receipt taken $250
+31/03/26-receip...'
+[Row 56 | Col 'History of Presenting Complaint 现病史'] Potential Billing/Admin Noise: '自述久行出现左侧足底疼痛，晨起尤甚，活动后减轻，偏头痛，纳寐可，二便调。脉细滑数，舌红苔薄。LMP：1/3/25。BP: 136/100(103) 建议继续观察
+复诊3/19：症状未改善，小腿僵硬，头痛暂无，未改善，左膝misalignme...'
+[Row 58 | Col 'Presenting Complaint 主诉'] Potential Billing/Admin Noise: 'R popliteal tightness for a week (did house chores and zumba), took panadol, pulling pain radiates to calf, esp when get...'
+[Row 59 | Col 'Presenting Complaint 主诉'] Potential Billing/Admin Noise: 'R popliteal tightness for a week (did house chores and zumba), took panadol, pulling pain radiates to calf, esp when get...'
+[Row 60 | Col 'Presenting Complaint 主诉'] Potential Billing/Admin Noise: 'R popliteal tightness for a week (did house chores and zumba), took panadol, pulling pain radiates to calf, esp when get...'
+[Row 61 | Col 'Presenting Complaint 主诉'] Potential Billing/Admin Noise: 'R popliteal tightness for a week (did house chores and zumba), took panadol, pulling pain radiates to calf, esp when get...'
+[Row 63 | Col 'Presenting Complaint 主诉'] Potential Billing/Admin Noise: 'R popliteal tightness for a week (did house chores and zumba), took panadol, pulling pain radiates to calf, esp when get...'
+[Row 65 | Col 'Presenting Complaint 主诉'] Potential Billing/Admin Noise: '19/5/26 bilateral traps tightness, neck stiff, ROM normal. 
+2 days ago did acupuncture and tuina but still feels sore....'
+[Row 66 | Col 'Presenting Complaint 主诉'] Potential Billing/Admin Noise: '19/5/26 bilateral traps tightness, neck stiff, ROM normal. 
+2 days ago did acupuncture and tuina but still feels sore....'
+[Row 68 | Col 'Treatment 治疗描述'] Potential Billing/Admin Noise: '针刺腰臀部阿是穴、环跳、阳陵泉、委阳，电针
+推拿
+
+[Consultation and Treatment for left lower back sprain that occurred on 22 April 2026. ]...'
+[Row 79 | Col 'Treatment 治疗描述'] Potential Billing/Admin Noise: '针刺阿是
+
+
+20session $1600 
+$80 per session...'
+[Row 89 | Col 'Treatment 治疗描述'] Potential Billing/Admin Noise: '苦瓜1bottle $85
+Lipid health x1 $20
+
+ROC Number : R00008665234...'
+[Row 92 | Col 'Treatment 治疗描述'] Potential Billing/Admin Noise: '针刺偏头痛方案
+free treatment redeem
+Left knee injury due to a fall at the park on 01 May 2026(2nd consultation for this injury...'
+[Row 104 | Col 'Treatment 治疗描述'] Potential Billing/Admin Noise: '姜半夏1 白术1 天麻1 泽泻1 石菖蒲1 陈皮1 薄荷1 羌活1 桂枝1 白芍1 大枣1 炙甘草1 7d
+ 
+$1090收据已拿...'
+[Row 106 | Col 'Treatment 治疗描述'] Potential Billing/Admin Noise: '1c/1 eswt right elbow 2000 shots 3.0 bar 8Hz, right elbow 1500 shots 3.5 bar 7Hz
+
+
+
+过后不用收consultation...'
+[Row 107 | Col 'Treatment 治疗描述'] Potential Billing/Admin Noise: '逍遥散5
+
+解郁1 bottle$85
+Lipid health $20
+Vocal $25 x2...'
+[Row 113 | Col 'Treatment 治疗描述'] Potential Billing/Admin Noise: '$1000 (before GST) split to 4receipts (说好了$500 under Wu Yi, 另外$500 under老公)
+$250 taken on 5/5/26 (name Wu Yi)
+$250 taken...'
+[Row 120 | Col 'Treatment 治疗描述'] Potential Billing/Admin Noise: 'Ho Kwai Fong 96269734 son.
+Split into 5 receipts-Each max $100 (Consult $20 Treatment $80). To send him every 3 days. 
+1...'
+[Row 123 | Col 'Treatment 治疗描述'] Potential Billing/Admin Noise: 'eswt 1c/1 1000shots 3.0 bar 7Hz
+
+RC: Left palm injury due to accidental slip and fall.(+ Chop)
+100 per time (5+1)
+
+1st f...'
+[Row 128 | Col 'Diagnosis 诊断'] Potential Billing/Admin Noise: '$500 (before GST) split to 8receipts
+Tuina $60 (before GST) issue on 21/04/26 - 1/8
+Tuina $60 (before GST) issue on 24/0...'
+[Row 134 | Col 'Treatment 治疗描述'] Potential Billing/Admin Noise: '1. 针刺：（双）风市 殷门 委中 阳陵泉 承山 血海 梁丘 内外膝眼 （右） 曲池 手三里
+2. 推拿
+3. 六味地黄5 麦冬1 苍耳子1 五味子1 防风1 葛根1 5d
+
+$1200 receipt
+$137.62 (before GS...'
+[Row 139 | Col 'Treatment 治疗描述'] Potential Billing/Admin Noise: '针刺美容
+$80/session bf GST...'
+[Row 154 | Col 'Treatment 治疗描述'] Potential Billing/Admin Noise: 'TENS LB 
+MFR LB+L glutes F10m 
+
+
+
+[Consultation and Treatment for left lower back sprain that occurred on 22 April 2026....'
+[Row 155 | Col 'History of Presenting Complaint 现病史'] Potential Billing/Admin Noise: '患者3周前不慎拉伤R肩后，现R上臂外展外旋时R肩峰前感觉疼痛僵硬
+
+12/5/26 deadlift - LBP (R) yday - tight and sore, slipped disc L4-5 a few yrs ago; tur...'
+[Row 164 | Col 'Diagnosis 诊断'] Potential Billing/Admin Noise: '$500 (before GST) split to 8receipts
+Tuina $60 (before GST) issue on 21/04/26 - 1/8
+Tuina $60 (before GST) issue on 24/0...'
+
+Scan Summary:
+- Total rows containing potential billing/admin noises: 382
+- Total rows containing potential multi-visit structures: 2841
+- Rows with empty/null Past History: 1357
+- Rows with empty/null Physical Exam: 1554
+

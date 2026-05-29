@@ -74,3 +74,59 @@ describe("bucketCautions", () => {
     expect(result.surfaced.length).toBe(3);
   });
 });
+
+import { parseAiOutput, mergeWithAi } from "../../lib/nudge/computeNudge";
+
+describe("parseAiOutput and mergeWithAi", () => {
+  it("parseAiOutput correctly parses description field from AI JSON array", () => {
+    const rawJson = JSON.stringify([
+      {
+        key: "影像排除",
+        description: "临床排除器质性病变",
+        examples: ["原话1", "原话2"],
+      },
+    ]);
+    const parsed = parseAiOutput(rawJson);
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0].key).toBe("影像排除");
+    expect(parsed[0].description).toBe("临床排除器质性病变");
+    expect(parsed[0].examples).toEqual(["原话1", "原话2"]);
+  });
+
+  it("parseAiOutput handles unwrapping from themes property", () => {
+    const rawJson = JSON.stringify({
+      themes: [
+        {
+          key: "手法推拿",
+          description: "手法力度适中防损伤",
+          examples: ["推拿暴力"],
+        },
+      ],
+    });
+    const parsed = parseAiOutput(rawJson);
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0].key).toBe("手法推拿");
+    expect(parsed[0].description).toBe("手法力度适中防损伤");
+    expect(parsed[0].examples).toEqual(["推拿暴力"]);
+  });
+
+  it("mergeWithAi blends surfaced buckets with AI output and fallback descriptions", () => {
+    const surfaced = [
+      { key: "转诊 / 排除器质病变", count: 4, examples: ["原话A"] },
+      { key: "慢病监测", count: 3, examples: ["原话B"] },
+    ];
+    const aiItems = [
+      { key: "转诊及影像", description: "转诊排除器质性病变", examples: ["原话A"] },
+      // Second item missing to test fallback
+    ];
+
+    const merged = mergeWithAi(surfaced, aiItems);
+    expect(merged).toHaveLength(2);
+    expect(merged[0].key).toBe("转诊及影像");
+    expect(merged[0].description).toBe("转诊排除器质性病变");
+
+    // Second fallback tests
+    expect(merged[1].key).toBe("慢病监测");
+    expect(merged[1].description).toBe("高血压、糖尿病等慢性病调理期间，需嘱咐患者定期监测生理指标");
+  });
+});

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 type NudgeTheme = {
   key: string;
   weight: number; // 0–1, computed server-side from counts
+  description?: string | null;
   examples: string[];
   originalKey?: string | null;
 };
@@ -86,8 +87,10 @@ export default function RiskNudgePanel({ viewAsDoctorId }: { viewAsDoctorId?: st
           <div key={i} className="risk-nudge-row">
             {/* Row label + bar. Popup appears on row hover. */}
             <div className="risk-nudge-row__label">{theme.key}</div>
-            {theme.originalKey && (
-              <div className="risk-nudge-row__desc">{theme.originalKey}</div>
+            {theme.description && (
+              <div className="risk-nudge-row__desc">
+                {theme.description}
+              </div>
             )}
             <div className="risk-nudge-bar-track">
               <div

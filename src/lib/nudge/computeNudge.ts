@@ -28,6 +28,7 @@ import { RISK_NUDGE_PROMPT_VERSION, RISK_NUDGE_SYSTEM_PROMPT } from "./prompts";
 export type NudgeTheme = {
   key: string;
   count: number;
+  description?: string;
   examples: string[];
   originalKey?: string;
 };
@@ -43,7 +44,18 @@ export type NudgeComputeResult = {
   themeCount?: number;
 };
 
-type AiThemeOutput = { key: string; examples: string[] };
+export type AiThemeOutput = { key: string; description: string; examples: string[] };
+
+export const FALLBACK_DESCRIPTIONS: Record<string, string> = {
+  "转诊 / 排除器质病变": "建议转诊或进一步影像检查以排除器质性病变",
+  "针刺安全（深度·解剖）": "针刺时注意进针深度，避开重要血管、神经和脏器解剖部位",
+  "手法 / 推拿安全": "推拿与手法治疗时注意力度适中，避免暴力操作造成二次损伤",
+  "出血 / 抗凝 / 活血药": "活血化瘀类药物与侵入性操作需防范出血风险，关注凝血及经期禁忌",
+  "感染防控 / 操作禁忌": "严格执行无菌消毒操作，防范局部感染，严格排查治疗禁忌症",
+  "剂量 / 药物体质": "注意用量剂量，结合患者体质防范毒副作用及合理配伍",
+  "慢病监测": "高血压、糖尿病等慢性病调理期间，需嘱咐患者定期监测生理指标",
+  "复诊指征": "嘱咐患者若出现症状加重或无改善，应及时复诊或寻求专科评估",
+};
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -94,7 +106,7 @@ export async function needsRecompute(
 }
 
 /** Parse the AI JSON array output; returns [] on any failure. */
-function parseAiOutput(text: string): AiThemeOutput[] {
+export function parseAiOutput(text: string): AiThemeOutput[] {
   try {
     // The AI wraps in an object per json_object mode — unwrap if needed
     const raw = JSON.parse(text);
@@ -113,6 +125,7 @@ function parseAiOutput(text: string): AiThemeOutput[] {
       )
       .map((item) => ({
         key: String(item.key).trim(),
+        description: typeof item.description === "string" ? String(item.description).trim() : "",
         examples: Array.isArray(item.examples)
           ? (item.examples as unknown[])
               .map((e) => String(e).trim())
@@ -129,7 +142,7 @@ function parseAiOutput(text: string): AiThemeOutput[] {
  * Merge AI output into surfaced buckets by index.
  * Falls back to the bucket's own key/examples if AI output is missing or too short.
  */
-function mergeWithAi(
+export function mergeWithAi(
   surfaced: SurfacedBucket[],
   aiItems: AiThemeOutput[],
 ): NudgeTheme[] {
@@ -138,6 +151,7 @@ function mergeWithAi(
     return {
       key: ai?.key || bucket.key,
       count: bucket.count,
+      description: ai?.description || FALLBACK_DESCRIPTIONS[bucket.key] || "",
       examples: (ai?.examples?.length ? ai.examples : bucket.examples).slice(0, 5),
       originalKey: bucket.key,
     };
@@ -284,7 +298,12 @@ export async function computeNudgeForDoctor(
   } catch (err) {
     console.error("AI Nudge rephrasing failed:", err);
     // AI failed — use deterministic labels as-is (invariant: never empty on AI failure)
-    themes = surfaced.map((b) => ({ key: b.key, count: b.count, examples: b.examples }));
+    themes = surfaced.map((b) => ({
+      key: b.key,
+      count: b.count,
+      description: FALLBACK_DESCRIPTIONS[b.key] || "",
+      examples: b.examples,
+    }));
   }
 
   // Step 8: upsert the row

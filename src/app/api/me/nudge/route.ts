@@ -14,7 +14,7 @@ import { getServiceRoleClient } from "@/lib/supabase/server";
 import { getViewAsContext, ViewAsError } from "@/lib/viewAs";
 
 type DbNudgeRow = {
-  themes: Array<{ key: string; count: number; examples: string[]; originalKey?: string }>;
+  themes: Array<{ key: string; count: number; examples: string[]; originalKey?: string; description?: string }>;
   computed_at: string | null;
 };
 
@@ -56,6 +56,7 @@ export async function GET(request: Request) {
     const themes = rawThemes.map((t) => ({
       key: t.key,
       weight: t.count / max, // 0–1
+      description: t.description || null,
       examples: (t.examples ?? []).slice(0, 5),
       originalKey: t.originalKey || null,
     }));
