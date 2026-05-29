@@ -2778,13 +2778,11 @@ details[open] .sample-details__toggle::before {
   border-radius: 10px;
   overflow: hidden;
   background: var(--surface, #fff);
-  width: fit-content;
-  max-width: 100%;
 }
 
 .users-list-head {
   display: grid;
-  grid-template-columns: 320px 180px 90px 175px 60px;
+  grid-template-columns: 320px 260px 90px 175px 1fr;
   padding: 8px 16px;
   background: var(--bg, #FAFAF8);
   border-bottom: 1px solid var(--border, #EAE6E2);
@@ -2797,7 +2795,7 @@ details[open] .sample-details__toggle::before {
 
 .users-row {
   display: grid;
-  grid-template-columns: 320px 180px 90px 175px 60px;
+  grid-template-columns: 320px 260px 90px 175px 1fr;
   align-items: center;
   padding: 11px 16px;
   border-bottom: 1px solid var(--border, #EAE6E2);
@@ -2884,7 +2882,7 @@ details[open] .sample-details__toggle::before {
 .users-row__actions {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-end;
 }
 
 .users-row__action-btn {
