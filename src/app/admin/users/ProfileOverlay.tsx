@@ -116,6 +116,9 @@ function ProfileBody({
 
   return (
     <div className="profile-overlay-body">
+      <p className="profile-overlay-desc">
+        系统自动检测该医生历史病案中的质量信号，标记出可能需要跟进的记录。点击任意病案行可在新标签页中打开工作台查看详情。
+      </p>
       <div className="profile-overlay-section-head">
         待关注病案
         {isLowSample && (
