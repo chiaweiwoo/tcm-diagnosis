@@ -3555,3 +3555,226 @@ details[open] .sample-details__toggle::before {
     gap: 10px;
   }
 }
+
+/* ── Admin Inline Discussion Agenda ── */
+
+.users-row-wrap {
+  border-bottom: 1px solid var(--border, #EAE6E2);
+}
+.users-row-wrap:last-child {
+  border-bottom: none;
+}
+
+/* ZoomIn / Magnifier Expand Toggle Button */
+.disc-toggle {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid var(--border, #EAE6E2);
+  background: var(--surface, #fff);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted, #8E8377);
+  transition: all 0.15s;
+}
+
+.disc-toggle:hover {
+  background: var(--mint, #e6f4ec);
+  border-color: var(--sage, #5b8c6e);
+  color: var(--sage, #5b8c6e);
+  transform: translateY(-1px);
+}
+
+.disc-toggle.active {
+  background: var(--sage, #5b8c6e);
+  border-color: var(--sage, #5b8c6e);
+  color: #fff;
+  transform: scale(1.05);
+}
+
+.disc-toggle svg {
+  width: 15px;
+  height: 15px;
+  transition: transform 0.2s ease;
+}
+
+.disc-toggle.active svg {
+  transform: rotate(90deg) scale(1.1);
+}
+
+/* Expansion Panel */
+.disc-panel-container {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.22s ease-in-out;
+  overflow: hidden;
+}
+
+.disc-panel-container.expanded {
+  grid-template-rows: 1fr;
+}
+
+.disc-panel {
+  background: var(--bg, #FAFAF8);
+  border-left: 3px solid var(--sage, #5b8c6e);
+  padding: 14px 16px 16px;
+  border-top: 1px dashed var(--border, #EAE6E2);
+}
+
+.disc-panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed #d7e3da;
+}
+
+.disc-panel-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--sage, #5b8c6e);
+  text-transform: uppercase;
+}
+
+.disc-panel-meta {
+  font-size: 10px;
+  color: var(--text-muted, #8E8377);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Card Grid */
+.disc-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+@media (max-width: 900px) {
+  .disc-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .disc-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Card Styling */
+.disc-card {
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #EAE6E2);
+  border-left: 3px solid #9ccbb0;
+  border-radius: 7px;
+  padding: 10px 11px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.disc-card:hover {
+  background: #fbfdfb;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(91, 140, 110, 0.06);
+  border-color: #79b090;
+}
+
+.disc-q {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1f2421;
+  line-height: 1.4;
+}
+
+.disc-anchor {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  color: var(--sage, #5b8c6e);
+  font-weight: 600;
+}
+
+.disc-anchor .dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #9ccbb0;
+  flex-shrink: 0;
+}
+
+.disc-reason {
+  font-size: 10.5px;
+  color: var(--text-muted, #8E8377);
+  line-height: 1.4;
+}
+
+.disc-follow {
+  font-size: 10px;
+  color: #2c7a7b;
+  background: #e9f6f6;
+  border-radius: 5px;
+  padding: 5px 7px;
+  line-height: 1.4;
+  margin-top: auto;
+}
+
+.disc-follow b {
+  font-weight: 700;
+}
+
+/* Skeletons */
+.disc-shimmer-card {
+  height: 130px;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #EAE6E2);
+  border-radius: 7px;
+  padding: 10px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.disc-shimmer-line {
+  height: 12px;
+  background: #f0eee9;
+  border-radius: 4px;
+  position: relative;
+  overflow: hidden;
+}
+
+.disc-shimmer-line::after {
+  content: "";
+  position: absolute;
+  top: 0; right: 0; bottom: 0; left: 0;
+  transform: translateX(-100%);
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.6) 20%,
+    rgba(255, 255, 255, 0.9) 60%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.disc-panel-empty {
+  font-size: 12px;
+  color: var(--text-muted, #8E8377);
+  padding: 12px 0;
+  text-align: center;
+  font-style: italic;
+}

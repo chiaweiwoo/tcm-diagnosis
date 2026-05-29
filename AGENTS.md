@@ -237,9 +237,35 @@ Recurring AI caution aggregation surfaced in the workbench left sidebar.
 **Database:** `public.doctor_risk_nudges` -- one row per doctor, PK `doctor_id`.
 RLS: doctor reads own row. `authenticated`: SELECT (RLS-gated). `service_role`: all. `anon`: nothing.
 
-> WARNING: **Unapplied migration: `029_doctor_risk_nudges.sql`** -- apply in Supabase SQL Editor before first `npm run nudge` or cron run.
+> WARNING: **Unapplied migration: `029_doctor_risk_nudges.sql` and `030_doctor_discussion_agenda.sql`** -- apply in Supabase SQL Editor before first `npm run nudge` or `npm run discussion` run.
 
 **Invariant 8:** caution text -> DeepSeek (permitted). Langfuse receives tokens/cost/latency only.
+
+---
+
+## Doctor Discussion Agenda
+
+Case-review discussion agenda pre-computed weekly and surfaced inline under each row in `/admin/users`.
+
+**Two-stage pipeline:**
+1. **Deterministic aggregation** (always runs; the floor): 14-day consultations window ending at `MAX(analyzed_at)` are grouped by `diagnosis × pattern × modality`. Groups with N >= 2 are surfaced, sorted by count desc, and noise cases are excluded via regex.
+2. **DeepSeek Flash generation** (polish; optional): AI generates up to 4 constructive discussion items, consisting of: clinical question (≤28字), case anchor ("诊断 N 例"), case group, 精简背景 (≤30字), and 跟进问法 (≤25字) for the senior reviewer to ask. **If AI fails, system evaluation guidance points are reshaped into fallback cards dynamically. The agenda is never empty due to AI outage if evaluation data exists.**
+
+**Watermark trigger:** only recompute if `MAX(analyzed_at)` > stored `source_last_record_at` or prompt version changes. Weekly cron skips unchanged doctors.
+
+**Key files:**
+- `src/lib/nudge/discussionPrompts.ts` -- `DISCUSSION_SYSTEM_PROMPT`, `DISCUSSION_PROMPT_VERSION = "discussion-v1"`
+- `src/lib/nudge/computeDiscussion.ts` -- `computeDiscussionForDoctor()`, `computeDiscussionsForActiveDoctors()`
+- `src/app/api/cron/discussion-agenda/route.ts` -- fleet-wide weekly pre-compute POST (X-Assessment-Key auth), `maxDuration=300`
+- `src/app/api/admin/users/[doctorId]/discussion/route.ts` -- admin read GET (admin auth, 1h cache)
+- `src/app/admin/users/UsersList.tsx` -- UI component (inline expander accordion, full skeletons, map caching)
+- `scripts/compute-discussion.ts` -- CLI: `npm run discussion -- --email ...` / `--doctorId ...` / `--force`
+- `.github/workflows/discussion-agenda.yml` -- weekly SGT Sunday 03:00 SGT (19:00 UTC) -- SECOND scheduled workflow
+
+**Database:** `public.doctor_discussion_agenda` -- one row per doctor, PK `doctor_id`.
+RLS: Admin-only. Bypassed by `service_role` (no grants to authenticated or anon).
+
+**Invariant 8:** case metrics -> DeepSeek (permitted). Langfuse receives tokens/cost/latency only.
 
 ---
 

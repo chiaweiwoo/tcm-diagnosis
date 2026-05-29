@@ -16,7 +16,9 @@ A doctor-facing workbench that helps registered TCM practitioners review structu
 - **辨证警示 diagnostic alert** — fires when AI detects critical inconsistencies (diagnosis↔symptom mismatch, pattern↔prescription 寒热矛盾, missed red-flag symptoms)
 - **Stale-analysis warning** — banner appears when form inputs diverge from the last analyzed snapshot
 - **Consultation history** — auto-saved, paginated, with Case ID / Follow-up Case ID / AI feedback fields
-- **Admin tools** — doctor allowlist management, per-doctor clinical profiling, fleet-wide AI output audit
+- **Doctor Risk Nudge** — workbench left sidebar aggregator showing recurring AI caution themes (weight-only, no counts) with verbatim hover popup
+- **Doctor Discussion Agenda** — inline expander in user list table under admin users page showing 4-card clinical review discussion agenda (calculated weekly)
+- **Admin tools** — doctor allowlist management, per-doctor clinical profiling, fleet-wide AI output audit, inline discussion agenda
 
 ---
 
@@ -91,15 +93,19 @@ npm run build     # Verify production build
 Doctor (browser)
   └── POST /api/analyze              → DeepSeek flash → clinical review JSON
   └── /api/consultations/*           → Supabase (save / load / delete history)
+  └── GET  /api/me/nudge             → risk-nudge themes + verbatim examples (doctor RLS-gated)
   └── GET  /api/me/profile           → descriptive clinical profile (admin-only fields stripped)
 
 Admin (is_admin = true)
-  └── /admin/users                   → doctor list with 30-day stats
+  └── /admin/users                   → doctor list with 30-day stats and inline discussion agendas
   └── /admin/users/[doctorId]        → consultation list + clinical profile (2-tab view)
+  └── GET  /api/admin/users/[doctorId]/discussion → fetch doctor pre-computed discussion items (admin-only)
   └── /admin/output-audits           → fleet-wide AI output audit results
 
 GitHub Actions (ASSESSMENT_API_KEY auth)
   └── npx tsx scripts/evaluate-local.ts   → per-doctor profile evaluation (process runner)
+  └── POST /api/cron/risk-nudge           → daily SGT 03:00 SGT (19:00 UTC) computation (cron)
+  └── POST /api/cron/discussion-agenda    → weekly SGT Sunday 03:00 SGT (19:00 UTC) computation (cron)
   └── POST /api/cron/output-audit         → fleet-wide AI output audit
 ```
 
