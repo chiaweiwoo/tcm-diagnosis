@@ -3658,8 +3658,8 @@ details[open] .sample-details__toggle::before {
   border-radius: 12px;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
   width: 100%;
-  max-width: 620px;
-  max-height: 82vh;
+  max-width: 800px;
+  max-height: 88vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -4090,6 +4090,14 @@ details[open] .sample-details__toggle::before {
 
 .profile-flag-row--clickable:hover {
   background: var(--bg, #FAFAF8);
+}
+
+.profile-flag-more {
+  padding: 6px 16px;
+  font-size: 11px;
+  color: var(--text-muted, #6B7280);
+  font-style: italic;
+  border-top: 1px dashed var(--border, #EAE6E2);
 }
 
 .profile-flag-date {

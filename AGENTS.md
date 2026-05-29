@@ -270,7 +270,11 @@ When `totalAnalyzed < LOW_SAMPLE_THRESHOLD` (20), only boolean rules (1 & 2) fir
 - `src/app/admin/users/ProfileOverlay.tsx` — overlay modal (shimmer / data / error states)
 - `src/app/admin/users/UsersList.tsx` — row click triggers overlay, eye icon keeps confirm popup
 
-**No DB table, no migration needed.** All data from `consultations.analysis_result` JSONB and `consultations.form_data` JSONB via service_role.
+**Database:** `public.doctor_profile_snapshots` — on-demand cache, one row per doctor, PK `doctor_id`. RLS enabled; service_role only (no authenticated/anon grants). Columns: `snapshot JSONB`, `flagged JSONB`, `clusters JSONB`, `source_last_record_at TIMESTAMPTZ`, `computed_at TIMESTAMPTZ`.
+
+**Cache logic (API route):** reads `MAX(analyzed_at)` from consultations, checks if cached `source_last_record_at` matches. Hit → return cached instantly. Miss → compute fresh (LLM clustering included), upsert to cache, return. Cache write is best-effort (non-fatal on failure).
+
+> WARNING: **Unapplied migration: `032_doctor_profile_snapshots.sql`** — run in Supabase SQL Editor before using the profile overlay in production. Until applied, the API falls through to on-demand computation every time (no error, just slower).
 
 **Invariant 8:** prescription text → DeepSeek (permitted). Langfuse not wired for clustering call.
 
@@ -497,11 +501,13 @@ Migrations: `supabase/migrations/` (numbered SQL). **Committing a migration file
 | `activity_logs` | Doctor activity events (login, analyze) — no UI for now |
 | `analytics_doctor_evaluations` | Legacy Goal 2 evaluation output. Preserved for historical reference only; no active runtime code should depend on it. |
 | `analytics_output_audits` | Fleet-wide AI output audits (Goal 1 v3). No RLS. Append-only. Renamed from `analytics_session_reviews` via migration 028. Old v1 rows (no `categories` key) rendered by `LegacyReview` component until pruned. |
+| `doctor_profile_snapshots` | On-demand cache for admin profile overlay. One row per doctor, PK `doctor_id`. RLS enabled; service_role only. See migration 032. |
 
 > **Unapplied migrations (must be run in Supabase SQL Editor):**
 > - `022_drop_analytics_and_assessments.sql` — drops legacy tables (`analytics_prompt_quality_runs`, etc.)
 > - `023_session_reviews_and_eval_cleanup.sql` — drops `output_review` column, creates `analytics_session_reviews` (prerequisite for 028)
 > - `028_rename_session_reviews_to_output_audits.sql` — renames `analytics_session_reviews` → `analytics_output_audits`. **Must run before new audit runs or the admin page can load data.**
+> - `032_doctor_profile_snapshots.sql` — creates profile snapshot cache table. Overlay still works without it (falls back to on-demand every time), but apply to enable caching.
 
 `consultations`: doctor reads use user-scoped Supabase client (anon key + session JWT); RLS enforces isolation. Admin routes use service_role (bypasses RLS). Never expose service_role key to browser.
 
@@ -638,6 +644,7 @@ Do not say done until the changed path is verified, not merely coded.
 5. **`023_session_reviews_and_eval_cleanup.sql`** — apply in production (drops `output_review` column, creates `analytics_session_reviews`; prerequisite for 028)
 6. **`028_rename_session_reviews_to_output_audits.sql`** — apply in production (renames `analytics_session_reviews` → `analytics_output_audits`; required before new audits can write or the admin page can load)
 7. **`031_drop_doctor_discussion_agenda.sql`** — apply in production (drops the retired `doctor_discussion_agenda` table)
+8. **`032_doctor_profile_snapshots.sql`** — apply in production to enable profile overlay cache (overlay works without it, just slower every time)
 8. Phase 2: doctor-facing surface (doctorFacingHint removed from v1.1 schema; revisit if needed)
 9. SGT timezone alignment in `buildWindow` — 14-day on-demand window makes boundary precision a non-issue; reopen if needed
 10. AI Output Audit pipeline: records where `analysis_stale=true` have mismatched form_data/analysis_result — may cause false "hallucination" findings. Consider filtering these records.

@@ -44,13 +44,15 @@ function FlagGroup({
 }) {
   if (cases.length === 0) return null;
   const isCritical = ruleKey === "criticalRisk";
+  const shown = cases.slice(0, 3);
+  const extra = cases.length - shown.length;
   return (
     <div className={`profile-flag-group${isCritical ? " profile-flag-group--critical" : ""}`}>
       <div className="profile-flag-head">
         <span className="profile-flag-label">{cases[0].ruleLabel}</span>
         <span className="profile-flag-count">{cases.length} 条</span>
       </div>
-      {cases.map((c) => (
+      {shown.map((c) => (
         <div
           key={c.id}
           className="profile-flag-row profile-flag-row--clickable"
@@ -62,6 +64,9 @@ function FlagGroup({
           <span className="profile-flag-evidence">{c.evidence}</span>
         </div>
       ))}
+      {extra > 0 && (
+        <div className="profile-flag-more">+{extra} 条，点击上方任意行在工作台查看</div>
+      )}
     </div>
   );
 }
