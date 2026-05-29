@@ -15,34 +15,20 @@ const RULE_ORDER: RuleKey[] = [
   "nonClinical",
   "needsReviewHigh",
   "physicalExamShort",
-  "currentIllnessShort",
 ];
 
 const LOW_SAMPLE_THRESHOLD = 20;
-
-function SignalCard({ label, rate }: { label: string; rate: number }) {
-  const pct = Math.round(rate * 100);
-  return (
-    <div className="profile-signal-card">
-      <div className="profile-signal-label">{label}</div>
-      <div className="profile-signal-bar-row">
-        <div className="profile-signal-bar-wrap">
-          <div className="profile-signal-bar" style={{ width: `${Math.min(pct, 100)}%` }} />
-        </div>
-        <span className="profile-signal-pct">{(rate * 100).toFixed(1)}%</span>
-      </div>
-    </div>
-  );
-}
 
 function FlagGroup({
   ruleKey,
   cases,
   doctorId,
+  rateLabel,
 }: {
   ruleKey: RuleKey;
   cases: FlaggedCase[];
   doctorId: string;
+  rateLabel?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
   if (cases.length === 0) return null;
@@ -52,7 +38,10 @@ function FlagGroup({
   return (
     <div className={`profile-flag-group${isCritical ? " profile-flag-group--critical" : ""}`}>
       <div className="profile-flag-head">
-        <span className="profile-flag-label">{cases[0].ruleLabel}</span>
+        <span className="profile-flag-label">
+          {cases[0].ruleLabel}
+          {rateLabel && <span className="profile-flag-rate">{rateLabel}</span>}
+        </span>
         <span className="profile-flag-count">{cases.length} 条</span>
       </div>
       {shown.map((c) => (
@@ -127,14 +116,7 @@ function ProfileBody({
 
   return (
     <div className="profile-overlay-body">
-      <div className="profile-overlay-section-head">质量信号</div>
-      <div className="profile-signal-cards">
-        <SignalCard label="辨证警示触发率" rate={snapshot.criticalRiskRate} />
-        <SignalCard label="非临床信息出现率" rate={snapshot.nonClinicalRate} />
-        <SignalCard label="风险有实质内容率" rate={snapshot.realCautionsRate} />
-      </div>
-
-      <div className="profile-overlay-section-head" style={{ marginTop: 20 }}>
+      <div className="profile-overlay-section-head">
         待关注病案
         {isLowSample && (
           <span className="profile-section__head-note">
@@ -152,6 +134,13 @@ function ProfileBody({
             ruleKey={ruleKey}
             cases={byRule.get(ruleKey) ?? []}
             doctorId={doctorId}
+            rateLabel={
+              ruleKey === "criticalRisk"
+                ? `触发率 ${(snapshot.criticalRiskRate * 100).toFixed(1)}%`
+                : ruleKey === "nonClinical"
+                ? `出现率 ${(snapshot.nonClinicalRate * 100).toFixed(1)}%`
+                : undefined
+            }
           />
         ))}
         {clusters.length > 0 && (
