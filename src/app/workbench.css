@@ -2218,3 +2218,11 @@ mark.critical-highlight {
   margin-top: 4px;
   line-height: 1.45;
 }
+
+.risk-nudge-row__desc {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 1px;
+  margin-bottom: 5px;
+  line-height: 1.35;
+}

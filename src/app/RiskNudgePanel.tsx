@@ -6,6 +6,7 @@ type NudgeTheme = {
   key: string;
   weight: number; // 0–1, computed server-side from counts
   examples: string[];
+  originalKey?: string | null;
 };
 
 type NudgeData = {
@@ -85,6 +86,9 @@ export default function RiskNudgePanel({ viewAsDoctorId }: { viewAsDoctorId?: st
           <div key={i} className="risk-nudge-row">
             {/* Row label + bar. Popup appears on row hover. */}
             <div className="risk-nudge-row__label">{theme.key}</div>
+            {theme.originalKey && (
+              <div className="risk-nudge-row__desc">{theme.originalKey}</div>
+            )}
             <div className="risk-nudge-bar-track">
               <div
                 className="risk-nudge-bar-fill"

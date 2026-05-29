@@ -29,6 +29,7 @@ export type NudgeTheme = {
   key: string;
   count: number;
   examples: string[];
+  originalKey?: string;
 };
 
 export type NudgeComputeStatus =
@@ -138,6 +139,7 @@ function mergeWithAi(
       key: ai?.key || bucket.key,
       count: bucket.count,
       examples: (ai?.examples?.length ? ai.examples : bucket.examples).slice(0, 5),
+      originalKey: bucket.key,
     };
   });
 }
