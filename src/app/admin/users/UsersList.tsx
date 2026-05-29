@@ -65,6 +65,10 @@ function DiscussionOverlay({
           <div className="disc-overlay-meta">生成于 {formattedDate} SGT</div>
         )}
 
+        <div className="disc-overlay-desc">
+          AI 分析该医生近14天病案中的高频诊断组合，自动生成以下议题供资深医师在督导或病案回顾时参考。每项议题附有病案依据与建议跟进问法。
+        </div>
+
         <div className="disc-overlay-body">
           {agenda === "loading" && (
             <div className="disc-overlay-shimmer-wrap">
