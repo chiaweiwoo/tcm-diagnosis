@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getServiceRoleClient } from "@/lib/supabase/server";
 import { ConsultationTable } from "./ConsultationTable";
+import { DoctorSubNav } from "./DoctorSubNav";
 import type { StructuredCaseForm } from "@/lib/forms/caseSchema";
 
 type RouteContext = {
@@ -80,6 +81,8 @@ export default async function DoctorPage({ params }: RouteContext) {
           </Link>
         </div>
       </div>
+
+      <DoctorSubNav doctorId={doctorId} />
 
       {records.length === 0 ? (
         <div className="admin-empty">

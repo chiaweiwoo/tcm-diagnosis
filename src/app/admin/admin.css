@@ -4024,3 +4024,235 @@ details[open] .sample-details__toggle::before {
   flex-direction: column;
   gap: 8px;
 }
+
+/* ── Doctor sub-nav tabs ──────────────────────────────────────────────────── */
+.doctor-subnav {
+  display: flex;
+  gap: 2px;
+  margin-top: 14px;
+  border-bottom: 1px solid var(--border, #EAE6E2);
+}
+
+.doctor-subnav__tab {
+  padding: 7px 16px;
+  font-size: 13px;
+  color: var(--text-muted, #6B7280);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color 0.12s, border-color 0.12s;
+  white-space: nowrap;
+}
+
+.doctor-subnav__tab:hover {
+  color: var(--text, #1A1A1A);
+}
+
+.doctor-subnav__tab--active {
+  color: var(--brand, #9B2226);
+  border-bottom-color: var(--brand, #9B2226);
+  font-weight: 500;
+}
+
+/* ── Profile snapshot page ────────────────────────────────────────────────── */
+.profile-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  margin-top: 20px;
+}
+
+.profile-low-sample {
+  background: #FFFBEB;
+  border: 1px solid #FCD34D;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: #92400E;
+  line-height: 1.5;
+}
+
+.profile-low-sample strong {
+  font-weight: 600;
+}
+
+.profile-section {
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #EAE6E2);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.profile-section__head {
+  padding: 10px 16px;
+  background: var(--bg, #FAFAF8);
+  border-bottom: 1px solid var(--border, #EAE6E2);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted, #6B7280);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Quality signal rows */
+.profile-signal-rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.profile-signal-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border, #EAE6E2);
+}
+
+.profile-signal-row:last-child {
+  border-bottom: none;
+}
+
+.profile-signal-label {
+  font-size: 13px;
+  color: var(--text, #1A1A1A);
+}
+
+.profile-signal-bar-wrap {
+  width: 90px;
+  height: 6px;
+  background: var(--bg, #FAFAF8);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.profile-signal-bar {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--brand, #9B2226);
+  transition: width 0.2s;
+}
+
+.profile-signal-pct {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text, #1A1A1A);
+  min-width: 38px;
+  text-align: right;
+}
+
+/* Section depth table */
+.profile-depth-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.profile-depth-table th {
+  padding: 8px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted, #6B7280);
+  text-align: left;
+  border-bottom: 1px solid var(--border, #EAE6E2);
+}
+
+.profile-depth-table th:not(:first-child) {
+  text-align: right;
+}
+
+.profile-depth-table td {
+  padding: 9px 16px;
+  font-size: 13px;
+  color: var(--text, #1A1A1A);
+  border-bottom: 1px solid var(--border, #EAE6E2);
+}
+
+.profile-depth-table td:not(:first-child) {
+  text-align: right;
+}
+
+.profile-depth-table tr:last-child td {
+  border-bottom: none;
+}
+
+.profile-depth-group {
+  font-size: 11px;
+  color: var(--text-muted, #6B7280);
+  margin-left: 4px;
+}
+
+.profile-zerorate {
+  color: var(--text-muted, #6B7280);
+}
+
+.profile-zerorate--high {
+  color: #B45309;
+  font-weight: 500;
+}
+
+/* Input completeness table */
+.profile-field-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.profile-field-table th {
+  padding: 8px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted, #6B7280);
+  text-align: left;
+  border-bottom: 1px solid var(--border, #EAE6E2);
+}
+
+.profile-field-table th:not(:first-child) {
+  text-align: right;
+}
+
+.profile-field-table td {
+  padding: 9px 16px;
+  font-size: 13px;
+  color: var(--text, #1A1A1A);
+  border-bottom: 1px solid var(--border, #EAE6E2);
+}
+
+.profile-field-table td:not(:first-child) {
+  text-align: right;
+}
+
+.profile-field-table tr:last-child td {
+  border-bottom: none;
+}
+
+.profile-field-chars {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.profile-field-bar-wrap {
+  width: 70px;
+  height: 5px;
+  background: var(--bg, #FAFAF8);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.profile-field-bar {
+  height: 100%;
+  border-radius: 3px;
+  background: #5b8c6e;
+  transition: width 0.2s;
+}
+
+.profile-field-low {
+  color: #B45309;
+  font-weight: 500;
+}
+
+.profile-meta {
+  font-size: 12px;
+  color: var(--text-muted, #6B7280);
+  margin-top: 4px;
+}
