@@ -9,6 +9,14 @@ describe("DeepSeek JSON parsing", () => {
   it("extracts JSON from surrounding prose", () => {
     expect(extractJsonObject('Here:\n{"status":"ok"}\nDone')).toBe('{"status":"ok"}');
   });
+
+  it("extracts JSON array from fenced code", () => {
+    expect(extractJsonObject('```json\n[{"status":"ok"}]\n```')).toBe('[{"status":"ok"}]');
+  });
+
+  it("extracts JSON array from surrounding prose", () => {
+    expect(extractJsonObject('Here:\n[{"status":"ok"}]\nDone')).toBe('[{"status":"ok"}]');
+  });
 });
 
 describe("DeepSeek JSON repair fallback", () => {

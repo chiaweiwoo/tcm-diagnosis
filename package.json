@@ -12,7 +12,7 @@
     "allowlist:add": "node --env-file=.env.local scripts/allowlist-add.mjs",
     "seed:cases": "node --env-file=.env.local scripts/seed-cases.mjs",
     "evaluate": "npx tsx scripts/evaluate-local.ts",
-    "nudge": "node --env-file=.env.local node_modules/.bin/tsx scripts/compute-nudge.ts"
+    "nudge": "npx tsx scripts/compute-nudge.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",

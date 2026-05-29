@@ -279,7 +279,8 @@ export async function computeNudgeForDoctor(
     usedModel = model;
     aiUsage = aiResult.usage;
     themes = mergeWithAi(surfaced, parsedItems);
-  } catch {
+  } catch (err) {
+    console.error("AI Nudge rephrasing failed:", err);
     // AI failed — use deterministic labels as-is (invariant: never empty on AI failure)
     themes = surfaced.map((b) => ({ key: b.key, count: b.count, examples: b.examples }));
   }

@@ -98,8 +98,28 @@ export function extractJsonObject(content: string) {
   const trimmed = content.trim();
   const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1]?.trim();
   const candidate = fenced || trimmed;
-  const start = candidate.indexOf("{");
-  const end = candidate.lastIndexOf("}");
+
+  const firstBrace = candidate.indexOf("{");
+  const firstBracket = candidate.indexOf("[");
+  let start = -1;
+  if (firstBrace !== -1 && firstBracket !== -1) {
+    start = Math.min(firstBrace, firstBracket);
+  } else if (firstBrace !== -1) {
+    start = firstBrace;
+  } else if (firstBracket !== -1) {
+    start = firstBracket;
+  }
+
+  const lastBrace = candidate.lastIndexOf("}");
+  const lastBracket = candidate.lastIndexOf("]");
+  let end = -1;
+  if (lastBrace !== -1 && lastBracket !== -1) {
+    end = Math.max(lastBrace, lastBracket);
+  } else if (lastBrace !== -1) {
+    end = lastBrace;
+  } else if (lastBracket !== -1) {
+    end = lastBracket;
+  }
 
   if (start === -1 || end === -1 || end <= start) {
     throw new DeepSeekError("DeepSeek returned JSON that could not be parsed.", 502, {
