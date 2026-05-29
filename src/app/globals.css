@@ -75,5 +75,5 @@ button {
 }
 
 ::selection {
-  background: var(--brand-light);
+  background: #F2C2C2;
 }
