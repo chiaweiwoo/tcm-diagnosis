@@ -2206,3 +2206,15 @@ mark.critical-highlight {
   left: 0;
   color: #6B7280;
 }
+
+/* Sidebar overflow fix & subheader description */
+.workbench__sidebar--left {
+  overflow: visible !important;
+}
+
+.risk-nudge-header__desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  line-height: 1.45;
+}

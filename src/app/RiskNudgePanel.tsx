@@ -53,6 +53,9 @@ export default function RiskNudgePanel({ viewAsDoctorId }: { viewAsDoctorId?: st
           >
             ⚠️ AI 反复提醒的风险点
           </span>
+          <div className="risk-nudge-header__desc">
+            这里汇总近期病案中 AI 反复提示的临床注意事项，帮助回顾常见风险点。仅供参考，不构成诊疗建议。
+          </div>
         </div>
         <div className="risk-nudge-empty">
           暂无足够的近期病案数据
@@ -72,6 +75,9 @@ export default function RiskNudgePanel({ viewAsDoctorId }: { viewAsDoctorId?: st
         >
           ⚠️ AI 反复提醒的风险点
         </span>
+        <div className="risk-nudge-header__desc">
+          这里汇总近期病案中 AI 反复提示的临床注意事项，帮助回顾常见风险点。仅供参考，不构成诊疗建议。
+        </div>
       </div>
 
       <div className="risk-nudge-list">
