@@ -13,6 +13,14 @@ type GenericVersionModule = {
   version: string;
   prompt?: string;
   buildPrompt?: () => string;
+  meta?: PromptMeta;
+};
+
+export type PromptMeta = {
+  version: string;
+  summary: string;
+  motivation: string;
+  futureIdeas: string[];
 };
 
 export const PROMPT_REGISTRY = {
@@ -186,6 +194,15 @@ export function getPrompt(key: PromptKey, manualOverride?: string): { version: s
     version: `${key}-${versionKey}`,
     prompt: resolvePromptText(moduleData),
   };
+}
+
+export function getPromptMeta(key: string, versionKey?: string): PromptMeta | null {
+  if (!(key in PROMPT_REGISTRY)) return null;
+  const promptKey = key as PromptKey;
+  const resolvedVersion = versionKey ?? resolvePromptVersion(promptKey);
+  const group = PROMPT_REGISTRY[promptKey];
+  const moduleData = group.versions[resolvedVersion as keyof typeof group.versions] as GenericVersionModule | undefined;
+  return moduleData?.meta ?? null;
 }
 
 /**

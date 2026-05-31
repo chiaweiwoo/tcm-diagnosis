@@ -158,3 +158,12 @@ export function buildTcmAnalysisUserPrompt(form: StructuredCaseForm): string {
 
   return lines.filter(Boolean).join("\n");
 }
+
+export const meta = {
+  version: "v1.5",
+  summary: "GitOps 迁移 — 提示词迁入注册表",
+  motivation: "提示词曾以散落字符串形式存在于 src/lib/ai/prompts.ts，无版本控制、无回滚路径、无法审查变更原因。v1.5 将其迁入 GitOps 注册表，实现提示词与代码同步部署、可追溯版本历史，同时内容与 v1.4 保持一致。",
+  futureIdeas: [
+    "通过环境变量覆盖在生产环境切换候选版本，无需重新部署",
+  ],
+};

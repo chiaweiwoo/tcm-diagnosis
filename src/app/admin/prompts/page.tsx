@@ -1,6 +1,5 @@
-import { PROMPT_REGISTRY, listPromptFamilies } from "@/lib/prompts";
+import { PROMPT_REGISTRY, listPromptFamilies, getPromptMeta } from "@/lib/prompts";
 import { getPromptHistory } from "@/lib/prompts/history";
-import type { PromptHistoryEntry } from "@/lib/prompts/history";
 import { PromptRegistryList } from "./PromptRegistryList";
 import type { FamilyView } from "./types";
 
@@ -16,11 +15,12 @@ export default function PromptsPage() {
   const families = listPromptFamilies();
   const activeFamilyKeys = new Set(Object.keys(PROMPT_REGISTRY));
 
-  // Group entries by family
-  const byFamily = new Map<string, PromptHistoryEntry[]>();
+  // Group entries by family, attaching structured meta when available
+  const byFamily = new Map<string, import("./types").VersionView[]>();
   for (const entry of entries) {
+    const meta = getPromptMeta(entry.family, entry.version);
     const list = byFamily.get(entry.family) ?? [];
-    list.push(entry);
+    list.push({ ...entry, meta });
     byFamily.set(entry.family, list);
   }
 

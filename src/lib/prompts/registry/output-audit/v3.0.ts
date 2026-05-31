@@ -73,3 +73,13 @@ Finding 结构：
 6. 若填写了 userFeedbackSummary，是否控制在 1-3 句以内（非长段落）？
 `.trim();
 }
+
+export const meta = {
+  version: "v3.0",
+  summary: "v3 审查 — 锚定最新分析窗口 + 用户反馈汇总",
+  motivation: 'v1/v2 审查窗口基于挂钟时间 "now-14d"，在生产负载低时会出现近乎空的样本集。v3 将窗口锚定到 MAX(analyzed_at)-14d，确保始终能取到最近的真实病案。同时新增 userFeedbackSummary，将医生对 AI 输出的反馈并入审查，让审查结果与临床现场感受对齐，而非纯粹技术指标。v2 的 priorImprovementStatus 链路依赖前次审查 ID，难以维护且容易失真，已移除。',
+  futureIdeas: [
+    "按医生分层审查，识别某类医生特有的输出质量问题",
+    "对 analysis_stale=true 的病案做标记后排除，减少幻觉误报",
+  ],
+};

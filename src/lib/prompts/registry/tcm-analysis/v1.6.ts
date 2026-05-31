@@ -159,3 +159,13 @@ export function buildTcmAnalysisUserPrompt(form: StructuredCaseForm): string {
 
   return lines.filter(Boolean).join("\n");
 }
+
+export const meta = {
+  version: "v1.6",
+  summary: "药材安全性检测 — 草药禁忌症触发",
+  motivation: "v1.4 的药草-历史相互作用触发器仅覆盖固定的几对组合；当出现未列入名单的草药时无法提示。v1.6 将触发逻辑泛化为基于禁忌症的检测，让 AI 根据既往史中出现的任何安全相关情况推断潜在风险，而非依赖预设名单。",
+  futureIdeas: [
+    "引入剂量感知：相同草药在常规剂量与超量时风险等级不同",
+    "增加多草药组合交互检测，而非单独评估每种草药",
+  ],
+};

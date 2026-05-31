@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { FamilyView } from "./types";
+import type { FamilyView, VersionView } from "./types";
 
 const SOURCE_LABELS: Record<string, string> = {
   latest: "默认 (latest)",
@@ -37,8 +37,9 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-function VersionCard({ entry, isActiveVersion }: { entry: import("@/lib/prompts/history").PromptHistoryEntry; isActiveVersion: boolean }) {
+function VersionCard({ entry, isActiveVersion }: { entry: VersionView; isActiveVersion: boolean }) {
   const [expanded, setExpanded] = useState(isActiveVersion);
+  const { meta } = entry;
 
   return (
     <div className={`prompt-version-card${isActiveVersion ? " prompt-version-card--active" : ""}`}>
@@ -53,6 +54,7 @@ function VersionCard({ entry, isActiveVersion }: { entry: import("@/lib/prompts/
             </span>
           )}
         </div>
+        {meta && <div className="prompt-meta-summary">{meta.summary}</div>}
         <div className="prompt-version-commits">
           <span className="prompt-commit-info">
             首次提交：{formatSgt(entry.firstCommit.isoDate)} · {entry.firstCommit.sha.slice(0, 7)} · {entry.firstCommit.author}
@@ -71,12 +73,25 @@ function VersionCard({ entry, isActiveVersion }: { entry: import("@/lib/prompts/
 
       {expanded && (
         <div className="prompt-version-body">
-          {entry.firstCommit.body && (
+          {meta ? (
             <div className="prompt-change-notes">
               <span className="prompt-change-notes-label">改动说明</span>
+              <p className="prompt-meta-motivation">{meta.motivation}</p>
+              {meta.futureIdeas.length > 0 && (
+                <div className="prompt-meta-future">
+                  <span className="prompt-meta-future-label">未来方向</span>
+                  <ul className="prompt-meta-future-list">
+                    {meta.futureIdeas.map((idea, i) => <li key={i}>{idea}</li>)}
+                  </ul>
+                </div>
+              )}
+            </div>
+          ) : entry.firstCommit.body ? (
+            <div className="prompt-change-notes">
+              <span className="prompt-change-notes-label">改动说明（来自提交记录）</span>
               <pre className="prompt-change-notes-body">{entry.firstCommit.body}</pre>
             </div>
-          )}
+          ) : null}
           <div className="prompt-source-header">
             <span className="prompt-source-label">提示词内容</span>
             <CopyButton text={entry.contents} />
