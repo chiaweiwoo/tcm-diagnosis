@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getPrompt, getTcmAnalysisPrompt, resolvePromptVersion, PROMPT_REGISTRY } from "../index";
+import { getPrompt, getTcmAnalysisPrompt, resolvePromptVersion, PROMPT_REGISTRY, listPromptFamilies, describeActiveVersion, envVarNameFor } from "../index";
 
 describe("Prompt Registry Resolution", () => {
   const originalEnv = { ...process.env };
@@ -74,6 +74,33 @@ describe("Prompt Registry Resolution", () => {
 
     const { version: fullVersion } = getPrompt("tcm-analysis", "v99.9");
     expect(fullVersion).toBe(`tcm-analysis-${PROMPT_REGISTRY["tcm-analysis"].latest}`);
+  });
+
+  it("listPromptFamilies returns a descriptor for every registry key", () => {
+    const families = listPromptFamilies();
+    const keys = families.map((f) => f.key);
+    expect(keys).toContain("tcm-analysis");
+    expect(keys).toContain("risk-nudge");
+    expect(keys).toContain("presc-cluster");
+    expect(keys).toContain("output-audit");
+    for (const f of families) {
+      expect(f.envVarName).toBe(envVarNameFor(f.key));
+      expect(f.allVersionKeys.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("describeActiveVersion reports source=latest when no overrides are set", () => {
+    delete process.env.TCM_ANALYSIS_PROMPT_VERSION;
+    const desc = describeActiveVersion("tcm-analysis");
+    expect(desc.source).toBe("latest");
+    expect(desc.activeVersion).toBe(PROMPT_REGISTRY["tcm-analysis"].latest);
+  });
+
+  it("describeActiveVersion reports source=env-invalid-fallback when env var is set to unknown version", () => {
+    process.env.TCM_ANALYSIS_PROMPT_VERSION = "v99.9";
+    const desc = describeActiveVersion("tcm-analysis");
+    expect(desc.source).toBe("env-invalid-fallback");
+    expect(desc.activeVersion).toBe(PROMPT_REGISTRY["tcm-analysis"].latest);
   });
 
   it("getTcmAnalysisPrompt returns a callable buildUserPrompt", () => {

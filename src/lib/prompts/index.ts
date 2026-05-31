@@ -45,6 +45,58 @@ export const PROMPT_REGISTRY = {
 
 export type PromptKey = keyof typeof PROMPT_REGISTRY;
 
+export function envVarNameFor(key: PromptKey): string {
+  return `${key.toUpperCase().replaceAll("-", "_")}_PROMPT_VERSION`;
+}
+
+export type VersionSource = "latest" | "env" | "cli" | "manual" | "env-invalid-fallback";
+
+export type FamilyDescriptor = {
+  key: PromptKey;
+  activeVersion: string;
+  source: VersionSource;
+  envVarName: string;
+  allVersionKeys: string[];
+};
+
+export function listPromptFamilies(): FamilyDescriptor[] {
+  return (Object.keys(PROMPT_REGISTRY) as PromptKey[]).map((key) =>
+    describeActiveVersion(key)
+  );
+}
+
+export function describeActiveVersion(key: PromptKey): FamilyDescriptor {
+  const group = PROMPT_REGISTRY[key];
+  const envVarName = envVarNameFor(key);
+  const envValue = typeof process !== "undefined" ? process.env[envVarName] : undefined;
+
+  const cliOverrides = getCliOverrides();
+  let source: VersionSource;
+  let activeVersion: string;
+
+  if (cliOverrides[key] && cliOverrides[key] in group.versions) {
+    source = "cli";
+    activeVersion = cliOverrides[key];
+  } else if (envValue && envValue in group.versions) {
+    source = "env";
+    activeVersion = envValue;
+  } else if (envValue && !(envValue in group.versions)) {
+    source = "env-invalid-fallback";
+    activeVersion = group.latest;
+  } else {
+    source = "latest";
+    activeVersion = group.latest;
+  }
+
+  return {
+    key,
+    activeVersion,
+    source,
+    envVarName,
+    allVersionKeys: Object.keys(group.versions),
+  };
+}
+
 /**
  * Command Line Argument Parser to extract prompt-specific version overrides.
  * Handled styles:
@@ -106,8 +158,7 @@ export function resolvePromptVersion(key: PromptKey, manualOverride?: string): s
   }
 
   // 3. Environment variable configuration
-  const envVarName = `${key.toUpperCase().replaceAll("-", "_")}_PROMPT_VERSION`;
-  const envValue = process.env[envVarName];
+  const envValue = process.env[envVarNameFor(key)];
   if (envValue && envValue in group.versions) {
     return envValue;
   }
