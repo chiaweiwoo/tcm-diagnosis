@@ -5,6 +5,7 @@ export type PromptHistoryEntry = {
   path: string;
   family: string;
   version: string;
+  isArchive: boolean;
   contents: string;
   currentlyInTree: boolean;
   firstCommit: { sha: string; isoDate: string; author: string; message: string; body: string };

@@ -83,16 +83,20 @@ for (const path of everPaths) {
     contents = "// (could not retrieve contents)";
   }
 
-  // Derive family and version from path: registry/<family>/<version>.ts
+  // Derive family, version, isArchive from path:
+  //   registry/<family>/<version>.ts          → isArchive: false
+  //   registry/<family>/_archive/<version>.ts → isArchive: true
   const rel = path.slice(REGISTRY_DIR.length + 1);
-  const slashIdx = rel.indexOf("/");
-  const family = rel.slice(0, slashIdx);
-  const version = rel.slice(slashIdx + 1).replace(/\.ts$/, "");
+  const parts = rel.split("/");
+  const family = parts[0];
+  const isArchive = parts.length === 3 && parts[1] === "_archive";
+  const version = parts[parts.length - 1].replace(/\.ts$/, "");
 
   entries.push({
     path,
     family,
     version,
+    isArchive,
     contents,
     currentlyInTree,
     firstCommit,

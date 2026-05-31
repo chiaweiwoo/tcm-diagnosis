@@ -37,9 +37,15 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
+function parseHistoricalCommit(contents: string): { sha: string; date: string } | null {
+  const m = contents.match(/historicalCommit\s*=\s*\{\s*sha:\s*"([^"]+)"[^}]*date:\s*"([^"]+)"/);
+  return m ? { sha: m[1], date: m[2] } : null;
+}
+
 function VersionCard({ entry, isActiveVersion }: { entry: VersionView; isActiveVersion: boolean }) {
   const [expanded, setExpanded] = useState(isActiveVersion);
   const { meta } = entry;
+  const historical = entry.isArchive ? parseHistoricalCommit(entry.contents) : null;
 
   return (
     <div className={`prompt-version-card${isActiveVersion ? " prompt-version-card--active" : ""}`}>
@@ -47,7 +53,8 @@ function VersionCard({ entry, isActiveVersion }: { entry: VersionView; isActiveV
         <div className="prompt-version-title">
           <span className="prompt-version-tag">{entry.version}</span>
           {isActiveVersion && <span className="prompt-badge prompt-badge--active">当前版本</span>}
-          {!entry.currentlyInTree && <span className="prompt-badge prompt-badge--deleted">已删除</span>}
+          {entry.isArchive && <span className="prompt-badge prompt-badge--history">历史存档</span>}
+          {!entry.currentlyInTree && !entry.isArchive && <span className="prompt-badge prompt-badge--deleted">已删除</span>}
           {entry.commitCount > 1 && (
             <span className="prompt-badge prompt-badge--warn" title={`此版本文件被修改过 ${entry.commitCount} 次（违反不可变原则）`}>
               ⚠ 修改过 {entry.commitCount} 次
@@ -56,10 +63,16 @@ function VersionCard({ entry, isActiveVersion }: { entry: VersionView; isActiveV
         </div>
         {meta && <div className="prompt-meta-summary">{meta.summary}</div>}
         <div className="prompt-version-commits">
-          <span className="prompt-commit-info">
-            首次提交：{formatSgt(entry.firstCommit.isoDate)} · {entry.firstCommit.sha.slice(0, 7)} · {entry.firstCommit.author}
-          </span>
-          {entry.commitCount > 1 && (
+          {historical ? (
+            <span className="prompt-commit-info">
+              原始提交：{historical.date} · {historical.sha.slice(0, 7)}
+            </span>
+          ) : (
+            <span className="prompt-commit-info">
+              首次提交：{formatSgt(entry.firstCommit.isoDate)} · {entry.firstCommit.sha.slice(0, 7)} · {entry.firstCommit.author}
+            </span>
+          )}
+          {entry.commitCount > 1 && !entry.isArchive && (
             <span className="prompt-commit-info">
               最近修改：{formatSgt(entry.lastCommit.isoDate)} · {entry.lastCommit.sha.slice(0, 7)}
             </span>
@@ -103,6 +116,31 @@ function VersionCard({ entry, isActiveVersion }: { entry: VersionView; isActiveV
   );
 }
 
+function ArchiveSection({ versions }: { versions: VersionView[] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="prompt-archive-section">
+      <div
+        className="prompt-archive-toggle"
+        onClick={() => setOpen((v) => !v)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => e.key === "Enter" && setOpen((v) => !v)}
+      >
+        <span className="prompt-badge prompt-badge--archived">历史版本 · {versions.length} 个</span>
+        <span className="prompt-archive-chevron">{open ? "▲" : "▼"}</span>
+      </div>
+      {open && versions.map((entry) => (
+        <VersionCard
+          key={entry.version}
+          entry={entry}
+          isActiveVersion={false}
+        />
+      ))}
+    </div>
+  );
+}
+
 function FamilyAccordion({ family }: { family: FamilyView }) {
   const [open, setOpen] = useState(family.isActive);
 
@@ -140,15 +178,24 @@ function FamilyAccordion({ family }: { family: FamilyView }) {
         <div className="prompt-family-body">
           {family.versions.length === 0 ? (
             <p className="prompt-empty">此系列无版本记录</p>
-          ) : (
-            family.versions.map((entry) => (
-              <VersionCard
-                key={entry.version}
-                entry={entry}
-                isActiveVersion={family.isActive && entry.version === family.activeVersion}
-              />
-            ))
-          )}
+          ) : (() => {
+            const live = family.versions.filter((v) => !v.isArchive);
+            const archive = family.versions.filter((v) => v.isArchive);
+            return (
+              <>
+                {live.map((entry) => (
+                  <VersionCard
+                    key={entry.version}
+                    entry={entry}
+                    isActiveVersion={family.isActive && entry.version === family.activeVersion}
+                  />
+                ))}
+                {archive.length > 0 && (
+                  <ArchiveSection versions={archive} />
+                )}
+              </>
+            );
+          })()}
         </div>
       )}
     </div>

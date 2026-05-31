@@ -4521,6 +4521,32 @@ details[open] .sample-details__toggle::before {
   color: #166534;
 }
 
+.prompt-badge--history {
+  background: #F1F5F9;
+  color: #475569;
+}
+
+.prompt-archive-section {
+  margin-top: 8px;
+  border-top: 1px dashed var(--border);
+  padding-top: 8px;
+}
+
+.prompt-archive-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 6px 0;
+  user-select: none;
+}
+
+.prompt-archive-chevron {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
 .prompt-badge--deleted {
   background: #FEF2F2;
   color: #991B1B;
