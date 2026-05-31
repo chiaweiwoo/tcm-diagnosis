@@ -195,6 +195,8 @@ export async function runOutputAudit({
         input: result.usage?.prompt_tokens ?? 0,
         output: result.usage?.completion_tokens ?? 0,
         total: result.usage?.total_tokens ?? 0,
+        cacheHit: result.usage?.prompt_cache_hit_tokens ?? 0,
+        cacheMiss: result.usage?.prompt_cache_miss_tokens ?? 0,
       },
       metadata: {
         repairedJson: result.repairedJson ?? false,
