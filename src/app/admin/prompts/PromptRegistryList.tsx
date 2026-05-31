@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { FamilyView } from "./page";
+import type { FamilyView } from "./types";
 
 const SOURCE_LABELS: Record<string, string> = {
   latest: "默认 (latest)",

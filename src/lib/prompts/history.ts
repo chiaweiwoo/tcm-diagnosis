@@ -1,3 +1,4 @@
+import "server-only";
 import historyJson from "./_history.generated.json";
 
 export type PromptHistoryEntry = {

@@ -14,6 +14,7 @@
 import { execSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
+import { createHash } from "node:crypto";
 
 const REGISTRY_DIR = "src/lib/prompts/registry";
 const OUT_PATH = "src/lib/prompts/_history.generated.json";
@@ -92,18 +93,47 @@ for (const path of everPaths) {
   });
 }
 
-// Sort: family asc, then version desc (newest first within a family)
+// Sort: family asc, then version desc (semver-aware, newest first within a family)
+function semverDesc(a, b) {
+  const parse = (v) => v.replace(/^v/, "").split(".").map(Number);
+  const [aMaj, aMin = 0, aPat = 0] = parse(a);
+  const [bMaj, bMin = 0, bPat = 0] = parse(b);
+  return bMaj - aMaj || bMin - aMin || bPat - aPat;
+}
 entries.sort(
   (a, b) =>
-    a.family.localeCompare(b.family) || b.version.localeCompare(a.version)
+    a.family.localeCompare(b.family) || semverDesc(a.version, b.version)
 );
 
-mkdirSync(dirname(OUT_PATH), { recursive: true });
-writeFileSync(
-  OUT_PATH,
-  JSON.stringify({ generatedAt: new Date().toISOString(), entries }, null, 2),
-  "utf8"
-);
-console.log(
-  `✓ Wrote ${entries.length} prompt history entries to ${OUT_PATH}`
-);
+// Only rewrite if entries changed — prevents noisy timestamp churn on every build
+const entriesHash = createHash("sha1")
+  .update(JSON.stringify(entries))
+  .digest("hex");
+
+let existingHash = null;
+if (existsSync(OUT_PATH)) {
+  try {
+    const existing = JSON.parse(readFileSync(OUT_PATH, "utf8"));
+    existingHash = createHash("sha1")
+      .update(JSON.stringify(existing.entries))
+      .digest("hex");
+  } catch {
+    // corrupted file — rewrite
+  }
+}
+
+if (entriesHash === existingHash) {
+  console.log(
+    `✓ Prompt history unchanged (${entries.length} entries) — skipping write`
+  );
+} else {
+  mkdirSync(dirname(OUT_PATH), { recursive: true });
+  writeFileSync(
+    OUT_PATH,
+    JSON.stringify({ generatedAt: new Date().toISOString(), entries }, null, 2),
+    "utf8"
+  );
+  console.log(
+    `✓ Wrote ${entries.length} prompt history entries to ${OUT_PATH}`
+  );
+}

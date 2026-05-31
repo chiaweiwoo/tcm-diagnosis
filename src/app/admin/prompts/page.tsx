@@ -2,22 +2,13 @@ import { PROMPT_REGISTRY, listPromptFamilies } from "@/lib/prompts";
 import { getPromptHistory } from "@/lib/prompts/history";
 import type { PromptHistoryEntry } from "@/lib/prompts/history";
 import { PromptRegistryList } from "./PromptRegistryList";
+import type { FamilyView } from "./types";
 
 const CALLERS: Record<string, string[]> = {
   "tcm-analysis":  ["POST /api/analyze", "scripts/analyze_batch_historical.mjs"],
   "risk-nudge":    ["POST /api/cron/dr_nudge", "npm run dr_nudge"],
   "presc-cluster": ["GET /api/admin/users/[doctorId]/profile"],
   "output-audit":  ["POST /api/admin/analytics/output-audit", "POST /api/cron/output-audit"],
-};
-
-export type FamilyView = {
-  family: string;
-  activeVersion: string;
-  source: string;
-  envVarName: string;
-  callers: string[];
-  versions: PromptHistoryEntry[];
-  isActive: boolean;
 };
 
 export default function PromptsPage() {
