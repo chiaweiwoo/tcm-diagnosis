@@ -33,11 +33,9 @@ Never push the worktree branch itself. Never use `--force`.
 - `X-Assessment-Key` header matching `ASSESSMENT_API_KEY` env var (calibration CLI)
 
 Neither → 401. Enforced by `src/lib/apiAuth.ts` called at the top of both routes.
-`ASSESSMENT_API_KEY` must be set in Vercel env vars, `.env.local`, and GitHub Actions secrets.
+`ASSESSMENT_API_KEY` must be set in Vercel env vars, `.env.local`, and GitHub Actions secrets (for `/api/cron/dr_nudge` and `/api/cron/output-audit`).
 
 `/api/admin/*` routes require a valid Supabase session AND `is_admin = true` on `doctor_allowlist`. Returns 403 otherwise.
-
-`ASSESSMENT_API_KEY` must also be present in GitHub Actions secrets for the cron workflows that call `/api/cron/dr_nudge` and `/api/cron/output-audit`.
 
 ### 4. DEV_AUTH_BYPASS must never reach production
 
@@ -82,7 +80,7 @@ Email is retained only as a denormalized display field. Never use it as a join k
 
 ### 11. RLS is the last line of defense
 
-Per-doctor tables (`consultations`) must have Row Level Security policies that restrict reads to `doctor_id = auth.uid()`. Admin routes use service_role to bypass RLS — but only those routes. The database itself must refuse cross-doctor reads even if application code asks. A missed `.eq("doctor_id", ...)` in a future PR must not be able to cause a data leak.
+Per-doctor tables (`consultations`) must have Row Level Security policies that restrict reads to `doctor_id = auth.uid()`. Admin routes use service_role to bypass RLS — but only those routes. The database itself must refuse cross-doctor reads even if application code asks.
 
 ### 11a. Supabase access-control baseline (`public` schema)
 
@@ -92,39 +90,8 @@ The `public` schema is hardened against Supabase Data API default changes. Prese
 - RLS is enabled on `public` tables, and any table under RLS must have at least one intentional policy.
 - Dangerous client privileges are removed from `anon` and `authenticated`: no `DELETE`, `TRUNCATE`, `TRIGGER`, or `REFERENCES`.
 - `anon` is read-only (`SELECT`) on sensitive `public` tables.
-- `authenticated` is further restricted on lower-risk archival/audit-style tables such as `consultations_bk_260523`, `analytics_output_audits`, `assessment_runs`, and `error_logs`.
 
-New table checklist:
-
-- Add explicit grants for `anon`, `authenticated`, and `service_role`.
-- Enable RLS.
-- Add at least one intentional policy before relying on the table in app/runtime code.
-
-Verification queries:
-
-```sql
--- Grants by table for anon/authenticated/service_role in public
-select table_name, grantee, privilege_type
-from information_schema.role_table_grants
-where table_schema = 'public'
-  and grantee in ('anon', 'authenticated', 'service_role')
-order by table_name, grantee, privilege_type;
-
--- RLS status + policy count for public tables
-select
-  c.relname as table_name,
-  c.relrowsecurity as rls_enabled,
-  count(p.policyname) as policy_count
-from pg_class c
-join pg_namespace n on n.oid = c.relnamespace
-left join pg_policies p
-  on p.schemaname = n.nspname
- and p.tablename = c.relname
-where n.nspname = 'public'
-  and c.relkind = 'r'
-group by c.relname, c.relrowsecurity
-order by c.relname;
-```
+New table checklist: add explicit grants for `anon`, `authenticated`, `service_role`; enable RLS; add at least one intentional policy.
 
 ### 12. Model selection — DeepSeek by default, smart model only with written justification
 
@@ -135,16 +102,15 @@ order by c.relname;
 
 ### 13. Doctor-facing sidebar — Risk Nudge card (replaces 我的画像)
 
-The workbench (`/`) left sidebar now shows `⚠️ AI 反复提醒的风险点` — the doctor's own recurring AI caution themes.
+The workbench (`/`) left sidebar shows `⚠️ AI 反复提醒的风险点` — the doctor's own recurring AI caution themes.
 
 - **Component:** `src/app/RiskNudgePanel.tsx`.
 - **Read endpoint:** `GET /api/me/nudge` — requires valid session; supports `X-View-As` for admin preview.
 - **Data source:** `doctor_risk_nudges` table (one row per doctor, upsert on `doctor_id` PK).
-- **What is shown:** `themes[].key` (TCM-native label ≤10字) + dynamic clinical description `themes[].description` (LLM-generated or database fallback, no frontend hardcoding) + relative frequency bar (`weight` 0–1). **No counts, no %, no verbatim text in bar area.**
-- **Row-hover popup:** shows label `示例：` + up to 5 verbatim caution excerpts from the doctor's own analyzed cases.
+- **What is shown:** `themes[].key` (TCM-native label ≤10字) + `themes[].description` (LLM-generated or DB fallback) + relative frequency bar (`weight` 0–1). No counts, no %, no verbatim text in bar area.
+- **Row-hover popup:** shows label `示例：` + up to 5 verbatim caution excerpts from the doctor's own cases.
 - **Raw counts never leave the server** — only `weight = count / max` is sent.
 - Cache: `Cache-Control: private, max-age=300, stale-while-revalidate=600`.
-- The old doctor profile sidebar and `/api/me/profile` are retired.
 
 ### 14. Prompt Registry & Versioning (GitOps)
 
@@ -267,33 +233,28 @@ Recurring AI caution aggregation surfaced in the workbench left sidebar.
 **Watermark trigger:** only recompute if `MAX(analyzed_at)` > stored `source_last_record_at`. Daily cron skips unchanged doctors.
 
 **Key files:**
-- `src/lib/nudge/buckets.ts` -- 8 bucket definitions, `bucketCautions()`, `RECURRENCE_FLOOR=3`, `WINDOW_DAYS=14`
-- `src/lib/prompts/registry/risk-nudge/v1.1.ts` — prompt text + version. Resolved via `getPrompt("risk-nudge")` from `src/lib/prompts/index.ts`.
-- `src/lib/nudge/computeNudge.ts` -- `computeNudgeForDoctor()`, `computeNudgesForActiveDoctors()`
-- `src/app/api/cron/dr_nudge/route.ts` -- fleet-wide cron POST (X-Assessment-Key auth), `maxDuration=300`
-- `src/app/api/me/nudge/route.ts` -- doctor read GET (session auth + X-View-As)
-- `src/app/RiskNudgePanel.tsx` -- UI component (shimmer / empty / data + row-hover popup)
-- `scripts/compute-nudge.ts` -- CLI: `npm run dr_nudge -- --email ...` / `--doctorId ...` / `--force`
-- `.github/workflows/dr_nudge.yml` -- daily at `0 19 * * *` (03:00 SGT)
+- `src/lib/nudge/buckets.ts` — 8 bucket definitions, `bucketCautions()`, `RECURRENCE_FLOOR=3`, `WINDOW_DAYS=14`
+- `src/lib/nudge/computeNudge.ts` — `computeNudgeForDoctor()`, `computeNudgesForActiveDoctors()`
+- `src/app/api/cron/dr_nudge/route.ts` — fleet-wide cron POST, `maxDuration=300`
+- `src/app/api/me/nudge/route.ts` — doctor read GET (session auth + X-View-As)
+- `scripts/compute-nudge.ts` — CLI: `npm run dr_nudge -- --email ...` / `--force`
+- `.github/workflows/dr_nudge.yml` — daily at `0 19 * * *` (03:00 SGT)
 
-**Database:** `public.doctor_risk_nudges` -- one row per doctor, PK `doctor_id`.
+**Database:** `public.doctor_risk_nudges` — one row per doctor, PK `doctor_id`.
 RLS: doctor reads own row. `authenticated`: SELECT (RLS-gated). `service_role`: all. `anon`: nothing.
 
-> WARNING: **Unapplied migration: `029_doctor_risk_nudges.sql`** -- apply in Supabase SQL Editor before first `npm run dr_nudge` run.
+> WARNING: **Unapplied migration: `029_doctor_risk_nudges.sql`** — apply in Supabase SQL Editor before first `npm run dr_nudge` run.
 
-**Invariant 8:** caution text -> DeepSeek (permitted). Langfuse receives tokens/cost/latency only.
+**Invariant 8:** caution text → DeepSeek (permitted). Langfuse receives tokens/cost/latency only.
 
 ---
 
 ## Doctor Profile Snapshot
 
-On-demand, admin-only snapshot of deterministic metrics per doctor. Loaded via API when admin clicks any doctor row on `/admin/users` — displayed in a fixed overlay modal. No caching, no stored state.
+On-demand, admin-only snapshot of deterministic metrics per doctor. Loaded via API when admin clicks any doctor row on `/admin/users` — displayed in a fixed overlay modal.
 
 **Overlay:** `src/app/admin/users/ProfileOverlay.tsx` (client component). Session-level React Map cache per doctorId.
 **API:** `GET /api/admin/users/[doctorId]/profile` — admin auth required; calls `computeDoctorProfile()` + `findFlaggedCases()` in parallel; returns `{ snapshot, flagged, clusters }`.
-
-**Layout:**
-1. **待关注病案** — flagged case list grouped by rule (see rules below); each row click opens workbench in new tab. The three signal rates (`criticalRiskRate`, `nonClinicalRate`, `realCautionsRate`) are no longer shown as standalone cards — `criticalRiskRate` appears inline as "触发率 X%" beside its group header, `nonClinicalRate` as "出现率 X%". `realCautionsRate` is retired from the UI entirely.
 
 **Flagged case rules (priority order; each case counted once):**
 | # | Rule | Threshold | Cap | Min N |
@@ -304,26 +265,19 @@ On-demand, admin-only snapshot of deterministic metrics per doctor. Loaded via A
 | 4 | 体查记录偏短 | < doctor's own P10 | 5 | 20 |
 | + | 处方高度重复 | DeepSeek Flash clusters ≥ 3 equivalent prescriptions (top 3) | — | 20 |
 
-Note: rule 5 (现病史记录偏短) has been removed from the UI `RULE_ORDER` — the data is still computed by `findFlaggedCases()` but no longer displayed.
+`criticalRiskRate` appears inline as "触发率 X%" beside its group header. `nonClinicalRate` as "出现率 X%". `realCautionsRate` is retired from the UI.
 
-When `totalAnalyzed < LOW_SAMPLE_THRESHOLD` (20), only boolean rules (1 & 2) fire; percentile and clustering rules are skipped with a note in the section header.
+When `totalAnalyzed < LOW_SAMPLE_THRESHOLD` (20), only boolean rules (1 & 2) fire.
 
 **Key files:**
-- `src/lib/analytics/doctorProfile.ts` — `computeDoctorProfile()`, `findFlaggedCases()`, `computePercentile()`, `LOW_SAMPLE_THRESHOLD`
+- `src/lib/analytics/doctorProfile.ts` — `computeDoctorProfile()`, `findFlaggedCases()`, `LOW_SAMPLE_THRESHOLD`
 - `src/lib/analytics/clusterPrescriptions.ts` — DeepSeek Flash call for prescription clustering (fail-open)
-- `src/lib/prompts/registry/presc-cluster/v1.0.ts` — prompt text + version. Resolved via `getPrompt("presc-cluster")`.
-- `src/lib/analytics/doctorProfile.test.ts` — 13 unit tests (mean, zeroRate, percentile, fallback detection)
 - `src/app/api/admin/users/[doctorId]/profile/route.ts` — admin GET endpoint
-- `src/app/admin/users/ProfileOverlay.tsx` — overlay modal (shimmer / data / error states)
-- `src/app/admin/users/UsersList.tsx` — row click triggers overlay, eye icon keeps confirm popup
+- `src/app/admin/users/ProfileOverlay.tsx` — overlay modal
 
-**Database:** `public.doctor_profile_snapshots` — on-demand cache, one row per doctor, PK `doctor_id`. RLS enabled; service_role only (no authenticated/anon grants). Columns: `snapshot JSONB`, `flagged JSONB`, `clusters JSONB`, `source_last_record_at TIMESTAMPTZ`, `computed_at TIMESTAMPTZ`.
+**Database:** `public.doctor_profile_snapshots` — on-demand cache, one row per doctor, PK `doctor_id`. RLS enabled; service_role only. Cache: reads `MAX(analyzed_at)`, compares to `source_last_record_at`. Miss → compute fresh, upsert.
 
-**Cache logic (API route):** reads `MAX(analyzed_at)` from consultations, checks if cached `source_last_record_at` matches. Hit → return cached instantly. Miss → compute fresh (LLM clustering included), upsert to cache, return. Cache write is best-effort (non-fatal on failure).
-
-> WARNING: **Unapplied migration: `032_doctor_profile_snapshots.sql`** — run in Supabase SQL Editor before using the profile overlay in production. Until applied, the API falls through to on-demand computation every time (no error, just slower).
-
-**Invariant 8:** prescription text → DeepSeek (permitted). Langfuse not wired for clustering call.
+> WARNING: **Unapplied migration: `032_doctor_profile_snapshots.sql`** — run in Supabase SQL Editor before using the profile overlay in production.
 
 **Fallback detection:** cautions-only-fallback = `cautions.length === 1 && cautions[0] === "请结合面诊与必要检查复核后执行。"`. Real cautions are counted when this condition is false.
 
@@ -331,9 +285,9 @@ When `totalAnalyzed < LOW_SAMPLE_THRESHOLD` (20), only boolean rules (1 & 2) fir
 
 ## CSS Architecture
 
-- `src/app/globals.css` — **full canonical token set**: `--brand`, `--text`, `--text-muted`, `--bg`, `--surface`, `--border`, `--border-strong`, `--border-focus`, `--error`, `--error-bg`, `--warn`, `--warn-bg`, `--radius`, `--radius-lg`, `--shadow`, `--shadow-md`. Always the primary source — all routes load it.
-- `src/app/workbench.css` — workbench-only styles. Also declares its own `:root` block (harmless duplicate) for IDE tooling. Loaded only on `/` route.
-- `src/app/admin/admin.css` — admin UI styles. Has a `:root` alias block that maps legacy names (`--muted`, `--foreground`, `--paper`, `--line`, `--sage`, `--mint`, `--clinic-red`, `--clinic-red-soft`) to canonical globals.css tokens.
+- `src/app/globals.css` — **full canonical token set** (`--brand`, `--text`, `--text-muted`, `--bg`, `--surface`, `--border`, etc.). Always the primary source — all routes load it.
+- `src/app/workbench.css` — workbench-only styles. Loaded only on `/` route.
+- `src/app/admin/admin.css` — admin UI styles. Maps legacy names to canonical globals.css tokens.
 
 Never define a token only in `workbench.css` — admin pages won't see it. Add it to `globals.css` first.
 
@@ -343,34 +297,22 @@ Never define a token only in `workbench.css` — admin pages won't see it. Add i
 
 - Single-step pipeline: doctor fills structured form → POST /api/analyze → result. No organize step.
 - Analyze always uses `DEEPSEEK_MODEL_FAST` (flash). No mode selector exposed to doctors.
-- All clinical fields remain editable at all times — including after analysis. Doctors can modify inputs and save without forcing a re-analysis. When clinical inputs differ from the snapshot at last analysis, the workbench shows a stale-analysis warning banner. The `analysis_stale` DB column persists this warning across page reloads.
+- All clinical fields remain editable at all times — including after analysis. When clinical inputs differ from the snapshot at last analysis, the workbench shows a stale-analysis warning banner. The `analysis_stale` DB column persists this warning across page reloads.
 - Metadata fields (`病案编号 Case ID`, `随访病案编号 Follow-up Case ID`, `给AI回馈 Feedback to AI`) save through the header `保存` button.
-- Two-level unsaved-changes warning on navigation: clinical inputs changed → "建议先保存并重新分析" (re-analyze prompt); metadata-only changed → generic save reminder.
 - Core analysis sections must be structurally stable — all sections always present, even if empty with a fallback string.
 - Analyze output reading order: 辨证警示 (if triggered) → 重点结论 → 当前思路 → 建议优化 → 可选思路 → 风险与提醒 → 随访监测 → 证据状态.
-- UI result layout: 3 columns — 判断 (当前思路) / 方案 (建议优化+可选) / 随访监测. Plus optional 辨证警示 red banner (top, above 重点结论), 重点结论 green banner, and 风险与提醒 warning box.
+- UI result layout: 3 columns — 判断 / 方案 / 随访监测. Plus optional 辨证警示 red banner, 重点结论 green banner, and 风险与提醒 yellow box.
 - Saved history must pass through the same normalization path as fresh analysis (`ensureAnalysisResult` in `src/lib/ai/analysisResult.ts`).
 
 ### Dynamic Token Budget
-- `/api/analyze` accepts an optional `maxTokens` parameter in the request body (e.g. `body.maxTokens || 1200`).
-- Standard doctor-facing workbench sessions use the `1200` token default to optimize latency and costs.
-- Batch ingestion workflows, CLI pipelines, or exceptionally long/complex clinical cases must pass `maxTokens: 2500` in the payload body to prevent DeepSeek completion truncation (`finish_reason: "length"`), which otherwise crashes JSON parsing with a terminal 502 error.
+- `/api/analyze` accepts an optional `maxTokens` parameter in the request body (default `1200`).
+- Batch ingestion workflows and CLI pipelines must pass `maxTokens: 2500` to prevent DeepSeek completion truncation (`finish_reason: "length"`), which crashes JSON parsing with a terminal 502 error.
 
 ### 辨证警示 Diagnostic Alert
 - AI field: `criticalRisk: { summary: string; highlights: string[] } | null` — present in `AnalysisJson` and `AnalysisResult`.
 - Fires when AI detects a critical diagnostic inconsistency: diagnosis↔symptoms mismatch, pattern↔prescription寒热矛盾, or missed red-flag symptom.
-- Prompt instructs no false alarms and requires echoing the critical point in `重点结论` as well.
 - UI: `<DiagnosticAlertBanner>` renders above 重点结论 when `criticalRisk` is non-null. `<HighlightedText>` wraps matched phrases in `<mark class="critical-highlight">`.
 - Normalization: missing or malformed field defaults to `null` (backward compat).
-- Prompt version bumped to `tcm-analysis-v1.2` with this change.
-
-### Result color coding
-- `辨证警示` banner: red (`#FEF2F2` bg, `#DC2626` border, 6px left border)
-- `重点结论` banner: green (`#F0FDF4` bg, `#16A34A` border)
-- `风险与提醒` banner: yellow (`#FEFCE8` bg, `#CA8A04` border)
-- 判断 column: green header (`result-column--green`)
-- 方案 column: slate/silver header (`result-column--slate`)
-- 随访监测 column: teal header (`result-column--teal`)
 
 ---
 
@@ -379,46 +321,24 @@ Never define a token only in `workbench.css` — admin pages won't see it. Add i
 Doctor fills 9 visible fields. All validated by `structuredCaseSchema` in `src/lib/forms/caseSchema.ts`.
 
 Required fields (hard-block if missing/invalid):
-- `prescriptionType`: `PrescriptionType[]` — array of "方药" | "针灸" | "综合调理", min 1 item (multi-select chip toggle)
+- `prescriptionType`: `PrescriptionType[]` — array of "方药" | "针灸" | "综合调理", min 1 item
 - `patientAge`: numeric 1-120
 - `patientSex`: "男" | "女"
 - `chiefComplaint`: 2-200 chars
 - `currentIllness`: 5-2000 chars
-- `pastHistory`: 1-1000 chars (if no relevant history, doctor writes "无")
+- `pastHistory`: 1-1000 chars
 - `physicalExam`: 2-1000 chars (tongue + pulse required)
 - `diagnosis`: 2-100 chars
 - `pattern`: 2-100 chars (证型)
 - `prescription`: 3-2000 chars
 
-Optional fields (in schema but not shown in form UI): `consultationName`
-
 > `doctorQuestion` has been removed from the schema, prompt, and all fixtures. Historical `form_data` rows may still contain the key — it is silently ignored.
 
-History item display name: auto-built from `patientSex + patientAge岁 + chiefComplaint` (no stored name field).
+History item display name: auto-built from `patientSex + patientAge岁 + chiefComplaint`.
 
-**Validation:** Single-layer zod schema (hard-block). Block patterns (hard-reject): guaranteed efficacy (`保证`, `治愈`, `包好`), patient self-use (`我是患者`, `我自己可以吃`).
+**Validation:** Single-layer zod schema (hard-block). Block patterns: guaranteed efficacy (`保证`, `治愈`, `包好`), patient self-use (`我是患者`, `我自己可以吃`).
 
-**Live validation UI:** Split into two:
-- `displayErrors`: debounced (250 ms) — used for per-field red/green borders and `<FieldError>` messages. Avoids zod parse blocking every keystroke.
-- `liveErrors`: synchronous `useMemo` — used only for submit-button `disabled` gating and in `handleAnalyze` before calling the API.
-Errors show once field is touched (`touched` set). Submit button disabled when `liveErrors` is non-empty.
-
----
-
-## CRUD State Machine (Status Bar)
-
-`SaveStatus = "new" | "unsaved" | "saving" | "saved"`
-
-| Trigger | Transition |
-|---|---|
-| `handleNew()` | → `"new"`, `savedAt = null` |
-| `setField(...)` | → `"unsaved"` (unless currently `"saving"`) |
-| `handleSelectHistory` success | → `"saved"`, `savedAt = record.updated_at` |
-| `handleAnalyze` / `handleSave` start | → `"saving"` |
-| save success | → `"saved"`, `savedAt = new Date()` |
-| save failure | → `"unsaved"` |
-
-Status bar renders below submit button inside `form-card`. Toast fires on: analyze error, save success/failure, delete, history load success/failure.
+**Live validation UI:** `displayErrors` (debounced 250ms, for field borders + error messages) vs `liveErrors` (synchronous, for submit-button disabled state + handleAnalyze guard).
 
 ---
 
@@ -429,28 +349,21 @@ Admin entry point: `⚙` icon (Settings2) in workbench header, visible only when
 Admin guard: `src/app/admin/layout.tsx` — server-side, redirects to `/?reason=not_admin` if not admin.
 
 Admin nav (3 tabs, `src/app/admin/AdminNav.tsx`):
-- **用户** — `/admin/users` — doctor list with 30-day activity sparkline, last-analysis timestamp (date + time, SGT), and role badge; row click opens profile overlay
+- **用户** — `/admin/users` — doctor list with 30-day activity sparkline, last-analysis timestamp (SGT), and role badge; row click opens profile overlay
 - **AI 输出审查** — `/admin/output-audits` — fleet-wide AI output audits (v3)
 - **提示词** — `/admin/prompts` — GitOps prompt registry browser (see Invariant #14)
 
 `/admin` redirects to `/admin/users`.
 
-`AdminNav` is a client component (needs `usePathname()` for active link highlighting). Admin layout is a server component.
+**Doctor profile overlay**: clicking a doctor row opens a fixed modal (`ProfileOverlay.tsx`). Inactive rows (no `doctorId`) are not clickable. Eye icon keeps its confirm popup (stopPropagation prevents row click).
 
-**Doctor profile overlay** (no sub-pages): clicking a doctor row in `/admin/users` opens a fixed modal (`ProfileOverlay.tsx`) with a short description caption + flagged case list. Inactive rows (no `doctorId`) are not clickable. Eye icon keeps its confirm popup (stopPropagation prevents row click).
+**Self-aware admin row**: impersonation eye icon is hidden on the admin's own row. When admin opens their own profile overlay and clicks a flagged case, the new tab opens `/` (not `/?viewAs=<self>`).
 
-**Self-aware admin row** (`UsersList.tsx` + `ProfileOverlay.tsx`): the current admin's `auth.users.id` is resolved server-side in `users/page.tsx` and passed down as `currentDoctorId`.
-- The impersonation eye icon is hidden on the admin's own row (can't preview self).
-- When the admin opens their own profile overlay and clicks a flagged case, the new tab opens `/` (normal workbench) instead of `/?viewAs=<self>` (impersonation).
+**Table layout** (`admin.css`): `grid-template-columns: 320px 1fr 80px 175px 60px` (email / sparkline / role / date / actions). The sparkline is `1fr` — required for vertical column alignment across rows (each row is its own grid container).
 
-**Table layout** (`admin.css`): all `.users-row` / `.users-list-head` grids share the same `grid-template-columns: 320px 1fr 80px 175px 60px` (email / sparkline / role / date / actions). The sparkline is `1fr` so it grows with viewport width while the other columns stay fixed — required because each row is its own grid container, so any content-dependent track (`max-content`, `fit-content`) would break vertical column alignment across rows.
+**No per-doctor sub-pages** — discussion agenda feature is retired entirely.
 
-**No per-doctor sub-pages** — `/admin/users/[doctorId]` and `/admin/users/[doctorId]/profile` have been removed. The discussion agenda feature is retired entirely.
-
-Clone case affordance: `POST /api/consultations/[id]/clone` — clones `form_data` to admin's own account. Workbench shows a blue info banner when a cloned consultation is loaded; banner disappears after re-analysis.
-
-Token usage: tracked in Langfuse only. No admin page for it.
-Activity logs: written to Supabase `activity_logs` but no admin UI page for now.
+Clone case: `POST /api/consultations/[id]/clone` — clones `form_data` to admin's own account.
 
 Seeded admins: `chiaweiwoo123@gmail.com`, `ardytcm@gmail.com`. Add more via `npm run allowlist:add -- --email <e> --admin`.
 
@@ -458,52 +371,24 @@ Seeded admins: `chiaweiwoo123@gmail.com`, `ardytcm@gmail.com`. Add more via `npm
 
 ## Legacy Goal 2 status
 
-The old doctor-profile evaluation stack is retired from runtime use:
+The old doctor-profile evaluation stack is fully retired. Removed: `evaluate-doctor.yml`, `/api/cron/evaluate-doctors`, `npm run evaluate`, all admin evaluation routes and UI. Historical rows in `analytics_doctor_evaluations` are preserved for reference only — do not wire new runtime features back to that table.
 
-- removed workflow: `.github/workflows/evaluate-doctor.yml`
-- removed cron route: `/api/cron/evaluate-doctors`
-- removed CLI entrypoints: `npm run evaluate`, `scripts/evaluate-local.ts`, `scripts/evaluate.mjs`
-- removed admin evaluation routes and UI trigger flow
-- removed doctor-facing `/api/me/profile` and `MyProfilePanel.tsx`
-
-Historical rows in `analytics_doctor_evaluations` are preserved for now as legacy data only. Do not wire new runtime features back to that table unless the product direction explicitly changes.
+---
 
 ## AI Output Audit (Goal 1 — v3, current)
 
 **On-demand only.** Fleet-wide audit of AI output quality across all doctors. Admin/senior-doctor use only.
 
-Route: `POST /api/admin/analytics/output-audit`
-- Admin session auth required
-- No body required; no prior-audit chaining
-- Returns inserted `analytics_output_audits` row
+- `POST /api/admin/analytics/output-audit` — triggers new audit, returns inserted row
+- `GET /api/admin/analytics/output-audit?limit=20` — lists audits newest first
+- `POST /api/cron/output-audit` — same logic, auth via `X-Assessment-Key`
+- `.github/workflows/ai-output-audit.yml` → calls cron route
 
-Route: `GET /api/admin/analytics/output-audit?limit=20`
-- Lists audits newest first
+UI: `/admin/output-audits` — append-only list, each row collapsible. Old v1 rows (no `categories` key) render with legacy renderer and "v1 旧版" badge.
 
-Cron route: `POST /api/cron/output-audit` — same logic, auth via `X-Assessment-Key`
+v3 key features: window anchored to `MAX(analyzed_at)-14d` (not wall-clock); sampling newest-first cap 100; `userFeedbackSummary` field; 6 finding categories (safety/hallucination/reliability/completeness/tone/structure); `findingKey = "category:shortName"`.
 
-GH Workflow: `.github/workflows/ai-output-audit.yml` → calls `/api/cron/output-audit`
-
-UI: `/admin/output-audits` — append-only list, each row collapsible, category sections + "用户反馈" section with tooltips
-- Backward compat: old v1 rows (without `categories` key) are rendered with legacy renderer and "v1 旧版" badge
-- Old v2 rows (with `priorImprovementStatus`) are silently ignored — field is optional on the type
-
-v3 schema key features:
-- Window anchored to `MAX(analyzed_at)` fleet-wide then −14 days (not wall-clock "now")
-- Sampling: newest-first, cap 100, no stratification
-- Doctor feedback corpus: `ai_feedback` within same window, cap 50, anonymised, no doctor identity
-- New output field: `userFeedbackSummary: string | null` — 1-3 sentence summary of feedback patterns
-- Prior-audit chaining removed; `priorImprovementStatus` / `promptVersionsCompared` dropped from v3 output
-- 6 Finding categories retained: safety / hallucination / reliability / completeness / tone / structure
-- `findingKey = "category:shortName"` for stable reference within a single audit
-- `exampleCases[].summary` self-contained: "女 45岁 头痛 — AI建议加酸枣仁（原案未提睡眠）"
-- Severity grounded in patient health risk (see `auditDefinitions.ts`)
-- All term definitions in `src/lib/analytics/auditDefinitions.ts` (single source of truth for both AI rubric and UI tooltips)
-
-Prompts: `src/lib/prompts/registry/output-audit/v3.0.ts` — `buildPrompt()` injects definitions via `buildDefinitionsBlock()`. Resolved via `getPrompt("output-audit")`.
-Library: `runOutputAudit()` in `src/lib/analytics/outputAudit.ts`
-Window helper: `buildWindowFromLatestAnalysis(client, days)` in `src/lib/analytics/stats.ts`
-
+Prompts: `src/lib/prompts/registry/output-audit/v3.0.ts` — `buildPrompt()`. Library: `runOutputAudit()` in `src/lib/analytics/outputAudit.ts`.
 
 ---
 
@@ -512,56 +397,43 @@ Window helper: `buildWindowFromLatestAnalysis(client, days)` in `src/lib/analyti
 No signup page. All onboarding is admin-driven via CLI:
 
 ```bash
-# Add a doctor (creates auth.users row if absent + upserts doctor_allowlist)
 npm run allowlist:add -- --email doctor@example.com [--admin]
-
-# Remove a doctor (soft-remove: is_active=false, auth.users preserved)
 npm run allowlist:add -- --email doctor@example.com --remove
-
 ```
 
 The doctor can then sign in via Google OAuth — Supabase matches the existing `auth.users` row by email.
 
 ---
 
-## Historical Data Ingestion Pipeline
+## Historical Data Ingestion (scratch scripts)
 
-When bulk-migrating or backfilling historical consultations from clinical exports (e.g., Odoo Excel/CSV):
-
-### 1. The Processing Pipeline (Scratch Scripts)
-- **`scratch/clean_historical_data.py`**: Python script that parses raw Excel/CSV (e.g., `nova_data_may.xls`), isolates target clinical date ranges, separates diagnostic patterns from western terms, infers prescription types (`方药` | `针灸` | `综合调理`), propagates gender chronologically across visits, shifts patient visits to compute `related_case_id`, and strips billing/retail noise. Generates cleaned UTF-8 BOM CSV, JSON, and `insert_ardy_data.sql` outputs.
-- **`scratch/ingest_ardy_data.mjs`**: Database insertion runner. Securely resolves target doctor UUID via Supabase admin APIs, performs local programmatic JSON backup to `output/` prior to mutation, executes targeted deletion of old consultations for the doctor, and bulk inserts the cleaned records. Automatically restores historical clinician feedbacks and timestamps for designated cases.
-- **`scratch/analyze_batch_historical.mjs`**: Background rate-limited, sequential analyzer. Calls the server `/api/analyze` endpoint using `ASSESSMENT_API_KEY` to generate clinical reviews for imported `"draft"` consultations. **Must pass `maxTokens: 2500` in request body** to prevent completion truncation on complex inputs.
-- **`scratch/check_ardy_rows.mjs`**: Diagnostic verification script that audits active row counts, date ranges, and draft-to-analyzed state conversions.
-
-### 2. Safety Guidelines for Data Ingestion
-- **Server Backup First:** Run dashboard SQL queries to snapshot the current `consultations` table into a backup table (e.g., `consultations_bk_260523`) before starting any deletion or ingestion.
-- **Programmatic Local Backup:** Ingestion scripts must extract and store a local JSON file under `output/` (gitignored) as a fallback snapshot of target rows prior to execution.
-- **Active Today Count Boundary:** Ensure today's active workbench records are isolated and completely untouched.
-- **Backdating Analysis:** Set `analyzed_at = record.created_at` in Supabase when saving batch results so all historical cases populate correctly on their target timeline days in the workbench time-series charts.
+For bulk-migrating clinical exports: `scratch/clean_historical_data.py` (parse/clean CSV), `scratch/ingest_ardy_data.mjs` (delete+insert with local JSON backup), `scratch/analyze_batch_historical.mjs` (batch analyze via `/api/analyze` with `maxTokens: 2500`), `scratch/check_ardy_rows.mjs` (verify counts). Always snapshot DB before deletion. Set `analyzed_at = record.created_at` to preserve timeline positioning.
 
 ---
 
 ## Database Schema
 
-Migrations: `supabase/migrations/` (numbered SQL). **Committing a migration file does NOT apply it — every file must be manually run in the Supabase SQL Editor.** The production DB only reflects migrations that have been explicitly executed there.
+Migrations: `supabase/migrations/` (numbered SQL). **Committing a migration file does NOT apply it — every file must be manually run in the Supabase SQL Editor.**
 
 | Table | Purpose |
 |---|---|
-| `consultations` | Doctor history — form_data JSONB, analysis JSON, model meta, optional `case_id` and `ai_feedback`. Has `doctor_id` UUID FK (migration 016) with RLS (migration 017). `analysis_stale` boolean (migration 027) persists stale-analysis state across reloads. |
-| `consultation_change_events` | Append-only audit log of every `consultations` UPDATE. Written by Postgres trigger (migration 026). RLS: authenticated users see only their own rows. |
+| `consultations` | Doctor history — form_data JSONB, analysis JSON, model meta, optional `case_id` and `ai_feedback`. Has `doctor_id` UUID FK (migration 016) with RLS (migration 017). `analysis_stale` boolean (migration 027). |
+| `consultation_change_events` | Append-only audit log of every `consultations` UPDATE. Written by Postgres trigger (migration 026). |
 | `error_logs` | Pipeline errors (no form field values) |
 | `doctor_allowlist` | `email`, `is_active`, `is_admin` — access control source of truth |
 | `activity_logs` | Doctor activity events (login, analyze) — no UI for now |
-| `analytics_doctor_evaluations` | Legacy Goal 2 evaluation output. Preserved for historical reference only; no active runtime code should depend on it. |
-| `analytics_output_audits` | Fleet-wide AI output audits (Goal 1 v3). No RLS. Append-only. Renamed from `analytics_session_reviews` via migration 028. Old v1 rows (no `categories` key) rendered by `LegacyReview` component until pruned. |
+| `analytics_doctor_evaluations` | Legacy Goal 2 evaluation output. No active runtime code should depend on it. |
+| `analytics_output_audits` | Fleet-wide AI output audits (Goal 1 v3). No RLS. Append-only. Renamed from `analytics_session_reviews` via migration 028. |
 | `doctor_profile_snapshots` | On-demand cache for admin profile overlay. One row per doctor, PK `doctor_id`. RLS enabled; service_role only. See migration 032. |
+| `doctor_risk_nudges` | One row per doctor, PK `doctor_id`. Created by migration 029. |
 
 > **Unapplied migrations (must be run in Supabase SQL Editor):**
-> - `022_drop_analytics_and_assessments.sql` — drops legacy tables (`analytics_prompt_quality_runs`, etc.)
-> - `023_session_reviews_and_eval_cleanup.sql` — drops `output_review` column, creates `analytics_session_reviews` (prerequisite for 028)
-> - `028_rename_session_reviews_to_output_audits.sql` — renames `analytics_session_reviews` → `analytics_output_audits`. **Must run before new audit runs or the admin page can load data.**
-> - `032_doctor_profile_snapshots.sql` — creates profile snapshot cache table. Overlay still works without it (falls back to on-demand every time), but apply to enable caching.
+> - `022_drop_analytics_and_assessments.sql` — drops legacy tables
+> - `023_session_reviews_and_eval_cleanup.sql` — prerequisite for 028
+> - `028_rename_session_reviews_to_output_audits.sql` — **must run before new audits or admin page can load**
+> - `029_doctor_risk_nudges.sql` — **must run before first `npm run dr_nudge`**
+> - `031_drop_doctor_discussion_agenda.sql` — drops retired table
+> - `032_doctor_profile_snapshots.sql` — enables profile overlay cache
 
 `consultations`: doctor reads use user-scoped Supabase client (anon key + session JWT); RLS enforces isolation. Admin routes use service_role (bypasses RLS). Never expose service_role key to browser.
 
@@ -569,63 +441,30 @@ Migrations: `supabase/migrations/` (numbered SQL). **Committing a migration file
 
 ## Langfuse Integration
 
-SDK v3 API. Per analyze call, `trace.generation()` receives three distinct usage fields:
+SDK v3 API. Per analyze call, `trace.generation()` receives:
 
-- **`usage`** — standard Langfuse field: `{ input, output, total, unit: "TOKENS" }`. This is the field Langfuse reads for model registry lookups and display.
-- **`usageDetails`** — cache breakdown for visibility: `{ cacheHit, cacheMiss }` (prompt_cache_hit/miss_tokens from DeepSeek).
-- **`costDetails`** — explicit USD cost: `{ input: inputCostUsd, output: outputCostUsd, total: totalCostUsd }`. Computed locally because DeepSeek is not in Langfuse's model registry.
+- **`usage`** — `{ input, output, total, unit: "TOKENS" }` — this is what Langfuse reads for display.
+- **`usageDetails`** — `{ cacheHit, cacheMiss }` (prompt_cache_hit/miss_tokens from DeepSeek).
+- **`costDetails`** — `{ input: inputCostUsd, output: outputCostUsd, total: totalCostUsd }` — computed locally (DeepSeek not in Langfuse model registry).
 - **`metadata`** — model, latency, prompt version, prescriptionType label, repairedJson flag.
 
-Cost formula (DeepSeek cache-aware pricing):
-```
-inputCost  = (cacheHit × HIT_PER_M + cacheMiss × MISS_PER_M) / 1_000_000
-outputCost = (outputTokens × OUT_PER_M) / 1_000_000
-```
-Defaults: `HIT_PER_M=0.07`, `MISS_PER_M=0.27`, `OUT_PER_M=1.10` (USD per 1M tokens).
-Override via env vars: `DEEPSEEK_PRICE_INPUT_HIT`, `DEEPSEEK_PRICE_INPUT_MISS`, `DEEPSEEK_PRICE_OUTPUT`.
+Always send all three fields. Defaults: `HIT_PER_M=0.07`, `MISS_PER_M=0.27`, `OUT_PER_M=1.10` USD/1M tokens. Override via `DEEPSEEK_PRICE_INPUT_HIT`, `DEEPSEEK_PRICE_INPUT_MISS`, `DEEPSEEK_PRICE_OUTPUT`. `LANGFUSE_BASE_URL` defaults to `https://jp.cloud.langfuse.com`.
 
-**No clinical text ever reaches Langfuse.** Token usage and cost are monitored at `jp.cloud.langfuse.com`.
-
-Env var: `LANGFUSE_BASE_URL` — defaults to `https://jp.cloud.langfuse.com` if not set.
-
----
-
-## Model And Pricing Rules
-
-- Analyze: `DEEPSEEK_MODEL_FAST` (flash). No other model exposed to doctors.
-- Evaluation (Goal 1+2): `DEEPSEEK_MODEL_FAST`. Escalate to `deepseek-reasoner` only if quality fails.
-- Cost is tracked in Langfuse via explicit `costDetails` (not the model registry — DeepSeek is not registered there).
-- `model_meta` stored in `consultations` has shape `{ model, promptVersion, durationSeconds, repairedJson }`. Token counts and cost live in Langfuse only.
-- Token usage and cost are internal only — never shown to doctors.
-
----
-
-## Logging Rules
-
-Per analyze call, Langfuse receives token counts, cost, latency, prompt version, prescriptionType, repairedJson flag. **No clinical text.**
-
-Error events go to `error_logs` in Supabase via `logServerEvent`. Must not include form field values.
-
-Doctor activity events (login, analyze) go to `activity_logs` in Supabase via `logActivity`. No admin UI for activity logs currently.
-
-Logging must not block doctor-facing responses (use `after()` from Next.js).
+**No clinical text ever reaches Langfuse.**
 
 ---
 
 ## Common Pitfalls
 
 **Chinese text becomes mojibake / garbled (`???`, `â€¦`, `æ²¡`)**
-- Treat this as an implementation bug, not cosmetic noise. Stop and fix encoding before continuing.
-- Prefer UTF-8-safe edits (`apply_patch`) and avoid rewriting Chinese files through shell commands that may use the wrong Windows code page.
-- After editing Chinese prompts/docs/UI strings, inspect the file with UTF-8 output and search for mojibake markers such as `???`, `â€`, `æ`, `ç`, `ä¸`, or `�`.
-- Do not commit garbled Chinese text. If a file already contains mojibake, repair it in the same commit that touches that area.
+- Treat as an implementation bug. Stop and fix encoding before continuing.
+- Prefer UTF-8-safe edits. After editing Chinese files, search for mojibake markers: `???`, `â€`, `æ`, `ç`, `ä¸`, `�`.
+- Do not commit garbled Chinese text.
 
 **Tiny Chinese UI / option changes**
-- Keep the diff proportional. For simple label or option additions, first find the source of truth and change only that plus the direct display/placeholder logic.
-- Do not touch broad interaction tests unless they fail or the source-of-truth contract test must change. For example, adding `推拿` to `PRESCRIPTION_TYPES` should update the enum/source constant, direct placeholder if needed, and the schema enum test if useful; avoid broad workbench test churn unless required.
-- Use `apply_patch` for Chinese text. Do not use PowerShell, Node, or Python mechanical rewrites on Chinese files for tiny edits.
-- If a test/doc/UI file becomes garbled because of your edit, stop after the first failed repair, restore that touched file from git, and reapply only the intended minimal patch.
-- Verification should be narrow: inspect `git diff`, search touched files for mojibake markers, run the smallest relevant targeted test, and run `npm.cmd run build` only when TypeScript or UI rendering could be affected.
+- Keep the diff proportional. For simple label additions, change only the source of truth and direct display logic.
+- Use `apply_patch` for Chinese text. Do not use PowerShell/Node/Python mechanical rewrites on Chinese files for tiny edits.
+- Verification: inspect `git diff`, search for mojibake markers, run the smallest relevant test.
 
 **Push rejected (non-fast-forward)**
 ```
@@ -637,41 +476,21 @@ git fetch origin main && git rebase origin/main && git push origin HEAD:main
 git stash && git rebase origin/main && git stash pop && git push origin HEAD:main
 ```
 
-**`ASSESSMENT_API_KEY` missing**
-Add it to `.env.local` and Vercel env vars. Still required for the `/api/analyze` route guard and the cron routes `/api/cron/dr_nudge` and `/api/cron/output-audit`.
+**`ASSESSMENT_API_KEY` missing** — Add to `.env.local` and Vercel env vars.
 
-**GitHub Actions secrets**
-Registered secrets: `ASSESS_BASE_URL` (e.g. `https://your-app.vercel.app`) and `ASSESSMENT_API_KEY`.
-There is no `CRON_SECRET` or `VERCEL_PRODUCTION_URL` — do not reference these.
+**GitHub Actions secrets** — Registered: `ASSESS_BASE_URL` and `ASSESSMENT_API_KEY`. There is no `CRON_SECRET` or `VERCEL_PRODUCTION_URL`.
 
-**Migration file committed but not applied to production**
-Committing a `.sql` file to `supabase/migrations/` has no effect on the live DB. The error will typically be a Postgres constraint or missing-column error surfaced through the API (e.g. `duplicate key value violates unique constraint`). Fix: open Supabase SQL Editor, run the pending migration manually, then retrigger. Always check the unapplied migrations list in the Database Schema section above before assuming a schema change is live.
+**Migration file committed but not applied** — Committing `.sql` has no effect on the live DB. Check the unapplied migrations list above before assuming a schema change is live.
 
-**`dr_nudge` skips doctors unexpectedly**
-Check that the doctor has analyzed consultations in the recent window and that `source_last_record_at` is not already up to date. Use `--force` in the CLI only when you intentionally want to bypass the watermark.
+**`dr_nudge` skips doctors unexpectedly** — Check `source_last_record_at` vs `MAX(analyzed_at)`. Use `--force` to bypass watermark intentionally.
 
-**DeepSeek returns malformed JSON**
-Expected — repair is built in. Check `repairedJson: true` in logs. If repair triggers consistently, the prompt output format needs tightening.
+**DeepSeek returns malformed JSON** — Expected; repair is built in. Check `repairedJson: true` in logs.
 
-**AI references a billing line, supplement, or gym record as if it were clinical data**
-The `输入清洗与保留` block in `tcm-analysis` prompt (v1.3+) was either edited out or a new noise pattern appeared that isn't covered. Fix: add the new pattern variant to the `[忽略类]` list in a new version module under `src/lib/prompts/registry/tcm-analysis/`, then bump the `latest` pointer in `src/lib/prompts/index.ts`. Noise content should appear in `非临床信息`, not in `风险与提醒` or `建议优化`.
+**AI references a billing line / gym record as clinical data** — The `输入清洗与保留` block in `tcm-analysis` prompt (v1.3+) was edited out or a new noise pattern appeared. Fix: add the new pattern variant to a new version module, bump `latest` in `index.ts`.
 
-**Admin pages can't see brand CSS variables**
-Brand tokens (`--brand`, etc.) must be defined in `globals.css`, not only in `workbench.css`. `workbench.css` only loads on `/` route.
+**Admin pages can't see brand CSS variables** — Tokens must be in `globals.css`, not only in `workbench.css`.
 
-**Langfuse shows $0 cost / missing token counts**
-Two independent failure modes — both must be correct:
-1. **Wrong field for tokens**: Langfuse reads the standard `usage` field (`{ input, output, total, unit: "TOKENS" }`) for display and registry lookups. Putting token counts only in `usageDetails` (a freeform custom field) means they never reach the cost engine.
-2. **Model not in registry**: DeepSeek models are not in Langfuse's built-in model registry. Even with correct token counts in `usage`, Langfuse cannot compute cost without a registry entry. Fix: pass `costDetails: { input, output, total }` with USD amounts computed locally. Use `usageDetails` for additional breakdown (e.g. cache hit/miss) — it is display-only.
-- Always send all three: `usage` (standard tokens), `usageDetails` (extras), `costDetails` (explicit USD).
-
----
-
-## Documentation Direction
-
-- `README.md` is in English following standard open-source best practices. Chinese UI terms (field names, section labels) may appear inline where they are the canonical name, but all prose, headings, and explanations are in English.
-- Update README when user-visible behavior meaningfully changes.
-- Update AGENTS.md whenever architecture, security rules, or calibration workflow changes.
+**Langfuse shows $0 cost / missing token counts** — Must send all three: `usage` (tokens), `usageDetails` (cache breakdown), `costDetails` (explicit USD). Tokens in only `usageDetails` never reach the cost engine.
 
 ---
 
@@ -693,13 +512,11 @@ Do not say done until the changed path is verified, not merely coded.
 
 1. Doctor feedback capture — accepted/rejected suggestion tracking
 2. External citation retrieval layer
-3. **`022_drop_analytics_and_assessments.sql`** — apply in production (drops legacy analytics/assessment tables)
-4. Legacy Goal 2 DB cleanup: only drop `analytics_doctor_evaluations` or related old artifacts in a separate migration after confirming no runtime code reads them
-5. **`023_session_reviews_and_eval_cleanup.sql`** — apply in production (drops `output_review` column, creates `analytics_session_reviews`; prerequisite for 028)
-6. **`028_rename_session_reviews_to_output_audits.sql`** — apply in production (renames `analytics_session_reviews` → `analytics_output_audits`; required before new audits can write or the admin page can load)
-7. **`031_drop_doctor_discussion_agenda.sql`** — apply in production (drops the retired `doctor_discussion_agenda` table)
-8. **`032_doctor_profile_snapshots.sql`** — apply in production to enable profile overlay cache (overlay works without it, just slower every time)
+3. **`022_drop_analytics_and_assessments.sql`** — apply in production
+4. **`023_session_reviews_and_eval_cleanup.sql`** — apply in production (prerequisite for 028)
+5. **`028_rename_session_reviews_to_output_audits.sql`** — apply in production (required before new audits can write or admin page can load)
+6. **`031_drop_doctor_discussion_agenda.sql`** — apply in production
+7. **`032_doctor_profile_snapshots.sql`** — apply in production to enable profile overlay cache
 8. Phase 2: doctor-facing surface (doctorFacingHint removed from v1.1 schema; revisit if needed)
-9. SGT timezone alignment in `buildWindow` — 14-day on-demand window makes boundary precision a non-issue; reopen if needed
-10. AI Output Audit pipeline: records where `analysis_stale=true` have mismatched form_data/analysis_result — may cause false "hallucination" findings. Consider filtering these records.
-11. Clone case button in workbench viewAs header — planned but not yet implemented.
+9. AI Output Audit pipeline: records where `analysis_stale=true` have mismatched form_data/analysis_result — may cause false "hallucination" findings. Consider filtering.
+10. Clone case button in workbench viewAs header — planned but not yet implemented.
