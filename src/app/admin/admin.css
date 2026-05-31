@@ -4428,6 +4428,34 @@ details[open] .sample-details__toggle::before {
   border-color: var(--brand, #9B2226);
 }
 
+.prompt-change-notes {
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  background: #FFFBEB;
+  border-left: 3px solid #D97706;
+  border-radius: 0 4px 4px 0;
+}
+
+.prompt-change-notes-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #92400E;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+
+.prompt-change-notes-body {
+  margin: 0;
+  font-size: 12px;
+  font-family: inherit;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.6;
+}
+
 .prompt-source-code {
   margin: 0;
   padding: 14px;

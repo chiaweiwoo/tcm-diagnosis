@@ -7,8 +7,8 @@ export type PromptHistoryEntry = {
   version: string;
   contents: string;
   currentlyInTree: boolean;
-  firstCommit: { sha: string; isoDate: string; author: string; message: string };
-  lastCommit: { sha: string; isoDate: string; author: string; message: string };
+  firstCommit: { sha: string; isoDate: string; author: string; message: string; body: string };
+  lastCommit: { sha: string; isoDate: string; author: string; message: string; body: string };
   commitCount: number;
 };
 

@@ -71,6 +71,12 @@ function VersionCard({ entry, isActiveVersion }: { entry: import("@/lib/prompts/
 
       {expanded && (
         <div className="prompt-version-body">
+          {entry.firstCommit.body && (
+            <div className="prompt-change-notes">
+              <span className="prompt-change-notes-label">改动说明</span>
+              <pre className="prompt-change-notes-body">{entry.firstCommit.body}</pre>
+            </div>
+          )}
           <div className="prompt-source-header">
             <span className="prompt-source-label">提示词内容</span>
             <CopyButton text={entry.contents} />

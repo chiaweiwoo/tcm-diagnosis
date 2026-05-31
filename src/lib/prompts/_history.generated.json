@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-31T04:11:17.403Z",
+  "generatedAt": "2026-05-31T04:42:07.411Z",
   "entries": [
     {
       "path": "src/lib/prompts/registry/doctor-eval/v1.5.ts",
@@ -11,13 +11,15 @@
         "sha": "fce1399e0292ae8354cfce22df78c883ee2ff5f2",
         "isoDate": "2026-05-31T11:30:45+08:00",
         "author": "chiaw",
-        "message": "feat(prompts): centralize versioned system prompts into GitOps Prompt Registry"
+        "message": "feat(prompts): centralize versioned system prompts into GitOps Prompt Registry",
+        "body": "- Consolidate clinical review, risk nudge, prescription clustering, doctor eval, and output audit prompts into src/lib/prompts/registry/\n- Implement a Registry Manager resolving prompts based on priority resolution: Manual code overrides > CLI --<key>-version flags > Env variables > default latest pointer\n- Set testTimeout: 20000 in vitest.config.ts to resolve flaky JSDOM rendering timeouts under high system load\n- Update AGENTS.md and route modules to support these invariants"
       },
       "lastCommit": {
         "sha": "8e9a1ad2a4a51cb6a6b4ce1a4b710f9ef80ce838",
         "isoDate": "2026-05-31T11:50:13+08:00",
         "author": "chiaw",
-        "message": "refactor(prompts): registry hygiene"
+        "message": "refactor(prompts): registry hygiene",
+        "body": "- Remove retired doctor-eval prompt (Goal 2 stack retired per AGENTS.md; no runtime callers)\n- Fix env-var name collapse on multi-dash keys (replaceAll instead of replace)\n- Split getPrompt: generic returns {version, prompt}; new getTcmAnalysisPrompt\n  exposes buildUserPrompt with honest types, drops unsafe `as any` cast\n- Update analyze route to use getTcmAnalysisPrompt\n- Add test for getTcmAnalysisPrompt callable buildUserPrompt (113 total)\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
       },
       "commitCount": 2
     },
@@ -31,13 +33,15 @@
         "sha": "fce1399e0292ae8354cfce22df78c883ee2ff5f2",
         "isoDate": "2026-05-31T11:30:45+08:00",
         "author": "chiaw",
-        "message": "feat(prompts): centralize versioned system prompts into GitOps Prompt Registry"
+        "message": "feat(prompts): centralize versioned system prompts into GitOps Prompt Registry",
+        "body": "- Consolidate clinical review, risk nudge, prescription clustering, doctor eval, and output audit prompts into src/lib/prompts/registry/\n- Implement a Registry Manager resolving prompts based on priority resolution: Manual code overrides > CLI --<key>-version flags > Env variables > default latest pointer\n- Set testTimeout: 20000 in vitest.config.ts to resolve flaky JSDOM rendering timeouts under high system load\n- Update AGENTS.md and route modules to support these invariants"
       },
       "lastCommit": {
         "sha": "fce1399e0292ae8354cfce22df78c883ee2ff5f2",
         "isoDate": "2026-05-31T11:30:45+08:00",
         "author": "chiaw",
-        "message": "feat(prompts): centralize versioned system prompts into GitOps Prompt Registry"
+        "message": "feat(prompts): centralize versioned system prompts into GitOps Prompt Registry",
+        "body": "- Consolidate clinical review, risk nudge, prescription clustering, doctor eval, and output audit prompts into src/lib/prompts/registry/\n- Implement a Registry Manager resolving prompts based on priority resolution: Manual code overrides > CLI --<key>-version flags > Env variables > default latest pointer\n- Set testTimeout: 20000 in vitest.config.ts to resolve flaky JSDOM rendering timeouts under high system load\n- Update AGENTS.md and route modules to support these invariants"
       },
       "commitCount": 1
     },
@@ -51,13 +55,15 @@
         "sha": "2a23a253e531c005b159e9d85df8e7d1e707b8b7",
         "isoDate": "2026-05-29T20:51:15+08:00",
         "author": "chiaw",
-        "message": "feat(profile): pivot snapshot to actionable flagged-case list with LLM clustering"
+        "message": "feat(profile): pivot snapshot to actionable flagged-case list with LLM clustering",
+        "body": "Replaces the three-table aggregate view with a case-level audit surface:\n\n  Boolean rules (always fire):\n    - criticalRisk triggered cases (cap 10)\n    - nonClinical text present (cap 5)\n\n  Within-doctor percentile rules (N >= 20):\n    - 需要复核 item count > P90 (cap 10)\n    - physicalExam length < P10 (cap 5)\n    - currentIllness length < P10 (cap 5)\n\n  LLM clustering (N >= 20, DeepSeek Flash, fail-open):\n    - Identifies groups of >= 3 clinically-equivalent prescriptions\n\nHeader strip (3 aggregate rates) retained above the flagged list.\nLow-sample threshold gates percentile + clustering rules; below 20 cases\nonly boolean rules fire with a note in the section header.\n\nNew files:\n  src/lib/analytics/profilePrompts.ts   — cluster system prompt + version\n  src/lib/analytics/clusterPrescriptions.ts — DeepSeek Flash cluster call\nExtends:\n  src/lib/analytics/doctorProfile.ts   — computePercentile + findFlaggedCases\n  src/lib/analytics/doctorProfile.test.ts — 5 new percentile tests (13 total)\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
       },
       "lastCommit": {
         "sha": "fce1399e0292ae8354cfce22df78c883ee2ff5f2",
         "isoDate": "2026-05-31T11:30:45+08:00",
         "author": "chiaw",
-        "message": "feat(prompts): centralize versioned system prompts into GitOps Prompt Registry"
+        "message": "feat(prompts): centralize versioned system prompts into GitOps Prompt Registry",
+        "body": "- Consolidate clinical review, risk nudge, prescription clustering, doctor eval, and output audit prompts into src/lib/prompts/registry/\n- Implement a Registry Manager resolving prompts based on priority resolution: Manual code overrides > CLI --<key>-version flags > Env variables > default latest pointer\n- Set testTimeout: 20000 in vitest.config.ts to resolve flaky JSDOM rendering timeouts under high system load\n- Update AGENTS.md and route modules to support these invariants"
       },
       "commitCount": 2
     },
@@ -71,13 +77,15 @@
         "sha": "a2e579b5f574341b9af80b04d27adf0be07c67e6",
         "isoDate": "2026-05-29T14:03:23+08:00",
         "author": "chiaw",
-        "message": "feat: nudge core lib — buckets, prompts, computeNudge"
+        "message": "feat: nudge core lib — buckets, prompts, computeNudge",
+        "body": ""
       },
       "lastCommit": {
         "sha": "fce1399e0292ae8354cfce22df78c883ee2ff5f2",
         "isoDate": "2026-05-31T11:30:45+08:00",
         "author": "chiaw",
-        "message": "feat(prompts): centralize versioned system prompts into GitOps Prompt Registry"
+        "message": "feat(prompts): centralize versioned system prompts into GitOps Prompt Registry",
+        "body": "- Consolidate clinical review, risk nudge, prescription clustering, doctor eval, and output audit prompts into src/lib/prompts/registry/\n- Implement a Registry Manager resolving prompts based on priority resolution: Manual code overrides > CLI --<key>-version flags > Env variables > default latest pointer\n- Set testTimeout: 20000 in vitest.config.ts to resolve flaky JSDOM rendering timeouts under high system load\n- Update AGENTS.md and route modules to support these invariants"
       },
       "commitCount": 4
     },
@@ -91,13 +99,15 @@
         "sha": "62e707f58157822b5ceb7e343b563f32b18912d5",
         "isoDate": "2026-05-12T13:57:05+08:00",
         "author": "chiaw",
-        "message": "Build mock TCM diagnosis dashboard"
+        "message": "Build mock TCM diagnosis dashboard",
+        "body": ""
       },
       "lastCommit": {
         "sha": "fce1399e0292ae8354cfce22df78c883ee2ff5f2",
         "isoDate": "2026-05-31T11:30:45+08:00",
         "author": "chiaw",
-        "message": "feat(prompts): centralize versioned system prompts into GitOps Prompt Registry"
+        "message": "feat(prompts): centralize versioned system prompts into GitOps Prompt Registry",
+        "body": "- Consolidate clinical review, risk nudge, prescription clustering, doctor eval, and output audit prompts into src/lib/prompts/registry/\n- Implement a Registry Manager resolving prompts based on priority resolution: Manual code overrides > CLI --<key>-version flags > Env variables > default latest pointer\n- Set testTimeout: 20000 in vitest.config.ts to resolve flaky JSDOM rendering timeouts under high system load\n- Update AGENTS.md and route modules to support these invariants"
       },
       "commitCount": 24
     },
@@ -111,13 +121,15 @@
         "sha": "62e707f58157822b5ceb7e343b563f32b18912d5",
         "isoDate": "2026-05-12T13:57:05+08:00",
         "author": "chiaw",
-        "message": "Build mock TCM diagnosis dashboard"
+        "message": "Build mock TCM diagnosis dashboard",
+        "body": ""
       },
       "lastCommit": {
         "sha": "fce1399e0292ae8354cfce22df78c883ee2ff5f2",
         "isoDate": "2026-05-31T11:30:45+08:00",
         "author": "chiaw",
-        "message": "feat(prompts): centralize versioned system prompts into GitOps Prompt Registry"
+        "message": "feat(prompts): centralize versioned system prompts into GitOps Prompt Registry",
+        "body": "- Consolidate clinical review, risk nudge, prescription clustering, doctor eval, and output audit prompts into src/lib/prompts/registry/\n- Implement a Registry Manager resolving prompts based on priority resolution: Manual code overrides > CLI --<key>-version flags > Env variables > default latest pointer\n- Set testTimeout: 20000 in vitest.config.ts to resolve flaky JSDOM rendering timeouts under high system load\n- Update AGENTS.md and route modules to support these invariants"
       },
       "commitCount": 24
     }

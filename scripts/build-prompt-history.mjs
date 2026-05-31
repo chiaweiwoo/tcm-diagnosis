@@ -54,8 +54,16 @@ for (const path of everPaths) {
     return { sha, isoDate, author, message };
   };
 
-  const lastCommit = parse(lines[0]);
-  const firstCommit = parse(lines[lines.length - 1]);
+  const getBody = (sha) => {
+    try {
+      return git(`show -s --format=%b ${sha}`, { silent: true }).trim();
+    } catch {
+      return "";
+    }
+  };
+
+  const lastCommit = { ...parse(lines[0]), body: getBody(parse(lines[0]).sha) };
+  const firstCommit = { ...parse(lines[lines.length - 1]), body: getBody(parse(lines[lines.length - 1]).sha) };
 
   const currentlyInTree = existsSync(path);
   let contents;
