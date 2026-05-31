@@ -4225,3 +4225,295 @@ details[open] .sample-details__toggle::before {
 .profile-cluster-body {
   padding: 8px 14px;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   Prompt Registry Browser
+   ══════════════════════════════════════════════════════════════ */
+
+.prompt-manifest-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  align-self: flex-end;
+}
+
+.prompt-registry-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ── Family accordion ── */
+.prompt-family {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 10px);
+  overflow: hidden;
+}
+
+.prompt-family--archived {
+  opacity: 0.7;
+}
+
+.prompt-family-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 18px;
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+  background: var(--surface);
+  transition: background 0.1s;
+}
+
+.prompt-family-header:hover {
+  background: var(--bg);
+}
+
+.prompt-family-chevron {
+  position: absolute;
+  right: 18px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.prompt-family-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.prompt-family-name {
+  font-size: 14px;
+  font-weight: 600;
+  font-family: ui-monospace, "Cascadia Code", monospace;
+  color: var(--text);
+}
+
+.prompt-family-meta {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.prompt-family-env code {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-family: ui-monospace, "Cascadia Code", monospace;
+  font-size: 11px;
+  color: var(--text);
+}
+
+.prompt-family-callers {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.prompt-family-body {
+  border-top: 1px solid var(--border);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ── Version card ── */
+.prompt-version-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 6px);
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.prompt-version-card--active {
+  border-color: var(--brand, #9B2226);
+  background: #FFF8F8;
+}
+
+.prompt-version-header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 14px;
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+}
+
+.prompt-version-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.prompt-version-tag {
+  font-size: 13px;
+  font-weight: 600;
+  font-family: ui-monospace, "Cascadia Code", monospace;
+  color: var(--text);
+}
+
+.prompt-version-commits {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.prompt-commit-info {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: ui-monospace, "Cascadia Code", monospace;
+}
+
+.prompt-commit-message {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.prompt-version-chevron {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.prompt-version-body {
+  border-top: 1px solid var(--border);
+}
+
+.prompt-source-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.prompt-source-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.prompt-copy-btn {
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+
+.prompt-copy-btn:hover {
+  background: var(--brand, #9B2226);
+  color: #fff;
+  border-color: var(--brand, #9B2226);
+}
+
+.prompt-source-code {
+  margin: 0;
+  padding: 14px;
+  font-size: 12px;
+  font-family: ui-monospace, "Cascadia Code", monospace;
+  color: var(--text);
+  background: var(--bg);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+/* ── Badges ── */
+.prompt-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+
+.prompt-badge--active {
+  background: #DCFCE7;
+  color: #166534;
+}
+
+.prompt-badge--deleted {
+  background: #FEF2F2;
+  color: #991B1B;
+}
+
+.prompt-badge--warn {
+  background: #FEF9C3;
+  color: #92400E;
+  cursor: help;
+}
+
+.prompt-badge--archived {
+  background: var(--bg);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+
+/* ── Source chips ── */
+.prompt-source-chip {
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.prompt-source-chip--latest {
+  background: #EFF6FF;
+  color: #1D4ED8;
+}
+
+.prompt-source-chip--env {
+  background: #F0FDF4;
+  color: #166534;
+}
+
+.prompt-source-chip--cli {
+  background: #FDF4FF;
+  color: #6B21A8;
+}
+
+.prompt-source-chip--manual {
+  background: #FFF7ED;
+  color: #9A3412;
+}
+
+.prompt-source-chip--env_invalid_fallback {
+  background: #FEF2F2;
+  color: #991B1B;
+}
+
+.prompt-source-chip--archived {
+  background: var(--bg);
+  color: var(--text-muted);
+}
+
+.prompt-empty {
+  color: var(--text-muted);
+  font-size: 13px;
+  padding: 8px 0;
+}
