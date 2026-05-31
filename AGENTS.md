@@ -232,7 +232,7 @@ Recurring AI caution aggregation surfaced in the workbench left sidebar.
 
 **Key files:**
 - `src/lib/nudge/buckets.ts` -- 8 bucket definitions, `bucketCautions()`, `RECURRENCE_FLOOR=3`, `WINDOW_DAYS=14`
-- `src/lib/nudge/prompts.ts` -- `RISK_NUDGE_SYSTEM_PROMPT`, `RISK_NUDGE_PROMPT_VERSION = "risk-nudge-v1"`
+- `src/lib/prompts/registry/risk-nudge/v1.1.ts` — prompt text + version. Resolved via `getPrompt("risk-nudge")` from `src/lib/prompts/index.ts`.
 - `src/lib/nudge/computeNudge.ts` -- `computeNudgeForDoctor()`, `computeNudgesForActiveDoctors()`
 - `src/app/api/cron/dr_nudge/route.ts` -- fleet-wide cron POST (X-Assessment-Key auth), `maxDuration=300`
 - `src/app/api/me/nudge/route.ts` -- doctor read GET (session auth + X-View-As)
@@ -275,7 +275,7 @@ When `totalAnalyzed < LOW_SAMPLE_THRESHOLD` (20), only boolean rules (1 & 2) fir
 **Key files:**
 - `src/lib/analytics/doctorProfile.ts` — `computeDoctorProfile()`, `findFlaggedCases()`, `computePercentile()`, `LOW_SAMPLE_THRESHOLD`
 - `src/lib/analytics/clusterPrescriptions.ts` — DeepSeek Flash call for prescription clustering (fail-open)
-- `src/lib/analytics/profilePrompts.ts` — `PRESC_CLUSTER_SYSTEM_PROMPT`, `PRESC_CLUSTER_PROMPT_VERSION`
+- `src/lib/prompts/registry/presc-cluster/v1.0.ts` — prompt text + version. Resolved via `getPrompt("presc-cluster")`.
 - `src/lib/analytics/doctorProfile.test.ts` — 13 unit tests (mean, zeroRate, percentile, fallback detection)
 - `src/app/api/admin/users/[doctorId]/profile/route.ts` — admin GET endpoint
 - `src/app/admin/users/ProfileOverlay.tsx` — overlay modal (shimmer / data / error states)
@@ -463,7 +463,7 @@ v3 schema key features:
 - Severity grounded in patient health risk (see `auditDefinitions.ts`)
 - All term definitions in `src/lib/analytics/auditDefinitions.ts` (single source of truth for both AI rubric and UI tooltips)
 
-Prompts: `buildOutputAuditSystemPrompt()` (injects definitions), `OUTPUT_AUDIT_PROMPT_VERSION = "output-audit-v3"` in `src/lib/analytics/prompts.ts`
+Prompts: `src/lib/prompts/registry/output-audit/v3.0.ts` — `buildPrompt()` injects definitions via `buildDefinitionsBlock()`. Resolved via `getPrompt("output-audit")`.
 Library: `runOutputAudit()` in `src/lib/analytics/outputAudit.ts`
 Window helper: `buildWindowFromLatestAnalysis(client, days)` in `src/lib/analytics/stats.ts`
 
@@ -617,7 +617,7 @@ Check that the doctor has analyzed consultations in the recent window and that `
 Expected — repair is built in. Check `repairedJson: true` in logs. If repair triggers consistently, the prompt output format needs tightening.
 
 **AI references a billing line, supplement, or gym record as if it were clinical data**
-The `输入清洗与保留` block in `TCM_ANALYSIS_SYSTEM_PROMPT` (v1.3+) was either edited out or a new noise pattern appeared that isn't covered. Fix: add the new pattern variant to the `[忽略类]` list in the prompt and bump the `TCM_ANALYSIS_PROMPT_VERSION`. Noise content should appear in `非临床信息`, not in `风险与提醒` or `建议优化`.
+The `输入清洗与保留` block in `tcm-analysis` prompt (v1.3+) was either edited out or a new noise pattern appeared that isn't covered. Fix: add the new pattern variant to the `[忽略类]` list in a new version module under `src/lib/prompts/registry/tcm-analysis/`, then bump the `latest` pointer in `src/lib/prompts/index.ts`. Noise content should appear in `非临床信息`, not in `风险与提醒` or `建议优化`.
 
 **Admin pages can't see brand CSS variables**
 Brand tokens (`--brand`, etc.) must be defined in `globals.css`, not only in `workbench.css`. `workbench.css` only loads on `/` route.
