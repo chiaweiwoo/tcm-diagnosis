@@ -1,6 +1,7 @@
-export const PRESC_CLUSTER_PROMPT_VERSION = "presc-cluster-v1";
+export const version = "v1.0";
 
-export const PRESC_CLUSTER_SYSTEM_PROMPT = `你是一名中医病案分析员，负责识别同一医生处方中高度重复的模式。
+export const prompt = `
+你是一名中医病案分析员，负责识别同一医生处方中高度重复的模式。
 
 给定一批病案摘要（病案ID、诊断、证型、处方节选），请识别其中临床上高度相似的处方组合。
 
@@ -21,4 +22,5 @@ export const PRESC_CLUSTER_SYSTEM_PROMPT = `你是一名中医病案分析员，
   ]
 }
 
-如无达到3例以上的重复组，返回 {"clusters":[]}。`;
+如无达到3例以上的重复组，返回 {"clusters":[]}。
+`.trim();

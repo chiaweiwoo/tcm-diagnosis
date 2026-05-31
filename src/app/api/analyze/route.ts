@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { after } from "next/server";
 import { callDeepSeekJson, DeepSeekError, getDeepSeekFastModel } from "@/lib/ai/deepseek";
 import { apiError } from "@/lib/apiResponses";
-import { buildTcmAnalysisUserPrompt, TCM_ANALYSIS_PROMPT_VERSION, TCM_ANALYSIS_SYSTEM_PROMPT } from "@/lib/ai/prompts";
+import { getPrompt } from "@/lib/prompts";
 import { structuredCaseSchema } from "@/lib/forms/caseSchema";
 import { logServerEvent } from "@/lib/logging";
 import { logActivity } from "@/lib/activityLog";
@@ -33,31 +33,41 @@ export async function POST(request: NextRequest) {
   }
 
   const startedAt = Date.now();
+  let body: { form?: unknown; maxTokens?: number; promptVersion?: string; version?: string } = {};
+  try {
+    body = await request.json();
+  } catch {
+    return apiError(400, "BAD_REQUEST", "请求格式不正确，必须为JSON。");
+  }
+
+  const parsed = structuredCaseSchema.safeParse(body.form);
+  if (!parsed.success) {
+    return apiError(400, "INVALID_INPUT", "病案资料未通过校验，请先复核必填字段。", {
+      errors: parsed.error.flatten().fieldErrors,
+    });
+  }
+
+  const form = parsed.data;
+
+  // Resolve system prompt and user prompt builder from registry
+  const { version: resolvedVersion, prompt: systemPrompt, buildUserPrompt } = getPrompt(
+    "tcm-analysis",
+    body.promptVersion || body.version
+  );
+
   const langfuse = getLangfuse();
-  // Trace created here so it is accessible in both success and error paths
   const trace = langfuse?.trace({
     name: "analyze",
-    metadata: { isCli, promptVersion: TCM_ANALYSIS_PROMPT_VERSION },
+    metadata: { isCli, promptVersion: resolvedVersion },
   });
 
   try {
-    const body = (await request.json()) as { form?: unknown; maxTokens?: number };
-    const parsed = structuredCaseSchema.safeParse(body.form);
-
-    if (!parsed.success) {
-      return apiError(400, "INVALID_INPUT", "病案资料未通过校验，请先复核必填字段。", {
-        errors: parsed.error.flatten().fieldErrors,
-      });
-    }
-
-    const form = parsed.data;
-
     const deepseekStartedAt = Date.now();
 
     const result = await callDeepSeekJson<AnalysisJson>({
       messages: [
-        { role: "system", content: TCM_ANALYSIS_SYSTEM_PROMPT },
-        { role: "user", content: buildTcmAnalysisUserPrompt(form) },
+        { role: "system", content: systemPrompt },
+        { role: "user", content: buildUserPrompt ? buildUserPrompt(form) : "" },
       ],
       maxTokens: body.maxTokens || 1200,
       model: getDeepSeekFastModel(),
@@ -117,7 +127,7 @@ export async function POST(request: NextRequest) {
             prescriptionType: form.prescriptionType,
             repairedJson:     result.repairedJson ?? false,
             latencyMs,
-            promptVersion:    TCM_ANALYSIS_PROMPT_VERSION,
+            promptVersion:    resolvedVersion,
           },
         });
         try { await langfuse.flushAsync(); } catch { /* non-critical */ }
@@ -135,14 +145,14 @@ export async function POST(request: NextRequest) {
       result: output,
       raw: result.data,
       model: result.model,
-      promptVersion: TCM_ANALYSIS_PROMPT_VERSION,
+      promptVersion: resolvedVersion,
       repairedJson: result.repairedJson ?? false,
     });
   } catch (error) {
     if (error instanceof DeepSeekError) {
       after(async () => {
         if (langfuse && trace) {
-          trace.update({ metadata: { error: error.message, stage: "deepseek_call", success: false } });
+          trace.update({ metadata: { error: error.message, stage: "deepseek_call", success: false, promptVersion: resolvedVersion } });
           try { await langfuse.flushAsync(); } catch { /* non-critical */ }
         }
         void logServerEvent({
@@ -156,7 +166,7 @@ export async function POST(request: NextRequest) {
 
     after(async () => {
       if (langfuse && trace) {
-        trace.update({ metadata: { stage: "normalize_or_map", success: false } });
+        trace.update({ metadata: { stage: "normalize_or_map", success: false, promptVersion: resolvedVersion } });
         try { await langfuse.flushAsync(); } catch { /* non-critical */ }
       }
       void logServerEvent({

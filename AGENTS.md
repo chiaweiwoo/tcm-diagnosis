@@ -146,6 +146,17 @@ The workbench (`/`) left sidebar now shows `⚠️ AI 反复提醒的风险点` 
 - Cache: `Cache-Control: private, max-age=300, stale-while-revalidate=600`.
 - The old doctor profile sidebar and `/api/me/profile` are retired.
 
+### 14. Prompt Registry & Versioning (GitOps)
+
+All system prompts are centralized and versioned inside the GitOps-based Code Prompt Registry under `src/lib/prompts/`.
+- **Registry Structure**: Prompts are stored in `src/lib/prompts/registry/` as TS modules. The central registry manager is `src/lib/prompts/index.ts`.
+- **Dynamic Version Resolution**: Prompt versions are resolved at runtime through a strict priority chain:
+  1. Manual override (Code/Request payload parameter)
+  2. CLI overrides (parsed from CLI arguments matching `--<key>-version`)
+  3. Environment variables (matching `<KEY>_PROMPT_VERSION` in `.env.local`)
+  4. Repository fallback default (`latest` pointer in registry index)
+- **Adding / Modifying Prompts**: Never hardcode prompt strings directly in API routes or logic modules. Create a new version module in the registry and update the central registry pointer. This guarantees prompt changes are deployed atomically with code changes, reviewable in PRs, and fully testable in offline unit tests.
+
 ---
 
 ## Product Purpose

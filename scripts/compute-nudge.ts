@@ -18,6 +18,7 @@ import {
   computeNudgesForActiveDoctors,
   getLatestAnalyzedAt,
 } from "../src/lib/nudge/computeNudge";
+import { resolvePromptVersion } from "../src/lib/prompts";
 
 // ─── Parse args ───────────────────────────────────────────────────────────────
 
@@ -88,7 +89,10 @@ async function main() {
   }
 
   console.log(`Target: ${targetLabel}`);
-  if (force) console.log("  --force: bypassing watermark\n");
+  if (force) console.log("  --force: bypassing watermark");
+
+  const activePromptVersion = resolvePromptVersion("risk-nudge");
+  console.log(`Active prompt version resolved: risk-nudge-${activePromptVersion}\n`);
 
   // Show latest analyzed_at
   const latest = await getLatestAnalyzedAt(admin, targetId);

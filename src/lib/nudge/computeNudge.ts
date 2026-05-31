@@ -21,7 +21,7 @@ import {
   bucketCautions,
   type SurfacedBucket,
 } from "./buckets";
-import { RISK_NUDGE_PROMPT_VERSION, RISK_NUDGE_SYSTEM_PROMPT } from "./prompts";
+import { getPrompt } from "@/lib/prompts";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -88,6 +88,7 @@ export async function needsRecompute(
   doctorId: string,
   latest: Date,
   force = false,
+  promptVersion?: string,
 ): Promise<boolean> {
   if (force) return true;
 
@@ -100,8 +101,11 @@ export async function needsRecompute(
   if (error || !data) return true; // no row → must compute
   if (!data.source_last_record_at) return true;
 
-  // Recompute if prompt version changed (e.g. description field added)
-  if ((data.prompt_version as string | null) !== RISK_NUDGE_PROMPT_VERSION) return true;
+  // Resolve dynamically from prompt registry
+  const { version: resolvedVersion } = getPrompt("risk-nudge", promptVersion);
+
+  // Recompute if prompt version changed
+  if ((data.prompt_version as string | null) !== resolvedVersion) return true;
 
   const stored = new Date(data.source_last_record_at as string);
   return latest > stored;
@@ -168,9 +172,11 @@ export function mergeWithAi(
 export async function computeNudgeForDoctor(
   client: SupabaseClient,
   doctorId: string,
-  options: { force?: boolean } = {},
+  options: { force?: boolean; promptVersion?: string } = {},
 ): Promise<NudgeComputeResult> {
   const t0 = Date.now();
+
+  const { version: resolvedVersion, prompt: systemPrompt } = getPrompt("risk-nudge", options.promptVersion);
 
   // Step 1: get latest analyzed_at
   const latest = await getLatestAnalyzedAt(client, doctorId);
@@ -186,7 +192,7 @@ export async function computeNudgeForDoctor(
         case_count: 0,
         caution_count: 0,
         model: null,
-        prompt_version: RISK_NUDGE_PROMPT_VERSION,
+        prompt_version: resolvedVersion,
         computed_at: new Date().toISOString(),
       },
       { onConflict: "doctor_id" },
@@ -195,7 +201,7 @@ export async function computeNudgeForDoctor(
   }
 
   // Step 2: watermark check
-  const shouldRecompute = await needsRecompute(client, doctorId, latest, options.force);
+  const shouldRecompute = await needsRecompute(client, doctorId, latest, options.force, options.promptVersion);
   if (!shouldRecompute) {
     return { status: "skipped" };
   }
@@ -237,7 +243,7 @@ export async function computeNudgeForDoctor(
   // Step 5: deterministic bucketing (floor)
   const { surfaced } = bucketCautions(allCautions);
 
-  if (surfaced.length === 0) {
+    if (surfaced.length === 0) {
     // Not enough recurring themes
     await client.from("doctor_risk_nudges").upsert(
       {
@@ -249,7 +255,7 @@ export async function computeNudgeForDoctor(
         case_count: consultations.length,
         caution_count: allCautions.length,
         model: null,
-        prompt_version: RISK_NUDGE_PROMPT_VERSION,
+        prompt_version: resolvedVersion,
         computed_at: new Date().toISOString(),
       },
       { onConflict: "doctor_id" },
@@ -278,7 +284,7 @@ export async function computeNudgeForDoctor(
       retryOnEmpty: true,
       jsonMode: true,
       messages: [
-        { role: "system", content: RISK_NUDGE_SYSTEM_PROMPT },
+        { role: "system", content: systemPrompt },
         { role: "user", content: aiUserContent },
       ],
     });
@@ -318,7 +324,7 @@ export async function computeNudgeForDoctor(
       case_count: consultations.length,
       caution_count: allCautions.length,
       model: usedModel,
-      prompt_version: RISK_NUDGE_PROMPT_VERSION,
+      prompt_version: resolvedVersion,
       computed_at: new Date().toISOString(),
     },
     { onConflict: "doctor_id" },
@@ -337,7 +343,7 @@ export async function computeNudgeForDoctor(
           output: aiUsage.completion_tokens ?? 0,
         },
         metadata: {
-          promptVersion: RISK_NUDGE_PROMPT_VERSION,
+          promptVersion: resolvedVersion,
           themeCount: themes.length,
           caseCount: consultations.length,
           latencyMs: Date.now() - t0,

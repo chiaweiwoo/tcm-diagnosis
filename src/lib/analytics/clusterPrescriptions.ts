@@ -8,7 +8,7 @@
  */
 
 import { callDeepSeekJson, getDeepSeekFastModel } from "@/lib/ai/deepseek";
-import { PRESC_CLUSTER_SYSTEM_PROMPT } from "./profilePrompts";
+import { getPrompt } from "@/lib/prompts";
 
 export type PrescriptionCluster = {
   caseIds: string[];
@@ -67,6 +67,8 @@ export async function clusterPrescriptions(
   ].join("\n");
 
   try {
+    const { prompt: systemPrompt } = getPrompt("presc-cluster");
+
     const result = await callDeepSeekJson<ClusterApiResponse>({
       model: getDeepSeekFastModel(),
       maxTokens: 1200,
@@ -74,7 +76,7 @@ export async function clusterPrescriptions(
       retryOnEmpty: false,
       jsonMode: true,
       messages: [
-        { role: "system", content: PRESC_CLUSTER_SYSTEM_PROMPT },
+        { role: "system", content: systemPrompt },
         { role: "user", content: userContent },
       ],
     });

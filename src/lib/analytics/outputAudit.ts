@@ -12,8 +12,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { callDeepSeekJson, getDeepSeekFastModel } from "@/lib/ai/deepseek";
-import { buildOutputAuditSystemPrompt, OUTPUT_AUDIT_PROMPT_VERSION } from "./prompts";
-import { TCM_ANALYSIS_PROMPT_VERSION } from "@/lib/ai/prompts";
+import { getPrompt } from "@/lib/prompts";
 import { buildWindowFromLatestAnalysis } from "./stats";
 import { serializeConsultationsCompact } from "./serializeConsultationsCompact";
 import { getLangfuse } from "@/lib/langfuse";
@@ -148,12 +147,15 @@ export async function runOutputAudit({
   const serialized = serializeConsultationsCompact(caseRows);
   const feedbackBlock = buildFeedbackBlock(feedbackRows);
   const model = getDeepSeekFastModel();
-  const systemPrompt = buildOutputAuditSystemPrompt();
+
+  // Resolve prompts from Prompt Registry
+  const { version: auditVersion, prompt: systemPrompt } = getPrompt("output-audit");
+  const { version: tcmVersion } = getPrompt("tcm-analysis");
 
   const userPrompt = [
     `请对以下 ${sampleSize} 条来自不同医生的病案 AI 输出进行系统审查。`,
     `窗口：${windowStart.toISOString().slice(0, 10)} — ${windowEnd.toISOString().slice(0, 10)}`,
-    `当前提示词版本：${TCM_ANALYSIS_PROMPT_VERSION}`,
+    `当前提示词版本：${tcmVersion}`,
     "",
     serialized,
     feedbackBlock,
@@ -167,7 +169,7 @@ export async function runOutputAudit({
       sampleCap,
       sampleSize,
       feedbackCount: feedbackRows.length,
-      promptVersion: TCM_ANALYSIS_PROMPT_VERSION,
+      promptVersion: tcmVersion,
     },
   });
 
@@ -193,8 +195,6 @@ export async function runOutputAudit({
         input: result.usage?.prompt_tokens ?? 0,
         output: result.usage?.completion_tokens ?? 0,
         total: result.usage?.total_tokens ?? 0,
-        cacheHit: result.usage?.prompt_cache_hit_tokens ?? 0,
-        cacheMiss: result.usage?.prompt_cache_miss_tokens ?? 0,
       },
       metadata: {
         repairedJson: result.repairedJson ?? false,
@@ -229,7 +229,7 @@ export async function runOutputAudit({
     .insert({
       window_start: windowStart.toISOString(),
       window_end: windowEnd.toISOString(),
-      prompt_version_at_run: `${OUTPUT_AUDIT_PROMPT_VERSION}/${TCM_ANALYSIS_PROMPT_VERSION}`,
+      prompt_version_at_run: `${auditVersion}/${tcmVersion}`,
       sample_size: sampleSize,
       model: result.model,
       review: audit,
@@ -241,4 +241,3 @@ export async function runOutputAudit({
 
   return inserted as OutputAuditRow;
 }
-

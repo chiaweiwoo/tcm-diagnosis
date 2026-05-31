@@ -1,13 +1,7 @@
-/**
- * Prompt for risk-nudge AI rephrasing stage (flash model).
- * The AI's ONLY job: rephrase deterministic bucket labels into TCM-native short labels
- * and select up to 5 verbatim example cautions per theme.
- * Invariant 8: examples come from the doctor's own cautions (permitted DeepSeek recipient).
- */
+export const version = "v1.1";
 
-export const RISK_NUDGE_PROMPT_VERSION = "risk-nudge-v1.1";
-
-export const RISK_NUDGE_SYSTEM_PROMPT = `你是中医临床助手，协助医生快速识别AI反复提醒的临床风险点。
+export const prompt = `
+你是中医临床助手，协助医生快速识别AI反复提醒的临床风险点。
 
 输入：已统计好的风险主题，含出现次数 and 原始示例。
 
@@ -41,4 +35,5 @@ export const RISK_NUDGE_SYSTEM_PROMPT = `你是中医临床助手，协助医生
 输出严格合法JSON数组，不添加任何说明文字，不省略任何项目，按输入顺序输出全部主题：
 [{"key":"改写标签","description":"临床释义","examples":["原话示例1","原话示例2",...]}]
 
-自检：确认所有examples均从输入原文逐字摘录（不改写），所有key均≤10字，所有description均≤30字。`;
+自检：确认所有examples均从输入原文逐字摘录（不改写），所有key均≤10字，所有description均≤30字。
+`.trim();
