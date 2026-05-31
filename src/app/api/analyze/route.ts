@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
   try {
     body = await request.json();
   } catch {
-    return apiError(400, "BAD_REQUEST", "请求格式不正确，必须为JSON。");
+    return apiError(400, "INVALID_INPUT", "请求格式不正确，必须为JSON。");
   }
 
   const parsed = structuredCaseSchema.safeParse(body.form);

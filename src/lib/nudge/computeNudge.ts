@@ -243,7 +243,7 @@ export async function computeNudgeForDoctor(
   // Step 5: deterministic bucketing (floor)
   const { surfaced } = bucketCautions(allCautions);
 
-    if (surfaced.length === 0) {
+  if (surfaced.length === 0) {
     // Not enough recurring themes
     await client.from("doctor_risk_nudges").upsert(
       {
