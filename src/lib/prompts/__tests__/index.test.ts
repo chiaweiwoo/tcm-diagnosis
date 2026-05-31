@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getPrompt, resolvePromptVersion, PROMPT_REGISTRY } from "../index";
+import { getPrompt, getTcmAnalysisPrompt, resolvePromptVersion, PROMPT_REGISTRY } from "../index";
 
 describe("Prompt Registry Resolution", () => {
   const originalEnv = { ...process.env };
@@ -74,5 +74,27 @@ describe("Prompt Registry Resolution", () => {
 
     const { version: fullVersion } = getPrompt("tcm-analysis", "v99.9");
     expect(fullVersion).toBe(`tcm-analysis-${PROMPT_REGISTRY["tcm-analysis"].latest}`);
+  });
+
+  it("getTcmAnalysisPrompt returns a callable buildUserPrompt", () => {
+    const { version, prompt, buildUserPrompt } = getTcmAnalysisPrompt();
+    expect(version).toBe(`tcm-analysis-${PROMPT_REGISTRY["tcm-analysis"].latest}`);
+    expect(prompt).toContain("医生端中医临床复核助手");
+    expect(typeof buildUserPrompt).toBe("function");
+
+    const userPrompt = buildUserPrompt({
+      consultationName: "",
+      prescriptionType: "方药",
+      patientAge: "45",
+      patientSex: "女",
+      chiefComplaint: "头痛",
+      currentIllness: "头痛三天",
+      pastHistory: "无",
+      physicalExam: "舌红苔薄，脉弦",
+      diagnosis: "头痛",
+      pattern: "肝阳上亢",
+      prescription: "天麻钩藤饮",
+    });
+    expect(userPrompt).toContain("头痛");
   });
 });

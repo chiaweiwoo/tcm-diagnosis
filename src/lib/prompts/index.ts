@@ -2,8 +2,18 @@ import * as tcmAnalysisV1_5 from "./registry/tcm-analysis/v1.5";
 import * as tcmAnalysisV1_6 from "./registry/tcm-analysis/v1.6";
 import * as riskNudgeV1_1 from "./registry/risk-nudge/v1.1";
 import * as prescClusterV1_0 from "./registry/presc-cluster/v1.0";
-import * as doctorEvalV1_5 from "./registry/doctor-eval/v1.5";
 import * as outputAuditV3_0 from "./registry/output-audit/v3.0";
+
+type TcmAnalysisVersions = {
+  "v1.5": typeof tcmAnalysisV1_5;
+  "v1.6": typeof tcmAnalysisV1_6;
+};
+
+type GenericVersionModule = {
+  version: string;
+  prompt?: string;
+  buildPrompt?: () => string;
+};
 
 export const PROMPT_REGISTRY = {
   "tcm-analysis": {
@@ -11,33 +21,27 @@ export const PROMPT_REGISTRY = {
     versions: {
       "v1.5": tcmAnalysisV1_5,
       "v1.6": tcmAnalysisV1_6,
-    }
+    } as TcmAnalysisVersions,
   },
   "risk-nudge": {
     latest: "v1.1",
     versions: {
       "v1.1": riskNudgeV1_1,
-    }
+    } as Record<string, GenericVersionModule>,
   },
   "presc-cluster": {
     latest: "v1.0",
     versions: {
       "v1.0": prescClusterV1_0,
-    }
-  },
-  "doctor-eval": {
-    latest: "v1.5",
-    versions: {
-      "v1.5": doctorEvalV1_5,
-    }
+    } as Record<string, GenericVersionModule>,
   },
   "output-audit": {
     latest: "v3.0",
     versions: {
       "v3.0": outputAuditV3_0,
-    }
-  }
-} as const;
+    } as Record<string, GenericVersionModule>,
+  },
+} as const satisfies Record<string, { latest: string; versions: Record<string, GenericVersionModule | TcmAnalysisVersions[keyof TcmAnalysisVersions]> }>;
 
 export type PromptKey = keyof typeof PROMPT_REGISTRY;
 
@@ -102,7 +106,7 @@ export function resolvePromptVersion(key: PromptKey, manualOverride?: string): s
   }
 
   // 3. Environment variable configuration
-  const envVarName = `${key.toUpperCase().replace("-", "_")}_PROMPT_VERSION`;
+  const envVarName = `${key.toUpperCase().replaceAll("-", "_")}_PROMPT_VERSION`;
   const envValue = process.env[envVarName];
   if (envValue && envValue in group.versions) {
     return envValue;
@@ -112,25 +116,38 @@ export function resolvePromptVersion(key: PromptKey, manualOverride?: string): s
   return group.latest;
 }
 
+function resolvePromptText(moduleData: GenericVersionModule): string {
+  if (typeof moduleData.prompt === "string") return moduleData.prompt;
+  if (typeof moduleData.buildPrompt === "function") return moduleData.buildPrompt();
+  return "";
+}
+
 /**
  * Retrieves the fully resolved system prompt text and version identifier.
+ * For tcm-analysis with buildUserPrompt access, use getTcmAnalysisPrompt() instead.
  */
-export function getPrompt(key: PromptKey, manualOverride?: string) {
+export function getPrompt(key: PromptKey, manualOverride?: string): { version: string; prompt: string } {
   const versionKey = resolvePromptVersion(key, manualOverride);
   const group = PROMPT_REGISTRY[key];
-  const moduleData = (group.versions as any)[versionKey];
-
-  let promptText = "";
-  if (typeof moduleData.prompt === "string") {
-    promptText = moduleData.prompt;
-  } else if (typeof moduleData.buildPrompt === "function") {
-    promptText = moduleData.buildPrompt();
-  }
+  const moduleData = group.versions[versionKey as keyof typeof group.versions] as GenericVersionModule;
 
   return {
     version: `${key}-${versionKey}`,
-    prompt: promptText,
-    // Provide user prompt builder access if it exists in the active module
-    buildUserPrompt: moduleData.buildTcmAnalysisUserPrompt as typeof tcmAnalysisV1_6.buildTcmAnalysisUserPrompt | undefined,
+    prompt: resolvePromptText(moduleData),
+  };
+}
+
+/**
+ * Typed accessor for the tcm-analysis prompt family.
+ * Returns the prompt text and the buildUserPrompt builder with correct types.
+ */
+export function getTcmAnalysisPrompt(manualOverride?: string) {
+  const versionKey = resolvePromptVersion("tcm-analysis", manualOverride) as keyof TcmAnalysisVersions;
+  const moduleData = PROMPT_REGISTRY["tcm-analysis"].versions[versionKey];
+
+  return {
+    version: `tcm-analysis-${versionKey}`,
+    prompt: moduleData.prompt,
+    buildUserPrompt: moduleData.buildTcmAnalysisUserPrompt,
   };
 }

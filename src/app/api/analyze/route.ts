@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { after } from "next/server";
 import { callDeepSeekJson, DeepSeekError, getDeepSeekFastModel } from "@/lib/ai/deepseek";
 import { apiError } from "@/lib/apiResponses";
-import { getPrompt } from "@/lib/prompts";
+import { getTcmAnalysisPrompt } from "@/lib/prompts";
 import { structuredCaseSchema } from "@/lib/forms/caseSchema";
 import { logServerEvent } from "@/lib/logging";
 import { logActivity } from "@/lib/activityLog";
@@ -50,8 +50,7 @@ export async function POST(request: NextRequest) {
   const form = parsed.data;
 
   // Resolve system prompt and user prompt builder from registry
-  const { version: resolvedVersion, prompt: systemPrompt, buildUserPrompt } = getPrompt(
-    "tcm-analysis",
+  const { version: resolvedVersion, prompt: systemPrompt, buildUserPrompt } = getTcmAnalysisPrompt(
     body.promptVersion || body.version
   );
 
