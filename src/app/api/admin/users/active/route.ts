@@ -1,14 +1,17 @@
 import { NextResponse } from "next/server";
 import { createServerSupabaseClient, getServiceRoleClient } from "@/lib/supabase/server";
-import { isAdminDoctorEmail, normalizeDoctorEmail } from "@/lib/auth";
+import { getAuthDetail, normalizeDoctorEmail } from "@/lib/auth";
 import { apiError } from "@/lib/apiResponses";
 
 export async function POST(request: Request) {
   const supabase = await createServerSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user || !(await isAdminDoctorEmail(user.email))) {
-    return apiError(403, "UNAUTHORIZED", "仅管理员可修改用户状态。");
-  }
+  if (!user) return apiError(401, "UNAUTHORIZED", "请先登录后再使用。");
+
+  const { status, isAdmin } = await getAuthDetail(user.email);
+  if (status === "expired") return apiError(401, "UNAUTHORIZED", "会话已过期，请重新登录。");
+  if (status === "deactivated") return apiError(401, "UNAUTHORIZED", "账号已停用，请联系管理员。");
+  if (status !== "ok" || !isAdmin) return apiError(403, "UNAUTHORIZED", "仅管理员可修改用户状态。");
 
   let body: { email?: unknown; isActive?: unknown };
   try {

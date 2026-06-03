@@ -155,16 +155,36 @@ export async function isAllowedDoctorEmail(email?: string | null) {
 }
 
 export async function isAdminDoctorEmail(email?: string | null) {
+  const { status, isAdmin } = await getAuthDetail(email);
+  return status === "ok" && isAdmin;
+}
+
+/**
+ * Single-query alternative to calling getAuthStatus + isAdminDoctorEmail separately.
+ * Use when both pieces are needed (admin API routes, admin layout) to avoid a second
+ * round-trip to Supabase.
+ */
+export async function getAuthDetail(
+  email?: string | null,
+): Promise<{ status: AuthStatus; isAdmin: boolean }> {
   const normalized = normalizeDoctorEmail(email);
-  if (!normalized) return false;
+  if (!normalized) return { status: "not_allowed", isAdmin: false };
 
   const record = await fetchAllowlistRecord(normalized);
-  if (!record || record.is_active === false || record.is_admin !== true) return false;
+
+  if (!record) {
+    const inEnv = parseEnvAllowlist().includes(normalized);
+    return { status: inEnv ? "ok" : "not_allowed", isAdmin: false };
+  }
+
+  if (record.is_active === false) return { status: "deactivated", isAdmin: false };
 
   if (record.last_signin_at) {
     const ageMs = Date.now() - new Date(record.last_signin_at).getTime();
-    if (ageMs > SESSION_MAX_AGE_DAYS * 24 * 60 * 60 * 1000) return false;
+    if (ageMs > SESSION_MAX_AGE_DAYS * 24 * 60 * 60 * 1000) {
+      return { status: "expired", isAdmin: false };
+    }
   }
 
-  return true;
+  return { status: "ok", isAdmin: record.is_admin === true };
 }
