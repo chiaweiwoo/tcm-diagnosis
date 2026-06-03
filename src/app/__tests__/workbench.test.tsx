@@ -672,6 +672,10 @@ describe("Analyze flow", () => {
     await waitFor(() => screen.getByText("\u5386\u53f2\u8bb0\u5f55"));
     await user.click(screen.getByText("\u5973 55 \u53cd\u590d\u5934\u6655\u76ee\u773c1\u5e74"));
 
+    // Row click now shows inline confirm \u2014 confirm to load
+    await waitFor(() => screen.getByText("\u8f7d\u5165\u6b64\u75c5\u6848\uff1f\u5f53\u524d\u5185\u5bb9\u5c06\u88ab\u66ff\u6362\u3002"));
+    await user.click(screen.getByRole("button", { name: "\u786e\u8ba4" }));
+
     await waitFor(() => {
       expect(document.querySelector(".case-linkage-rail")).not.toBeNull();
     });
@@ -783,9 +787,9 @@ describe("Analyze flow", () => {
     await waitFor(() => screen.getByLabelText("删除病案"));
     await user.click(screen.getByLabelText("删除病案"));
 
-    // Custom dialog — click confirm to proceed with deletion
-    await waitFor(() => screen.getByRole("alertdialog"));
-    await user.click(screen.getByText("继续离开"));
+    // Inline confirm strip — click confirm to proceed with deletion
+    await waitFor(() => screen.getByText("确认删除此病案？操作不可撤销。"));
+    await user.click(screen.getByRole("button", { name: "确认" }));
 
     const fetchMock = vi.mocked(global.fetch);
     await waitFor(() =>

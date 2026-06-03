@@ -196,6 +196,7 @@ Helps registered TCM doctors:
 - Receive simplified-Chinese clinical review output directly
 - Save consultation history for later comparison
 - Leave optional `病案编号 Case ID`, `随访病案编号 Follow-up Case ID`, and `给AI回馈 Feedback to AI` notes on analyzed records
+- Create follow-up consultations (随访) from any existing record with one click
 
 ---
 
@@ -325,6 +326,7 @@ Never define a token only in `workbench.css` — admin pages won't see it. Add i
 - Analyze always uses `DEEPSEEK_MODEL_FAST` (flash). No mode selector exposed to doctors.
 - All clinical fields remain editable at all times — including after analysis. When clinical inputs differ from the snapshot at last analysis, the workbench shows a stale-analysis warning banner. The `analysis_stale` DB column persists this warning across page reloads.
 - Metadata fields (`病案编号 Case ID`, `随访病案编号 Follow-up Case ID`, `给AI回馈 Feedback to AI`) save through the header `保存` button.
+- **随访 Follow-up workflow**: In the history modal, each row exposes a `随访` button (hover to reveal, next to delete). Clicking shows an always-on inline confirm strip. On confirm, `handleFollowUp(source)` pre-populates the form from `source.form_data`, clears `caseId`, sets `relatedCaseId = source.case_id` (empty if source had none), clears `activeId`/result/feedback, and auto-focuses the 病案编号 input. A "随访自 #XXXXX" chip appears next to the 病案编号 label (transient — state only, not persisted, cleared on reload or record load). All three row actions (load, 随访, delete) require always-on inline confirmation; `confirmDiscardChanges` is bypassed for history modal actions.
 - Core analysis sections must be structurally stable — all sections always present, even if empty with a fallback string.
 - Analyze output reading order: 辨证警示 (if triggered) → 重点结论 → 当前思路 → 建议优化 → 可选思路 → 风险与提醒 → 随访监测 → 证据状态.
 - UI result layout: 3 columns — 判断 / 方案 / 随访监测. Plus optional 辨证警示 red banner, 重点结论 green banner, and 风险与提醒 yellow box.

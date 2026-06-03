@@ -11,11 +11,11 @@ A doctor-facing workbench that helps registered TCM practitioners review structu
 
 ## Features
 
-- **Structured 9-field form** — chief complaint, current illness, past history, physical exam (tongue + pulse required), diagnosis, pattern (证型), and prescription (herbal, acupuncture, or integrative)
+- **Structured 9-field form** — chief complaint, current illness, past history, physical exam (tongue + pulse required), diagnosis, pattern (证型), and prescription (方药 / 针灸 / 推拿 / 综合调理)
 - **AI clinical review** — three-column output: 判断 (assessment) / 方案 (treatment plan) / 随访监测 (follow-up), plus 重点结论 (key conclusions) and 风险与提醒 (risk alerts)
 - **辨证警示 diagnostic alert** — fires when AI detects critical inconsistencies (diagnosis↔symptom mismatch, pattern↔prescription 寒热矛盾, missed red-flag symptoms)
 - **Stale-analysis warning** — banner appears when form inputs diverge from the last analyzed snapshot
-- **Consultation history** — auto-saved, paginated, with Case ID / Follow-up Case ID / AI feedback fields
+- **Consultation history** — auto-saved, paginated, with Case ID / Follow-up Case ID / AI feedback fields; **随访 button** in the history modal pre-populates form from any prior case (one-click; auto-focuses Case ID input; "随访自 #XXXXX" chip shown after follow-up)
 - **Doctor Risk Nudge** — workbench left sidebar aggregator showing recurring AI caution themes (weight-only, no counts) with verbatim hover popup
 - **Doctor Profile Snapshot** — admin overlay (opens on doctor row click) with quality-signal rates and flagged-case list grouped by rule (critical alerts, non-clinical noise, short exam records, high-review-count cases, near-duplicate prescriptions); on-demand cached per doctor
 - **Admin tools** — doctor allowlist management, doctor profile overlay, 30-day activity sparkline per doctor, fleet-wide AI output audit, impersonation preview (`/?viewAs=<doctorId>`) for non-self doctors
@@ -179,23 +179,60 @@ node scratch/consistency_check.mjs --runs 5 --email doctor@example.com
 
 ## Historical Data Ingestion
 
-Supports bulk import from Odoo Excel exports (e.g. `nova_data_may.xls`).
+Historical ingestion is a staged pipeline, not a one-shot import. Every run starts from a chosen Excel export and stops at review gates before the next stage.
+
+Required source columns:
+
+- `Order Ref` or `External ID`
+- `Created on`
+- `Diagnosed By 诊断医师`
+- `Patient 患者`
+- `Age`
+- `Presenting Complaint 主诉`
+- `History of Presenting Complaint 现病史`
+- `Diagnosis 诊断`
+- `Treatment 治疗描述`
+- `Past Medical History 既往史`
+- `Medical Examination 体格检查`
+
+Default ingestion window:
+
+- Day-based latest 31 days from `MAX(Created on)`
+- `Age`-invalid rows are dropped only when they are under 10% of the selected window; otherwise stop and fix the export
+- `External ID` may replace `Order Ref` only when it is a stable Odoo row id such as `__export__.pos_order_69213`
+
+Run order:
 
 ```bash
-# 1. Clean and restructure raw export
-python scratch/clean_historical_data.py
+# 1. Deterministic pre-LLM package
+npm run hist:prepare -- --file "C:\path\to\pos.order.xls" --out-dir "output\historical_ingestion\batch_name"
 
-# 2. Insert into database (creates local JSON backup first)
-node --env-file=.env.local scratch/ingest_ardy_data.mjs
+# 2. Validate the pre-LLM package
+npm run hist:validate -- --input "output\historical_ingestion\batch_name\pre_llm_payload.json"
 
-# 3. Batch-analyze all imported draft records
-node --env-file=.env.local scratch/analyze_batch_historical.mjs
+# 3. Sample LLM extraction first
+npm run hist:extract -- --input "output\historical_ingestion\batch_name\pre_llm_payload.json" --output "output\historical_ingestion\batch_name\llm_sample.json" --sample 20
 
-# 4. Verify row counts, date boundaries, and draft→analyzed conversions
-node --env-file=.env.local scratch/check_ardy_rows.mjs
+# 4. Validate the sample extraction
+npm run hist:validate -- --input "output\historical_ingestion\batch_name\llm_sample.json"
+
+# 5. Dry-run sample upsert using a doctor map
+npm run hist:upsert -- --input "output\historical_ingestion\batch_name\llm_sample.json" --doctor-map "scratch\historical_doctor_map.json" --dry-run
+
+# 6. After approval and migration 033, apply sample upsert
+npm run hist:upsert -- --input "output\historical_ingestion\batch_name\llm_sample.json" --doctor-map "scratch\historical_doctor_map.json" --apply
+
+# 7. Post-push verification
+npm run hist:verify -- --batch batch_name --expected "output\historical_ingestion\batch_name\llm_sample.json"
 ```
 
-> **Always take a Supabase SQL snapshot backup before running ingestion.** The ingest script creates a local JSON backup under `output/` (gitignored) but a server-side backup is the safer first step.
+Notes:
+
+- `hist:extract` uses DeepSeek Flash with batched calls, bounded parallelism, retries, and single-row fallback for failed batches.
+- Do sample extraction and sample upsert first. Only run the full month after the sample path is approved.
+- Create `scratch\historical_doctor_map.json` from `scratch\historical_doctor_map.example.json` before any dry-run or apply step.
+- Placeholder doctor emails such as `users_129@gmail.com` are allowed for historical import review, but they must still resolve to real Supabase `auth.users.id` rows before insert.
+- Run `supabase/migrations/033_consultations_doctor_case_unique.sql` in the Supabase SQL Editor before any real upsert. It adds the `(doctor_id, case_id)` uniqueness required for idempotent import.
 
 ---
 
