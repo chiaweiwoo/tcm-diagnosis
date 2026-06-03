@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import type { DoctorRow } from "./page";
@@ -21,18 +21,24 @@ function formatSGT(iso: string | null) {
 
 function Sparkline({ counts }: { counts: number[] }) {
   const max = Math.max(...counts, 1);
-  return (
-    <div className="spark-wrap">
-      {counts.map((c, i) => (
-        <div
-          key={i}
-          className={`spark-bar${c === 0 ? " spark-bar--zero" : ""}`}
-          style={{ height: c === 0 ? "2px" : `${Math.max(Math.round((c / max) * 100), 15)}%` }}
-          title={`${c} 条`}
-        />
-      ))}
-    </div>
-  );
+  const todayDow = new Date().getDay(); // 0=Sun … 6=Sat
+  const items: React.ReactNode[] = [];
+  counts.forEach((c, i) => {
+    const dow = ((todayDow - (29 - i)) % 7 + 7) % 7;
+    items.push(
+      <div
+        key={i}
+        className={`spark-bar${c === 0 ? " spark-bar--zero" : ""}`}
+        style={{ height: c === 0 ? "2px" : `${Math.max(Math.round((c / max) * 100), 15)}%` }}
+        title={`${c} 条`}
+      />
+    );
+    // dotted separator after every Sunday bar (between Sun and Mon)
+    if (dow === 0 && i < 29) {
+      items.push(<div key={`sep-${i}`} className="spark-week-sep" />);
+    }
+  });
+  return <div className="spark-wrap">{items}</div>;
 }
 
 export function UsersList({
