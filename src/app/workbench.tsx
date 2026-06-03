@@ -13,7 +13,6 @@ import {
   Save,
   Search,
   LayoutDashboard,
-  Trash2,
   X,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -44,7 +43,7 @@ type ConsultationSummary = {
   case_id_updated_at: string | null;
   related_case_id: string | null;
   related_case_id_updated_at: string | null;
-  form_data: StructuredCaseForm | null;
+  form_data: unknown | null;
   analysis_status: "draft" | "analyzed";
   created_at: string;
   updated_at: string;
@@ -285,7 +284,13 @@ const Toast = memo(function Toast({ toast, onClose }: { toast: ToastState; onClo
   );
 });
 
-type ConfirmDialogState = { message: string; isClinical: boolean; resolve: (ok: boolean) => void };
+type ConfirmDialogState = {
+  title?: string;
+  message: string;
+  confirmLabel: string;
+  confirmTone?: "primary" | "danger";
+  resolve: (ok: boolean) => void;
+};
 
 const ConfirmDialog = memo(function ConfirmDialog({
   state,
@@ -297,13 +302,17 @@ const ConfirmDialog = memo(function ConfirmDialog({
   return (
     <div className="confirm-overlay" role="presentation">
       <div className="confirm-dialog" role="alertdialog" aria-modal="true">
+        {state.title ? <h3 className="confirm-dialog__title">{state.title}</h3> : null}
         <p className="confirm-dialog__message">{state.message}</p>
         <div className="confirm-dialog__actions">
           <button className="btn btn--ghost btn--sm" onClick={() => onResolve(false)}>
             取消
           </button>
-          <button className="btn btn--primary btn--sm" onClick={() => onResolve(true)}>
-            {state.isClinical ? "继续（不保存）" : "继续离开"}
+          <button
+            className={`btn btn--sm ${state.confirmTone === "danger" ? "btn--danger" : "btn--primary"}`}
+            onClick={() => onResolve(true)}
+          >
+            {state.confirmLabel}
           </button>
         </div>
       </div>
@@ -389,8 +398,11 @@ function ShimmerCard() {
 
 function buildDisplayName(c: ConsultationSummary): string {
   if (c.consultation_name) return c.consultation_name;
-  if (c.form_data) {
-    const { patientSex, patientAge, chiefComplaint } = c.form_data;
+  if (c.form_data && typeof c.form_data === "object") {
+    const raw = c.form_data as Record<string, unknown>;
+    const patientSex = typeof raw.patientSex === "string" ? raw.patientSex : null;
+    const patientAge = typeof raw.patientAge === "string" ? raw.patientAge : null;
+    const chiefComplaint = typeof raw.chiefComplaint === "string" ? raw.chiefComplaint : null;
     const parts = [
       patientSex,
       patientAge ? `${patientAge}岁` : null,
@@ -429,6 +441,19 @@ function formatSavedTime(d: Date) {
 function normalizeCaseId(value: string) {
   const trimmed = value.trim();
   return trimmed ? trimmed : null;
+}
+
+function parseHistoricalFormData(formData: unknown): StructuredCaseForm | null {
+  if (!formData || typeof formData !== "object") return null;
+  const raw = formData as Record<string, unknown>;
+  const coerced = {
+    ...raw,
+    prescriptionType: Array.isArray(raw.prescriptionType)
+      ? (raw.prescriptionType[0] ?? "方药")
+      : raw.prescriptionType,
+  };
+  const parsed = structuredCaseSchema.safeParse(coerced);
+  return parsed.success ? parsed.data : null;
 }
 
 function getConsultationSortTime(record: Pick<ConsultationSummary, "created_at">) {
@@ -619,12 +644,6 @@ const CaseLinkTimeline = memo(function CaseLinkTimeline({
   );
 });
 
-// ---------------------------------------------------------------------------
-// History panel
-// ---------------------------------------------------------------------------
-
-type RowConfirm = { type: "load" | "followUp" | "delete"; id: string };
-
 const HistoryPanel = memo(function HistoryPanel({
   consultations,
   activeId,
@@ -645,7 +664,6 @@ const HistoryPanel = memo(function HistoryPanel({
   readOnly?: boolean;
 }) {
   const [query, setQuery] = useState("");
-  const [rowConfirm, setRowConfirm] = useState<RowConfirm | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   // Focus search on open and close on Escape
@@ -710,100 +728,74 @@ const HistoryPanel = memo(function HistoryPanel({
           )}
         </div>
 
-        <div className="history-table-head" aria-hidden>
-          <span className="history-table-head__name">病案</span>
-          <span className="history-table-head__case">病案编号</span>
-          <span className="history-table-head__related">随访编号</span>
-          <span className="history-table-head__time">创建时间</span>
-        </div>
-
-        {/* List */}
-        <div className="history-modal__list">
-          {loading && <div className="history-modal__empty">加载中…</div>}
-          {!loading && filtered.length === 0 && (
-            <div className="history-modal__empty">
-              {query ? "无匹配记录" : "暂无历史记录"}
+        <div className="history-table-shell">
+          <div className={`history-table${readOnly ? " history-table--readonly" : ""}`}>
+            <div className="history-table-head" aria-hidden>
+              <span className="history-table-head__name">病案</span>
+              <span className="history-table-head__pills">编号 / 随访</span>
+              <span className="history-table-head__time">创建时间</span>
+              {!readOnly ? <span className="history-table-head__actions">操作</span> : null}
             </div>
-          )}
-          {filtered.map((c) => {
-            const isConfirming = rowConfirm?.id === c.id;
-            const confirmType = isConfirming ? rowConfirm.type : null;
-            return (
-              <div
-                key={c.id}
-                className={`history-item${c.id === activeId ? " history-item--active" : ""}${isConfirming ? " history-item--confirming" : ""}`}
-              >
-                <div
-                  className="history-item__content"
-                  onClick={() => { if (!isConfirming) setRowConfirm({ type: "load", id: c.id }); }}
-                >
-                  <div className="history-item__name">{buildDisplayName(c)}</div>
-                  <div className="history-item__pills">
-                    {c.case_id ? (
-                      <span className="history-item__pill history-item__pill--case">{c.case_id}</span>
-                    ) : (
-                      <span className="history-item__pill-spacer" aria-hidden />
-                    )}
-                    {c.related_case_id ? (
-                      <span className="history-item__pill history-item__pill--related">{c.related_case_id}</span>
-                    ) : (
-                      <span className="history-item__pill-spacer" aria-hidden />
-                    )}
-                  </div>
-                  <div className="history-item__meta">
-                    <span>{formatDate(c.created_at)}</span>
-                  </div>
-                  {!readOnly ? (
-                    <div className="history-item__actions">
-                      <button
-                        className="history-item__followup-btn"
-                        onClick={(e) => { e.stopPropagation(); setRowConfirm({ type: "followUp", id: c.id }); }}
-                        title="创建随访记录"
-                        aria-label="随访"
-                      >
-                        随访
-                      </button>
-                      <button
-                        className="history-item__delete"
-                        onClick={(e) => { e.stopPropagation(); setRowConfirm({ type: "delete", id: c.id }); }}
-                        title="删除"
-                        aria-label="删除病案"
-                      >
-                        <Trash2 size={12} />
-                      </button>
-                    </div>
-                  ) : null}
+
+            <div className="history-modal__list">
+              {loading && <div className="history-modal__empty">加载中…</div>}
+              {!loading && filtered.length === 0 && (
+                <div className="history-modal__empty">
+                  {query ? "无匹配记录" : "暂无历史记录"}
                 </div>
-                {isConfirming && (
-                  <div className="history-row-confirm">
-                    <span className="history-row-confirm__msg">
-                      {confirmType === "load" && "载入此病案？当前内容将被替换。"}
-                      {confirmType === "followUp" && "以此病案为基础创建随访？当前内容将被替换。"}
-                      {confirmType === "delete" && "确认删除此病案？操作不可撤销。"}
-                    </span>
-                    <button
-                      className="btn btn--ghost btn--sm"
-                      onClick={() => setRowConfirm(null)}
-                    >
-                      取消
-                    </button>
-                    <button
-                      className={`btn btn--sm ${confirmType === "delete" ? "btn--danger" : "btn--primary"}`}
-                      onClick={() => {
-                        const type = confirmType;
-                        setRowConfirm(null);
-                        if (type === "load") { onSelect(c.id); onClose(); }
-                        else if (type === "followUp") { onFollowUp(c); onClose(); }
-                        else if (type === "delete") { onDelete(c.id); }
-                      }}
-                    >
-                      确认
-                    </button>
+              )}
+              {filtered.map((c) => {
+                const displayName = buildDisplayName(c);
+                const createdAt = formatDate(c.created_at);
+                return (
+                  <div
+                    key={c.id}
+                    className={`history-item${c.id === activeId ? " history-item--active" : ""}`}
+                  >
+                    <div className="history-item__content" onClick={() => onSelect(c.id)}>
+                      <div className="history-item__name" title={displayName}>{displayName}</div>
+                      <div className="history-item__pills">
+                        {c.case_id ? (
+                          <span className="history-item__pill history-item__pill--case" title={c.case_id}>{c.case_id}</span>
+                        ) : null}
+                        {c.related_case_id ? (
+                          <span className="history-item__pill history-item__pill--related" title={c.related_case_id}>{c.related_case_id}</span>
+                        ) : null}
+                      </div>
+                      <div className="history-item__meta" title={createdAt}>
+                        <span>{createdAt}</span>
+                      </div>
+                      {!readOnly ? (
+                        <div className="history-item__actions">
+                          <button
+                            className="btn btn--ghost btn--sm history-item__action-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onFollowUp(c);
+                            }}
+                            title="创建随访记录"
+                          >
+                            随访
+                          </button>
+                          <button
+                            className="btn btn--ghost btn--sm history-item__action-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDelete(c.id);
+                            }}
+                            aria-label="删除病案"
+                            title="删除病案"
+                          >
+                            删除
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
-                )}
-              </div>
-            );
-          })}
+                );
+              })}
+            </div>
+          </div>
         </div>
 
         {!loading && consultations.length > 0 && (
@@ -906,7 +898,6 @@ export default function Workbench({
 
   const [analyzing, setAnalyzing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [followUpSourceCaseId, setFollowUpSourceCaseId] = useState<string | null>(null);
   const caseIdInputRef = useRef<HTMLInputElement>(null);
 
   const [consultations, setConsultations] = useState<ConsultationSummary[]>([]);
@@ -979,18 +970,29 @@ export default function Workbench({
   }, []);
   const dismissToast = useCallback(() => setToast(null), []);
 
+  const openConfirmDialog = useCallback((options: Omit<ConfirmDialogState, "resolve">): Promise<boolean> => {
+    return new Promise((resolve) => {
+      setConfirmDialogState({ ...options, resolve });
+    });
+  }, []);
+
+  const buildHistoryDiscardWarning = useCallback(() => {
+    if (!hasUnsavedChanges) return null;
+    return clinicalDirty
+      ? "当前病案输入已修改但尚未保存，继续后将丢失。修改内容可能影响AI分析结果。"
+      : "当前病案编号、随访病案编号或给AI回馈尚未保存，继续后将丢失。";
+  }, [clinicalDirty, hasUnsavedChanges]);
+
   const confirmDiscardChanges = useCallback((): Promise<boolean> => {
     if (!hasUnsavedChanges) return Promise.resolve(true);
-    return new Promise((resolve) => {
-      setConfirmDialogState({
-        isClinical: clinicalDirty,
-        message: clinicalDirty
-          ? "病案输入已修改但尚未保存，离开后将丢失。建议先保存并重新分析以获取最新AI建议。"
-          : "病案编号、随访病案编号或给AI回馈尚未保存，离开后将丢失。",
-        resolve,
-      });
+    return openConfirmDialog({
+      title: "未保存修改",
+      message: clinicalDirty
+        ? "病案输入已修改但尚未保存，离开后将丢失。建议先保存并重新分析以获取最新AI建议。"
+        : "病案编号、随访病案编号或给AI回馈尚未保存，离开后将丢失。",
+      confirmLabel: clinicalDirty ? "继续（不保存）" : "继续离开",
     });
-  }, [clinicalDirty, hasUnsavedChanges]);
+  }, [clinicalDirty, hasUnsavedChanges, openConfirmDialog]);
 
   useEffect(() => {
     if (!hasUnsavedChanges) return;
@@ -1013,7 +1015,7 @@ export default function Workbench({
   // Restore consultation from ?id= on page load / refresh
   const initialId = useRef(searchParams.get("id"));
   useEffect(() => {
-    if (initialId.current) void handleSelectHistory(initialId.current);
+    if (initialId.current) void loadConsultationIntoWorkbench(initialId.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -1063,7 +1065,6 @@ export default function Workbench({
     setHistoryOpen(false);
     setSaveStatus("new");
     setSavedAt(null);
-    setFollowUpSourceCaseId(null);
     router.replace(buildUrl(), { scroll: false });
   }, [router, buildUrl]);
 
@@ -1072,31 +1073,24 @@ export default function Workbench({
     resetWorkbenchToNew();
   }
 
-  async function handleSelectHistory(id: string, skipDiscardConfirm = false) {
-    if (!skipDiscardConfirm && id !== activeId && !await confirmDiscardChanges()) return;
+  async function loadConsultationIntoWorkbench(id: string) {
     try {
       let nextForm = EMPTY_FORM;
+      let formWarning: string | null = null;
       const record = await apiGetConsultation(id, viewAs?.doctorId);
-      if (record.form_data) {
-        // Backward compat: records saved before the prescriptionType array→string
-        // migration store the value as e.g. ["方药"]. Normalize before parsing.
-        const raw = record.form_data as Record<string, unknown>;
-        const coerced = {
-          ...raw,
-          prescriptionType: Array.isArray(raw.prescriptionType)
-            ? (raw.prescriptionType[0] ?? "方药")
-            : raw.prescriptionType,
-        };
-        const parsed = structuredCaseSchema.safeParse(coerced);
-        if (parsed.success) {
-          nextForm = parsed.data;
-          setForm(parsed.data);
-          setTouched(new Set(REQUIRED_FIELDS));
-        }
+      const parsedForm = parseHistoricalFormData(record.form_data);
+      if (parsedForm) {
+        nextForm = parsedForm;
+        setForm(parsedForm);
+        setTouched(new Set(REQUIRED_FIELDS));
+      } else {
+        setForm(EMPTY_FORM);
+        setTouched(new Set());
+        formWarning = "此病案的临床输入无法读取，已载入空白表单。";
       }
       const analysis = ensureAnalysisResult(
         record.analysis_result,
-        normalizePrescriptionType((record.form_data as StructuredCaseForm | null | undefined)?.prescriptionType),
+        normalizePrescriptionType(parsedForm?.prescriptionType),
       );
       setResult(analysis);
       setMeta(record.model_meta ?? null);
@@ -1117,49 +1111,27 @@ export default function Workbench({
       setHistoryOpen(false);
       setSaveStatus("saved");
       setSavedAt(new Date(record.updated_at));
-      setFollowUpSourceCaseId(null);
-      showToast("已加载病案。", "success");
+      showToast(formWarning ?? "已加载病案。", formWarning ? "info" : "success");
       router.replace(buildUrl({ id }), { scroll: false });
     } catch {
       showToast("读取病案记录失败。", "error");
     }
   }
 
-  async function handleDeleteHistory(id: string) {
-    try {
-      await apiDeleteConsultation(id, viewAs?.doctorId);
-      setConsultations((prev) => prev.filter((c) => c.id !== id));
-      if (activeId === id) {
-        resetWorkbenchToNew();
-      }
-      showToast("已删除。", "success");
-    } catch {
-      showToast("删除失败，请稍后重试。", "error");
+  function createFollowUpDraft(source: ConsultationSummary) {
+    const parsedForm = parseHistoricalFormData(source.form_data);
+    if (!parsedForm) {
+      showToast("此病案缺少可用的临床输入，无法创建随访。", "error");
+      return;
     }
-  }
-
-  function handleFollowUp(source: ConsultationSummary) {
-    if (source.form_data) {
-      const raw = source.form_data as Record<string, unknown>;
-      const coerced = {
-        ...raw,
-        prescriptionType: Array.isArray(raw.prescriptionType)
-          ? (raw.prescriptionType[0] ?? "方药")
-          : raw.prescriptionType,
-      };
-      const parsed = structuredCaseSchema.safeParse(coerced);
-      if (parsed.success) {
-        setForm(parsed.data);
-        setTouched(new Set(REQUIRED_FIELDS));
-      }
-    }
+    setForm(parsedForm);
+    setTouched(new Set(REQUIRED_FIELDS));
     setResult(null);
     setMeta(null);
     setRawResult(null);
     setCaseId("");
     setSavedCaseId(null);
-    const sourceCase = source.case_id ?? "";
-    setRelatedCaseId(sourceCase);
+    setRelatedCaseId(source.case_id ?? "");
     setSavedRelatedCaseId(null);
     setFeedback("");
     setFeedbackUpdatedAt(null);
@@ -1173,9 +1145,63 @@ export default function Workbench({
     setHistoryOpen(false);
     setSaveStatus("unsaved");
     setSavedAt(null);
-    setFollowUpSourceCaseId(source.case_id || null);
     router.replace(buildUrl(), { scroll: false });
     setTimeout(() => caseIdInputRef.current?.focus(), 80);
+  }
+
+  async function handleHistorySelect(id: string) {
+    const warning = buildHistoryDiscardWarning();
+    const ok = await openConfirmDialog({
+      title: "载入病案",
+      message: warning
+        ? `载入此病案将替换当前工作台内容。\n\n${warning}`
+        : "载入此病案将替换当前工作台内容。",
+      confirmLabel: "载入",
+    });
+    if (!ok) return;
+    await loadConsultationIntoWorkbench(id);
+  }
+
+  async function handleHistoryFollowUp(source: ConsultationSummary) {
+    const warning = buildHistoryDiscardWarning();
+    const ok = await openConfirmDialog({
+      title: "创建随访",
+      message: warning
+        ? `将以此病案的临床输入创建新的随访记录。\n\n${warning}`
+        : "将以此病案的临床输入创建新的随访记录。",
+      confirmLabel: "创建随访",
+    });
+    if (!ok) return;
+    createFollowUpDraft(source);
+  }
+
+  async function handleHistoryDelete(id: string) {
+    const warning = activeId === id ? buildHistoryDiscardWarning() : null;
+    const ok = await openConfirmDialog({
+      title: "删除病案",
+      message: warning
+        ? `删除此病案后不可撤销。\n\n${warning}`
+        : "删除此病案后不可撤销。",
+      confirmLabel: "删除",
+      confirmTone: "danger",
+    });
+    if (!ok) return;
+
+    try {
+      await apiDeleteConsultation(id, viewAs?.doctorId);
+      setConsultations((prev) => prev.filter((c) => c.id !== id));
+      if (activeId === id) {
+        resetWorkbenchToNew();
+      }
+      showToast("已删除。", "success");
+    } catch {
+      showToast("删除失败，请稍后重试。", "error");
+    }
+  }
+
+  async function handleTimelineSelect(id: string) {
+    if (!await confirmDiscardChanges()) return;
+    await loadConsultationIntoWorkbench(id);
   }
 
   async function handleAnalyze() {
@@ -1410,9 +1436,9 @@ export default function Workbench({
               <HistoryPanel
                 consultations={consultations}
                 activeId={activeId}
-                onSelect={(id) => void handleSelectHistory(id, true)}
-                onFollowUp={(source) => handleFollowUp(source)}
-                onDelete={(id) => void handleDeleteHistory(id)}
+                onSelect={(id) => void handleHistorySelect(id)}
+                onFollowUp={(source) => void handleHistoryFollowUp(source)}
+                onDelete={(id) => void handleHistoryDelete(id)}
                 onClose={() => setHistoryOpen(false)}
                 loading={historyLoading}
                 readOnly={isReadOnly}
@@ -1538,12 +1564,7 @@ export default function Workbench({
                 </div>
               </fieldset>
               <div className="form-group">
-                <label className="form-label" htmlFor="case-id-input">
-                  病案编号 Case ID
-                  {followUpSourceCaseId && (
-                    <span className="followup-source-chip">随访自 #{followUpSourceCaseId}</span>
-                  )}
-                </label>
+                <label className="form-label" htmlFor="case-id-input">病案编号 Case ID</label>
                 <input
                   ref={caseIdInputRef}
                   id="case-id-input"
@@ -1866,7 +1887,7 @@ export default function Workbench({
                     })
                   : null
               }
-              onSelect={(id) => void handleSelectHistory(id)}
+              onSelect={(id) => void handleTimelineSelect(id)}
             />
           </aside>
 
