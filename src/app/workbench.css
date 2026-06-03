@@ -246,7 +246,7 @@
   border-radius: var(--radius-lg);
   box-shadow: 0 20px 60px rgba(10, 5, 5, 0.18);
   width: 100%;
-  max-width: 720px;
+  max-width: min(920px, calc(100vw - 32px));
   max-height: 80vh;
   display: flex;
   flex-direction: column;
@@ -347,26 +347,44 @@
   color: var(--text);
 }
 
+.history-table-shell {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.history-table {
+  --history-columns: minmax(280px, 1fr) 112px 112px 160px 120px;
+  min-width: 840px;
+}
+
+.history-table--readonly {
+  --history-columns: minmax(280px, 1fr) 112px 112px 160px;
+  min-width: 664px;
+}
+
 .history-table-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 104px 104px 136px;
+  grid-template-columns: var(--history-columns);
   align-items: center;
   column-gap: 12px;
-  padding: 8px 40px 8px 12px;
+  padding: 8px 12px;
   border-bottom: 1px solid var(--border);
   background: #fcfaf7;
   font-size: 10.5px;
   color: var(--text-muted);
 }
 
-.history-table-head__time {
+.history-table-head__time,
+.history-table-head__actions {
   text-align: right;
 }
 
-/* List */
 .history-modal__list {
-  overflow-y: auto;
-  flex: 1;
+  min-width: inherit;
 }
 
 .history-modal__empty {
@@ -397,10 +415,10 @@
 
 .history-item__content {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 104px 104px 136px;
+  grid-template-columns: var(--history-columns);
   align-items: center;
   column-gap: 12px;
-  padding: 10px 12px;
+  padding: 5px 12px;
   cursor: pointer;
   transition: background 0.12s;
 }
@@ -413,11 +431,6 @@
   background: var(--brand-light);
 }
 
-.history-item--confirming .history-item__content {
-  opacity: 0.45;
-  pointer-events: none;
-}
-
 .history-item__name {
   min-width: 0;
   font-size: 12.5px;
@@ -426,10 +439,6 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.history-item__pills {
-  display: contents;
 }
 
 .history-item__pill {
@@ -474,62 +483,39 @@
 .history-item__actions {
   display: flex;
   align-items: center;
-  gap: 4px;
-  opacity: 0;
-  transition: opacity 0.15s;
+  gap: 6px;
   justify-content: flex-end;
 }
 
-.history-item__content:hover .history-item__actions {
-  opacity: 1;
-}
-
-.history-item__followup-btn {
+.history-item__action-btn {
   border: none;
-  background: var(--brand-light);
-  color: var(--brand);
   cursor: pointer;
   font-size: 11px;
   font-weight: 600;
+  line-height: 1;
   padding: 3px 7px;
   border-radius: 4px;
   white-space: nowrap;
 }
 
-.history-item__followup-btn:hover {
+.history-item__action-btn--followup {
+  background: var(--brand-light);
+  color: var(--brand);
+}
+
+.history-item__action-btn--followup:hover {
   background: var(--brand);
   color: #fff;
 }
 
-.history-item__delete {
-  border: none;
-  background: none;
-  cursor: pointer;
+.history-item__action-btn--delete {
+  background: transparent;
   color: var(--text-muted);
-  padding: 3px;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
 }
 
-.history-item__delete:hover {
+.history-item__action-btn--delete:hover {
   color: var(--error);
   background: var(--error-bg);
-}
-
-.history-row-confirm {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  background: var(--bg);
-  border-top: 1px solid var(--border);
-}
-
-.history-row-confirm__msg {
-  flex: 1;
-  font-size: 11.5px;
-  color: var(--text-muted);
 }
 
 .btn--danger {
@@ -540,20 +526,6 @@
 
 .btn--danger:hover:not(:disabled) {
   background: #b91c1c;
-}
-
-.followup-source-chip {
-  display: inline-flex;
-  align-items: center;
-  margin-left: 8px;
-  padding: 2px 8px;
-  background: #eef5fb;
-  color: #516d8b;
-  border-radius: 999px;
-  font-size: 10.5px;
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-  vertical-align: middle;
 }
 
 /* ---------- Main ---------- */
@@ -1452,7 +1424,7 @@ mark.critical-highlight {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 200;
+  z-index: 500;
 }
 
 .confirm-dialog {
@@ -1468,11 +1440,19 @@ mark.critical-highlight {
   gap: 20px;
 }
 
+.confirm-dialog__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+
 .confirm-dialog__message {
   font-size: 14px;
   color: var(--text);
   line-height: 1.6;
   margin: 0;
+  white-space: pre-wrap;
 }
 
 .confirm-dialog__actions {
@@ -1559,58 +1539,7 @@ mark.critical-highlight {
   }
 
   .history-modal {
-    max-width: min(720px, calc(100vw - 24px));
-  }
-
-  .history-table-head {
-    display: none; /* Hide table head on mobile, items will stack/adjust */
-  }
-
-  .history-item__content {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 6px;
-    padding: 12px;
-  }
-
-  .history-item__name {
-    font-size: 14px;
-    white-space: normal;
-    overflow: visible;
-    text-overflow: clip;
-    width: 100%;
-  }
-
-  .history-item__pills {
-    display: flex;
-    gap: 6px;
-    width: 100%;
-  }
-
-  .history-item__pill {
-    width: auto;
-    min-width: 0;
-    flex: 1;
-  }
-
-  /* Spacer must not take space on mobile — otherwise it consumes the full
-     flex container width (from base `width: 100%`) and squeezes the pill
-     to near-zero, showing only the middle chars of centered text. */
-  .history-item__pill-spacer {
-    width: 0;
-    flex: 0 0 0;
-  }
-
-  .history-item__meta {
-    width: 100%;
-    text-align: left;
-    font-size: 12px;
-  }
-
-  .history-item__actions {
-    opacity: 1;
-    align-self: flex-end;
+    max-width: calc(100vw - 24px);
   }
 }
 
@@ -1806,63 +1735,9 @@ mark.critical-highlight {
     min-width: 0;
   }
 
-  .history-table-head {
-    grid-template-columns: minmax(0, 1fr) 80px 80px 116px;
-    column-gap: 8px;
-    padding: 8px 10px;
+  .history-modal__header {
+    padding: 12px 14px;
   }
-
-  .history-item__content {
-    grid-template-columns: minmax(0, 1fr) 80px 80px 116px;
-    column-gap: 8px;
-    padding: 9px 10px;
-  }
-
-  .history-table-head,
-  .history-item__name,
-  .history-item__pill,
-  .history-item__meta {
-    font-size: 10.5px;
-  }
-
-  .history-item__pill {
-    padding: 3px 6px;
-  }
-}
-
-@media (max-width: 480px) {
-  .workbench__brand-sub {
-    display: none;
-  }
-
-  .workbench__brand-mark {
-    width: 28px;
-    height: 28px;
-  }
-
-  .workbench__brand-title {
-    font-size: 13px;
-  }
-}
-
-/* ---------- Page footer ---------- */
-
-.workbench-footer {
-  max-width: 100%;
-  margin: 0 auto;
-  padding: 16px 24px 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  font-size: 11.5px;
-  color: var(--text-muted);
-  border-top: 1px solid var(--border);
-  margin-top: 12px;
-}
-
-.workbench-footer__sep {
-  opacity: 0.4;
 }
 
 /* ---------- Login page ---------- */
