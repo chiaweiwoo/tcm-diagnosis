@@ -449,9 +449,10 @@
 }
 
 .history-item__pills {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   align-items: center;
-  gap: 6px;
+  column-gap: 8px;
   min-width: 0;
 }
 
@@ -459,9 +460,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex: 0 1 auto;
   min-width: 0;
-  max-width: 100px;
+  width: 100%;
   padding: 2px 9px;
   border-radius: 999px;
   font-size: 10.5px;
@@ -469,6 +469,11 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.history-item__pill-slot {
+  display: block;
+  min-width: 0;
 }
 
 .history-item__pill--case {

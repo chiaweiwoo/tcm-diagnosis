@@ -755,12 +755,16 @@ const HistoryPanel = memo(function HistoryPanel({
                     <div className="history-item__content" onClick={() => onSelect(c.id)}>
                       <div className="history-item__name" title={displayName}>{displayName}</div>
                       <div className="history-item__pills">
-                        {c.case_id ? (
-                          <span className="history-item__pill history-item__pill--case" title={c.case_id}>{c.case_id}</span>
-                        ) : null}
-                        {c.related_case_id ? (
-                          <span className="history-item__pill history-item__pill--related" title={c.related_case_id}>{c.related_case_id}</span>
-                        ) : null}
+                        <span className="history-item__pill-slot">
+                          {c.case_id ? (
+                            <span className="history-item__pill history-item__pill--case" title={c.case_id}>{c.case_id}</span>
+                          ) : null}
+                        </span>
+                        <span className="history-item__pill-slot">
+                          {c.related_case_id ? (
+                            <span className="history-item__pill history-item__pill--related" title={c.related_case_id}>{c.related_case_id}</span>
+                          ) : null}
+                        </span>
                       </div>
                       <div className="history-item__meta" title={createdAt}>
                         <span>{createdAt}</span>

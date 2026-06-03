@@ -672,9 +672,9 @@ describe("Analyze flow", () => {
     await waitFor(() => screen.getByText("\u5386\u53f2\u8bb0\u5f55"));
     await user.click(screen.getByText("\u5973 55 \u53cd\u590d\u5934\u6655\u76ee\u773c1\u5e74"));
 
-    // Row click now shows inline confirm \u2014 confirm to load
-    await waitFor(() => screen.getByText("\u8f7d\u5165\u6b64\u75c5\u6848\uff1f\u5f53\u524d\u5185\u5bb9\u5c06\u88ab\u66ff\u6362\u3002"));
-    await user.click(screen.getByRole("button", { name: "\u786e\u8ba4" }));
+    await waitFor(() => screen.getByRole("alertdialog"));
+    expect(screen.getByRole("alertdialog").textContent).toContain("载入此病案将替换当前工作台内容。");
+    await user.click(screen.getByRole("button", { name: "载入" }));
 
     await waitFor(() => {
       expect(document.querySelector(".case-linkage-rail")).not.toBeNull();
@@ -787,9 +787,10 @@ describe("Analyze flow", () => {
     await waitFor(() => screen.getByLabelText("删除病案"));
     await user.click(screen.getByLabelText("删除病案"));
 
-    // Inline confirm strip — click confirm to proceed with deletion
-    await waitFor(() => screen.getByText("确认删除此病案？操作不可撤销。"));
-    await user.click(screen.getByRole("button", { name: "确认" }));
+    await waitFor(() => screen.getByRole("alertdialog"));
+    expect(screen.getByRole("alertdialog").textContent).toContain("删除此病案后不可撤销。");
+    expect(screen.getByRole("alertdialog").textContent).toContain("当前病案编号、随访病案编号或给AI回馈尚未保存");
+    await user.click(screen.getByRole("button", { name: "删除" }));
 
     const fetchMock = vi.mocked(global.fetch);
     await waitFor(() =>
@@ -894,6 +895,448 @@ describe("History panel", () => {
       expect(screen.getByText("000325")).toBeInTheDocument();
       expect(screen.getByText("000221")).toBeInTheDocument();
     });
+  });
+
+  it("shows visible follow-up and delete text buttons, and hides them in read-only preview", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string, init?: RequestInit) => {
+        const method = init?.method ?? "GET";
+        if (url === "/api/consultations" && method === "GET") {
+          return makeOkJson({
+            records: [
+              {
+                id: "case-actions",
+                consultation_name: null,
+                case_id: "000325",
+                case_id_updated_at: new Date().toISOString(),
+                related_case_id: "000221",
+                related_case_id_updated_at: new Date().toISOString(),
+                form_data: {
+                  patientSex: "女",
+                  patientAge: "35",
+                  chiefComplaint: "减肥",
+                },
+                analysis_status: "analyzed",
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                analyzed_at: new Date().toISOString(),
+              },
+            ],
+          });
+        }
+        return makeErrJson(404, "not found");
+      }),
+    );
+
+    const user = userEvent.setup();
+    const { rerender } = render(<Workbench />);
+    await waitFor(() => screen.getByText("历史"));
+    await user.click(screen.getByText("历史"));
+    await waitFor(() => screen.getByText("历史记录"));
+    expect(screen.getByRole("button", { name: "随访" })).toBeInTheDocument();
+    expect(screen.getByText("删除")).toBeInTheDocument();
+    await user.click(screen.getByLabelText("关闭"));
+    await waitFor(() => expect(screen.queryByText("历史记录")).not.toBeInTheDocument());
+
+    rerender(<Workbench viewAs={{ doctorId: "doctor-1", email: "doctor@example.com" }} />);
+    await waitFor(() => screen.getByText("只读预览"));
+    await user.click(screen.getByText("历史"));
+    await waitFor(() => screen.getByText("历史记录"));
+    expect(screen.queryByRole("button", { name: "随访" })).not.toBeInTheDocument();
+    expect(screen.queryByText("删除")).not.toBeInTheDocument();
+  });
+
+  it("creates a follow-up draft from a valid source and clears analysis state", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string, init?: RequestInit) => {
+        const method = init?.method ?? "GET";
+        if (url === "/api/consultations" && method === "GET") {
+          return makeOkJson({
+            records: [
+              {
+                id: "case-followup",
+                consultation_name: null,
+                case_id: "000325",
+                case_id_updated_at: new Date().toISOString(),
+                related_case_id: null,
+                related_case_id_updated_at: null,
+                form_data: {
+                  consultationName: "",
+                  prescriptionType: "方药",
+                  patientSex: "女",
+                  patientAge: "35",
+                  chiefComplaint: "减肥",
+                  currentIllness: "体重增加半年。",
+                  pastHistory: "无",
+                  physicalExam: "舌淡红苔薄白，脉细",
+                  diagnosis: "肥胖",
+                  pattern: "脾虚痰湿",
+                  prescription: "参苓白术散加减",
+                },
+                analysis_status: "analyzed",
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                analyzed_at: new Date().toISOString(),
+              },
+            ],
+          });
+        }
+        return makeErrJson(404, "not found");
+      }),
+    );
+
+    const user = userEvent.setup();
+    render(<Workbench />);
+    await waitFor(() => screen.getByText("历史"));
+    await user.click(screen.getByText("历史"));
+    await waitFor(() => screen.getByText("历史记录"));
+    await user.click(screen.getByRole("button", { name: "随访" }));
+    await waitFor(() => screen.getByRole("button", { name: "创建随访" }));
+    await user.click(screen.getByRole("button", { name: "创建随访" }));
+
+    expect(screen.getByPlaceholderText(/头痛眩晕反复发作/)).toHaveValue("减肥");
+    expect(screen.getByPlaceholderText("例：0004222")).toHaveValue("");
+    expect(screen.getByPlaceholderText("例：0004221")).toHaveValue("000325");
+    expect(screen.queryByText("给AI回馈 Feedback to AI")).not.toBeInTheDocument();
+    expect(screen.queryByText(/随访自 #/)).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByPlaceholderText("例：0004222")).toHaveFocus());
+  });
+
+  it("allows follow-up copy without linkage when the source has no case id", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string, init?: RequestInit) => {
+        const method = init?.method ?? "GET";
+        if (url === "/api/consultations" && method === "GET") {
+          return makeOkJson({
+            records: [
+              {
+                id: "case-no-id",
+                consultation_name: null,
+                case_id: null,
+                case_id_updated_at: null,
+                related_case_id: null,
+                related_case_id_updated_at: null,
+                form_data: {
+                  consultationName: "",
+                  prescriptionType: "方药",
+                  patientSex: "女",
+                  patientAge: "45",
+                  chiefComplaint: "湿疹反复发作",
+                  currentIllness: "湿疹三个月。",
+                  pastHistory: "无",
+                  physicalExam: "舌淡红苔白，脉细",
+                  diagnosis: "湿疹",
+                  pattern: "血虚风燥",
+                  prescription: "当归饮子加减",
+                },
+                analysis_status: "analyzed",
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                analyzed_at: new Date().toISOString(),
+              },
+            ],
+          });
+        }
+        return makeErrJson(404, "not found");
+      }),
+    );
+
+    const user = userEvent.setup();
+    render(<Workbench />);
+    await waitFor(() => screen.getByText("历史"));
+    await user.click(screen.getByText("历史"));
+    await waitFor(() => screen.getByText("历史记录"));
+    await user.click(screen.getByRole("button", { name: "随访" }));
+    await waitFor(() => screen.getByRole("button", { name: "创建随访" }));
+    await user.click(screen.getByRole("button", { name: "创建随访" }));
+
+    expect(screen.getByPlaceholderText("例：0004221")).toHaveValue("");
+  });
+
+  it("blocks follow-up when the source has no usable clinical form", async () => {
+    const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+      const method = init?.method ?? "GET";
+      if (url === "/api/consultations" && method === "GET") {
+        return makeOkJson({
+          records: [
+            {
+              id: "case-invalid-followup",
+              consultation_name: null,
+              case_id: "0005001",
+              case_id_updated_at: new Date().toISOString(),
+              related_case_id: null,
+              related_case_id_updated_at: null,
+              form_data: null,
+              analysis_status: "draft",
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              analyzed_at: null,
+            },
+          ],
+        });
+      }
+      return makeErrJson(404, "not found");
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const user = userEvent.setup();
+    render(<Workbench />);
+    await waitFor(() => screen.getByText("开始分析"));
+    await fillRequiredFields(user);
+    await user.click(screen.getByText("历史"));
+    await waitFor(() => screen.getByText("历史记录"));
+    await user.click(screen.getByRole("button", { name: "随访" }));
+    await waitFor(() => screen.getByRole("button", { name: "创建随访" }));
+    await user.click(screen.getByRole("button", { name: "创建随访" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert").textContent).toContain("此病案缺少可用的临床输入");
+    });
+    expect(screen.getByText("历史记录")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/头痛眩晕反复发作/)).toHaveValue("头痛眩晕反复发作");
+    expect(fetchMock.mock.calls.some(([url, options]) => String(url).includes("/api/consultations/") && options?.method === "PATCH")).toBe(false);
+  });
+
+  it("loads invalid historical forms as blank and shows a warning toast", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string, init?: RequestInit) => {
+        const method = init?.method ?? "GET";
+        if (url === "/api/consultations" && method === "GET") {
+          return makeOkJson({
+            records: [
+              {
+                id: "case-load-invalid",
+                consultation_name: null,
+                case_id: "000325",
+                case_id_updated_at: new Date().toISOString(),
+                related_case_id: "000221",
+                related_case_id_updated_at: new Date().toISOString(),
+                form_data: {
+                  patientSex: "女",
+                  patientAge: "52",
+                  chiefComplaint: "眩晕",
+                },
+                analysis_status: "draft",
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                analyzed_at: null,
+              },
+            ],
+          });
+        }
+        if (String(url).includes("/api/consultations/") && method === "GET") {
+          return makeOkJson({
+            record: {
+              id: "case-load-invalid",
+              form_data: { chiefComplaint: "只有主诉" },
+              analysis_result: null,
+              model_meta: null,
+              analysis_status: "draft",
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              analyzed_at: null,
+              consultation_name: null,
+              case_id: "000325",
+              case_id_updated_at: new Date().toISOString(),
+              related_case_id: "000221",
+              related_case_id_updated_at: new Date().toISOString(),
+              ai_feedback: null,
+              ai_feedback_updated_at: null,
+              analysis_raw: null,
+              analysis_stale: false,
+            },
+          });
+        }
+        return makeErrJson(404, "not found");
+      }),
+    );
+
+    const user = userEvent.setup();
+    render(<Workbench />);
+    await waitFor(() => screen.getByText("开始分析"));
+    await fillRequiredFields(user);
+    await user.click(screen.getByText("历史"));
+    await waitFor(() => screen.getByText("历史记录"));
+    await user.click(screen.getByText("女 52岁 眩晕"));
+    await waitFor(() => screen.getByRole("button", { name: "载入" }));
+    await user.click(screen.getByRole("button", { name: "载入" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert").textContent).toContain("此病案的临床输入无法读取");
+    });
+    expect(screen.getByPlaceholderText(/头痛眩晕反复发作/)).toHaveValue("");
+  });
+
+  it("loads missing historical forms as blank and shows a warning toast", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string, init?: RequestInit) => {
+        const method = init?.method ?? "GET";
+        if (url === "/api/consultations" && method === "GET") {
+          return makeOkJson({
+            records: [
+              {
+                id: "case-load-missing",
+                consultation_name: "缺少表单",
+                case_id: "000326",
+                case_id_updated_at: new Date().toISOString(),
+                related_case_id: null,
+                related_case_id_updated_at: null,
+                form_data: null,
+                analysis_status: "draft",
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                analyzed_at: null,
+              },
+            ],
+          });
+        }
+        if (String(url).includes("/api/consultations/") && method === "GET") {
+          return makeOkJson({
+            record: {
+              id: "case-load-missing",
+              form_data: null,
+              analysis_result: null,
+              model_meta: null,
+              analysis_status: "draft",
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              analyzed_at: null,
+              consultation_name: "缺少表单",
+              case_id: "000326",
+              case_id_updated_at: new Date().toISOString(),
+              related_case_id: null,
+              related_case_id_updated_at: null,
+              ai_feedback: null,
+              ai_feedback_updated_at: null,
+              analysis_raw: null,
+              analysis_stale: false,
+            },
+          });
+        }
+        return makeErrJson(404, "not found");
+      }),
+    );
+
+    const user = userEvent.setup();
+    render(<Workbench />);
+    await waitFor(() => screen.getByText("开始分析"));
+    await fillRequiredFields(user);
+    await user.click(screen.getByText("历史"));
+    await waitFor(() => screen.getByText("历史记录"));
+    await user.click(screen.getByText("缺少表单"));
+    await waitFor(() => screen.getByRole("button", { name: "载入" }));
+    await user.click(screen.getByRole("button", { name: "载入" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert").textContent).toContain("此病案的临床输入无法读取");
+    });
+    expect(screen.getByPlaceholderText(/头痛眩晕反复发作/)).toHaveValue("");
+  });
+
+  it("confirms before reloading the same active history row", async () => {
+    const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+      const method = init?.method ?? "GET";
+      if (url === "/api/consultations" && method === "GET") {
+        return makeOkJson({
+          records: [
+            {
+              id: "case-repeat-load",
+              consultation_name: null,
+              case_id: "000325",
+              case_id_updated_at: new Date().toISOString(),
+              related_case_id: "000221",
+              related_case_id_updated_at: new Date().toISOString(),
+              form_data: {
+                consultationName: "",
+                prescriptionType: "方药",
+                patientSex: "女",
+                patientAge: "52",
+                chiefComplaint: "眩晕",
+                currentIllness: "眩晕反复发作三个月。",
+                pastHistory: "无",
+                physicalExam: "舌淡红苔白，脉细",
+                diagnosis: "眩晕",
+                pattern: "气血两虚",
+                prescription: "归脾汤加减",
+              },
+              analysis_status: "draft",
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              analyzed_at: null,
+            },
+          ],
+        });
+      }
+      if (String(url).includes("/api/consultations/") && method === "GET") {
+        return makeOkJson({
+          record: {
+            id: "case-repeat-load",
+            form_data: {
+              consultationName: "",
+              prescriptionType: "方药",
+              patientSex: "女",
+              patientAge: "52",
+              chiefComplaint: "眩晕",
+              currentIllness: "眩晕反复发作三个月。",
+              pastHistory: "无",
+              physicalExam: "舌淡红苔白，脉细",
+              diagnosis: "眩晕",
+              pattern: "气血两虚",
+              prescription: "归脾汤加减",
+            },
+            analysis_result: null,
+            model_meta: null,
+            analysis_status: "draft",
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            analyzed_at: null,
+            consultation_name: null,
+            case_id: "000325",
+            case_id_updated_at: new Date().toISOString(),
+            related_case_id: "000221",
+            related_case_id_updated_at: new Date().toISOString(),
+            ai_feedback: null,
+            ai_feedback_updated_at: null,
+            analysis_raw: null,
+            analysis_stale: false,
+          },
+        });
+      }
+      return makeErrJson(404, "not found");
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const user = userEvent.setup();
+    render(<Workbench />);
+    await waitFor(() => screen.getByText("开始分析"));
+
+    await user.click(screen.getByText("历史"));
+    await waitFor(() => screen.getByText("历史记录"));
+    await user.click(screen.getByText("女 52岁 眩晕"));
+    await waitFor(() => screen.getByRole("button", { name: "载入" }));
+    await user.click(screen.getByRole("button", { name: "载入" }));
+    await waitFor(() => expect(screen.queryByText("历史记录")).not.toBeInTheDocument());
+
+    await user.click(screen.getByText("历史"));
+    await waitFor(() => screen.getByText("历史记录"));
+    await user.click(screen.getByText("女 52岁 眩晕"));
+    await waitFor(() => screen.getByRole("alertdialog"));
+    expect(screen.getByRole("alertdialog").textContent).toContain("载入此病案将替换当前工作台内容。");
+    await user.click(screen.getByRole("button", { name: "取消" }));
+    expect(screen.getByText("历史记录")).toBeInTheDocument();
+    expect(fetchMock.mock.calls.filter(([url, options]) => String(url).includes("/api/consultations/case-repeat-load") && (options?.method ?? "GET") === "GET")).toHaveLength(1);
+
+    await user.click(screen.getByText("女 52岁 眩晕"));
+    await waitFor(() => screen.getByRole("button", { name: "载入" }));
+    await user.click(screen.getByRole("button", { name: "载入" }));
+    await waitFor(() =>
+      expect(fetchMock.mock.calls.filter(([url, options]) => String(url).includes("/api/consultations/case-repeat-load") && (options?.method ?? "GET") === "GET")).toHaveLength(2)
+    );
   });
 
   it("does not show empty case id pills in history rows", async () => {
