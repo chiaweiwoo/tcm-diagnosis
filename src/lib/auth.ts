@@ -141,7 +141,7 @@ export async function getAuthStatus(email?: string | null): Promise<AuthStatus> 
   return "ok";
 }
 
-/** Thin wrapper — true only when status is "ok". */
+/** Checks allowlist membership and is_active only. Does NOT enforce session expiry — use getAuthStatus() for full page-level guards. */
 export async function isAllowedDoctorEmail(email?: string | null) {
   const normalized = normalizeDoctorEmail(email);
   if (!normalized) return false;
@@ -159,5 +159,12 @@ export async function isAdminDoctorEmail(email?: string | null) {
   if (!normalized) return false;
 
   const record = await fetchAllowlistRecord(normalized);
-  return record?.is_active !== false && record?.is_admin === true;
+  if (!record || record.is_active === false || record.is_admin !== true) return false;
+
+  if (record.last_signin_at) {
+    const ageMs = Date.now() - new Date(record.last_signin_at).getTime();
+    if (ageMs > SESSION_MAX_AGE_DAYS * 24 * 60 * 60 * 1000) return false;
+  }
+
+  return true;
 }

@@ -74,9 +74,9 @@ function AddUserForm({ onAdded }: { onAdded: () => void }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: normalized }),
       });
-      const data = (await res.json()) as { error?: { message?: string } };
+      const data = (await res.json()) as { error?: string };
       if (!res.ok) {
-        setError(data.error?.message ?? "添加失败，请稍后再试。");
+        setError(data.error ?? "添加失败，请稍后再试。");
         return;
       }
       setEmail("");
@@ -188,8 +188,8 @@ export function UsersList({
       body: JSON.stringify({ email, isActive }),
     });
     if (!res.ok) {
-      const data = (await res.json()) as { error?: { message?: string } };
-      setActiveError(data.error?.message ?? "操作失败，请稍后再试。");
+      const data = (await res.json()) as { error?: string };
+      setActiveError(data.error ?? "操作失败，请稍后再试。");
       return;
     }
     // Optimistic update
@@ -348,10 +348,10 @@ export function UsersList({
                         )}
                       </span>
                     )}
-                    {(!doc.doctorId || !doc.isActive || doc.email === adminEmail) && (
+                    {(!doc.doctorId || !doc.isActive) && doc.email !== adminEmail && (
                       <span
                         className="users-row__action-btn users-row__action-btn--disabled"
-                        title={!doc.doctorId ? "未注册，无法预览" : !doc.isActive ? "已停用，无法预览" : ""}
+                        title={!doc.doctorId ? "未注册，无法预览" : "已停用，无法预览"}
                       >
                         <EyeOff size={16} />
                       </span>

@@ -21,6 +21,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (authStatus === "expired") {
     redirect("/auth/signout?reason=session_expired");
   }
+  if (authStatus === "deactivated") {
+    redirect("/auth/signout?reason=unauthorized");
+  }
   if (authStatus !== "ok" || !(await isAdminDoctorEmail(userEmail))) {
     redirect("/?reason=not_admin");
   }
