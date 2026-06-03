@@ -2782,7 +2782,7 @@ details[open] .sample-details__toggle::before {
 
 .users-list-head {
   display: grid;
-  grid-template-columns: 320px 1fr 80px 175px 60px;
+  grid-template-columns: 320px 1fr 80px 100px 175px 60px;
   column-gap: 20px;
   padding: 8px 16px;
   background: var(--bg, #FAFAF8);
@@ -2796,7 +2796,7 @@ details[open] .sample-details__toggle::before {
 
 .users-row {
   display: grid;
-  grid-template-columns: 320px 1fr 80px 175px 60px;
+  grid-template-columns: 320px 1fr 80px 100px 175px 60px;
   column-gap: 20px;
   align-items: center;
   padding: 11px 16px;
@@ -2888,6 +2888,13 @@ details[open] .sample-details__toggle::before {
   margin: 0 2px;
 }
 
+.users-head__status,
+.users-row__status {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
 .users-head__actions,
 .users-row__actions {
   display: flex;
@@ -2928,12 +2935,204 @@ details[open] .sample-details__toggle::before {
   font-style: italic;
 }
 
+/* Deactivated row dim */
+.users-row--deactivated {
+  opacity: 0.55;
+}
+
+/* Status pill variants */
+.status-pill--active {
+  background: #d1fae5;
+  color: #065f46;
+  font-size: 12px;
+}
+
+.status-pill--off {
+  background: #F0EDE9;
+  color: var(--text-muted, #8E8377);
+  font-size: 12px;
+}
+
+.status-pill--clickable {
+  cursor: pointer;
+  transition: opacity 0.12s;
+}
+
+.status-pill--clickable:hover {
+  opacity: 0.75;
+}
+
+/* Deactivate / reactivate confirm popup */
+.active-confirm-popup {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 50;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #EAE6E2);
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+  padding: 12px 14px;
+  min-width: 260px;
+  max-width: 340px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.active-confirm-msg {
+  font-size: 13px;
+  color: var(--text, #1A1A1A);
+  line-height: 1.5;
+}
+
+.active-confirm-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.active-confirm-ok {
+  padding: 5px 14px;
+  border-radius: 6px;
+  border: none;
+  background: var(--brand, #9B2226);
+  color: #fff;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.active-confirm-ok:hover {
+  background: var(--brand-dark, #6F1D1B);
+}
+
+.active-confirm-cancel {
+  padding: 5px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--border, #EAE6E2);
+  background: transparent;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.active-confirm-cancel:hover {
+  background: var(--bg, #FAFAF8);
+}
+
+/* Error banner */
+.users-error-banner {
+  margin-bottom: 8px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: var(--danger-bg, #FEF2F2);
+  color: var(--danger, #991B1B);
+  font-size: 13px;
+}
+
+/* Add-user toolbar controls */
+.add-user-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #EAE6E2);
+  background: var(--surface, #fff);
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--text, #1A1A1A);
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+  white-space: nowrap;
+}
+
+.add-user-btn:hover {
+  background: var(--bg, #FAFAF8);
+  border-color: var(--brand, #9B2226);
+}
+
+.add-user-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.add-user-input {
+  height: 34px;
+  padding: 0 10px;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--text, #1A1A1A);
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #EAE6E2);
+  border-radius: 7px;
+  outline: none;
+  width: 220px;
+  transition: border-color 0.15s;
+}
+
+.add-user-input:focus {
+  border-color: var(--brand, #9B2226);
+}
+
+.add-user-submit {
+  padding: 0 14px;
+  height: 34px;
+  border-radius: 7px;
+  border: none;
+  background: var(--brand, #9B2226);
+  color: #fff;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.12s;
+  white-space: nowrap;
+}
+
+.add-user-submit:hover:not(:disabled) {
+  background: var(--brand-dark, #6F1D1B);
+}
+
+.add-user-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.add-user-cancel {
+  padding: 0 10px;
+  height: 34px;
+  border-radius: 7px;
+  border: 1px solid var(--border, #EAE6E2);
+  background: transparent;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.add-user-cancel:hover:not(:disabled) {
+  background: var(--bg, #FAFAF8);
+}
+
+.add-user-error {
+  font-size: 12px;
+  color: var(--danger, #991B1B);
+  width: 100%;
+}
+
 @media (max-width: 480px) {
-  .users-list-head {
+  .users-list-head,
+  .users-row {
     grid-template-columns: 1fr 80px 40px;
   }
   .users-head__spark,
   .users-row__spark,
+  .users-head__status,
+  .users-row__status,
   .users-head__date,
   .users-row__date {
     display: none;

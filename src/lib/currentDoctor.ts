@@ -1,4 +1,4 @@
-import { getDevBypassDoctorEmail, normalizeDoctorEmail } from "@/lib/auth";
+import { getAuthStatus, getDevBypassDoctorEmail, normalizeDoctorEmail } from "@/lib/auth";
 import { createServerSupabaseClient, getServiceRoleClient } from "@/lib/supabase/server";
 
 export async function getCurrentDoctorEmail() {
@@ -54,5 +54,7 @@ export async function getCurrentDoctor(): Promise<{
   if (!user?.id || !user?.email) throw new Error("Unauthorized");
   const email = normalizeDoctorEmail(user.email);
   if (!email) throw new Error("Unauthorized");
+  const status = await getAuthStatus(email);
+  if (status !== "ok") throw new Error("Unauthorized");
   return { id: user.id, email, isDevBypass: false };
 }

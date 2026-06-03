@@ -1,8 +1,13 @@
+export const SESSION_MAX_AGE_DAYS = 3;
+
 type DoctorAllowlistRecord = {
   email: string;
   is_active?: boolean | null;
   is_admin?: boolean | null;
+  last_signin_at?: string | null;
 };
+
+export type AuthStatus = "ok" | "deactivated" | "expired" | "not_allowed";
 
 function assertDevBypassIsLocalOnly() {
   if (process.env.DEV_AUTH_BYPASS === "true" && process.env.NODE_ENV !== "development") {
@@ -53,13 +58,13 @@ function getSupabaseAdminConfig() {
   };
 }
 
-async function fetchAllowlistRecord(email: string) {
+async function fetchAllowlistRecord(email: string): Promise<DoctorAllowlistRecord | null> {
   const config = getSupabaseAdminConfig();
   if (!config) return null;
 
   try {
     const url = new URL(config.baseUrl);
-    url.searchParams.set("select", "email,is_active,is_admin");
+    url.searchParams.set("select", "email,is_active,is_admin,last_signin_at");
     url.searchParams.set("email", `eq.${email}`);
     url.searchParams.set("limit", "1");
 
@@ -111,6 +116,32 @@ export async function getAllowedDoctorEmails() {
   return (await fetchAllowlistEmails()) ?? parseEnvAllowlist();
 }
 
+/**
+ * Full auth status check — covers is_active, 3-day session expiry, and allowlist membership.
+ * Use this at every page-level guard to get the right redirect reason.
+ */
+export async function getAuthStatus(email?: string | null): Promise<AuthStatus> {
+  const normalized = normalizeDoctorEmail(email);
+  if (!normalized) return "not_allowed";
+
+  const record = await fetchAllowlistRecord(normalized);
+
+  if (!record) {
+    // Fall back to env allowlist (no expiry enforcement for env-list entries)
+    return parseEnvAllowlist().includes(normalized) ? "ok" : "not_allowed";
+  }
+
+  if (record.is_active === false) return "deactivated";
+
+  if (record.last_signin_at) {
+    const ageMs = Date.now() - new Date(record.last_signin_at).getTime();
+    if (ageMs > SESSION_MAX_AGE_DAYS * 24 * 60 * 60 * 1000) return "expired";
+  }
+
+  return "ok";
+}
+
+/** Thin wrapper — true only when status is "ok". */
 export async function isAllowedDoctorEmail(email?: string | null) {
   const normalized = normalizeDoctorEmail(email);
   if (!normalized) return false;

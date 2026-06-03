@@ -1,7 +1,7 @@
 import "./admin.css";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getDevBypassDoctorEmail, isAdminDoctorEmail } from "@/lib/auth";
+import { getAuthStatus, getDevBypassDoctorEmail, isAdminDoctorEmail } from "@/lib/auth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { BRANDING } from "@/lib/branding";
 import AdminNav from "./AdminNav";
@@ -17,7 +17,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     userEmail = user.email ?? "";
   }
 
-  if (!(await isAdminDoctorEmail(userEmail))) {
+  const authStatus = await getAuthStatus(userEmail);
+  if (authStatus === "expired") {
+    redirect("/auth/signout?reason=session_expired");
+  }
+  if (authStatus !== "ok" || !(await isAdminDoctorEmail(userEmail))) {
     redirect("/?reason=not_admin");
   }
 

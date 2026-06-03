@@ -1,4 +1,5 @@
 import { type NextRequest } from "next/server";
+import { getAuthStatus } from "@/lib/auth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { apiError } from "@/lib/apiResponses";
 
@@ -33,6 +34,16 @@ export async function requireApiAuth(request: NextRequest): Promise<ApiAuthResul
     const supabase = await createServerSupabaseClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
+      const status = await getAuthStatus(user.email);
+      if (status === "deactivated") {
+        return { ok: false, response: apiError(401, "UNAUTHORIZED", "账号已停用，请联系管理员。") };
+      }
+      if (status === "expired") {
+        return { ok: false, response: apiError(401, "UNAUTHORIZED", "会话已过期，请重新登录。") };
+      }
+      if (status !== "ok") {
+        return { ok: false, response: apiError(401, "UNAUTHORIZED", "账号无访问权限。") };
+      }
       return { ok: true, doctorEmail: user.email ?? null, isCli: false };
     }
   } catch {

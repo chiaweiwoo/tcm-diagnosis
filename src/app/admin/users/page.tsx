@@ -1,11 +1,12 @@
 import { createServerSupabaseClient, getServiceRoleClient } from "@/lib/supabase/server";
-import { getDevBypassDoctorEmail } from "@/lib/auth";
+import { getDevBypassDoctorEmail, normalizeDoctorEmail } from "@/lib/auth";
 import { UsersList } from "./UsersList";
 
 export type DoctorRow = {
   doctorId: string | null;
   email: string;
   isAdmin: boolean;
+  isActive: boolean;
   lastActive: string | null;
   dailyCounts: number[]; // 30 entries: index 0 = 30 days ago, index 29 = today (SGT)
 };
@@ -31,7 +32,6 @@ async function loadDoctors(): Promise<DoctorRow[]> {
     admin
       .from("doctor_allowlist")
       .select("email,is_admin,is_active")
-      .eq("is_active", true)
       .order("email"),
     admin.auth.admin.listUsers({ perPage: 1000 }),
     admin
@@ -61,12 +61,14 @@ async function loadDoctors(): Promise<DoctorRow[]> {
     (allowlistResult.data ?? []).map(async (row) => {
       const email = row.email.toLowerCase();
       const doctorId = emailToId.get(email) ?? null;
+      const isActive = row.is_active ?? true;
 
       if (!doctorId) {
         return {
           doctorId: null,
           email,
           isAdmin: row.is_admin ?? false,
+          isActive,
           lastActive: null,
           dailyCounts: Array(30).fill(0) as number[],
         };
@@ -85,6 +87,7 @@ async function loadDoctors(): Promise<DoctorRow[]> {
         doctorId,
         email,
         isAdmin: row.is_admin ?? false,
+        isActive,
         lastActive: lastResult.data?.analyzed_at ?? null,
         dailyCounts: buildDailyCounts(doctorId, sparkMap),
       };
@@ -92,20 +95,16 @@ async function loadDoctors(): Promise<DoctorRow[]> {
   );
 }
 
-async function getCurrentDoctorId(): Promise<string | null> {
+async function getCurrentAdminEmail(): Promise<string> {
   const bypassEmail = getDevBypassDoctorEmail();
-  if (bypassEmail) {
-    const admin = getServiceRoleClient();
-    const { data } = await admin.auth.admin.listUsers({ perPage: 1000 });
-    return data?.users.find((u) => u.email?.toLowerCase() === bypassEmail.toLowerCase())?.id ?? null;
-  }
+  if (bypassEmail) return normalizeDoctorEmail(bypassEmail);
   const supabase = await createServerSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
-  return user?.id ?? null;
+  return normalizeDoctorEmail(user?.email);
 }
 
 export default async function UsersPage() {
-  const [doctors, currentDoctorId] = await Promise.all([loadDoctors(), getCurrentDoctorId()]);
+  const [doctors, adminEmail] = await Promise.all([loadDoctors(), getCurrentAdminEmail()]);
 
   return (
     <main className="admin-page">
@@ -113,7 +112,7 @@ export default async function UsersPage() {
         <div>
           <p className="eyebrow">后台管理</p>
           <h1>用户列表</h1>
-          <p className="admin-meta">所有已启用的医生账户</p>
+          <p className="admin-meta">所有已注册的医生账户</p>
         </div>
       </div>
 
@@ -124,7 +123,7 @@ export default async function UsersPage() {
           </p>
         </div>
       ) : (
-        <UsersList doctors={doctors} currentDoctorId={currentDoctorId} />
+        <UsersList doctors={doctors} adminEmail={adminEmail} />
       )}
     </main>
   );

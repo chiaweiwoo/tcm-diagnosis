@@ -37,6 +37,10 @@ Neither → 401. Enforced by `src/lib/apiAuth.ts` called at the top of both rout
 
 `/api/admin/*` routes require a valid Supabase session AND `is_admin = true` on `doctor_allowlist`. Returns 403 otherwise.
 
+**`apiAuth.ts` also re-checks the allowlist and session expiry** (via `getAuthStatus`) — deactivation and expiry take effect on the very next API request, not only page navigation.
+
+Routes using `getCurrentDoctor()` (e.g. `/api/me/nudge`) inherit the same check — `currentDoctor.ts` calls `getAuthStatus` after resolving the email.
+
 ### 4. DEV_AUTH_BYPASS must never reach production
 
 Guard is in `src/lib/auth.ts → assertDevBypassIsLocalOnly()`. It throws if `NODE_ENV !== "development"`. Never remove this check. Never add `NEXT_PUBLIC_DEV_AUTH_BYPASS`.
@@ -44,6 +48,28 @@ Guard is in `src/lib/auth.ts → assertDevBypassIsLocalOnly()`. It throws if `NO
 ### 5. Doctor allowlist is source of truth for access
 
 Read from Supabase `doctor_allowlist` table first. Fall back to `ALLOWED_DOCTOR_EMAILS` env var only when Supabase is unreachable. Signed-in but non-allowlisted users must be signed out immediately with a Chinese message.
+
+### 15. 3-day session expiry — forced re-auth
+
+All users (including admins) must re-authenticate every **3 days** from their last sign-in.
+
+- `SESSION_MAX_AGE_DAYS = 3` constant in `src/lib/auth.ts`.
+- `doctor_allowlist.last_signin_at` is stamped at `/auth/callback` on every successful OAuth sign-in (service-role UPDATE).
+- `getAuthStatus(email)` in `src/lib/auth.ts` checks `last_signin_at`; returns `"expired"` if stale.
+- Page guards (`src/app/page.tsx`, `src/app/admin/layout.tsx`) redirect expired users to `/auth/signout?reason=session_expired` → `/login?reason=session_expired` with Chinese notice 「会话已过期，请重新登录。」
+- API guards (`apiAuth.ts`, `currentDoctor.ts`) return 401 immediately for expired sessions.
+- Do not silently extend sessions or remove this check. The 3-day window is intentional.
+- **Migration 034** must be applied before this feature is live (adds `last_signin_at` column + backfills existing rows with `now()` so existing users get a fresh 3-day window at deploy time).
+
+### 16. Doctor allowlist management — add via UI, never delete
+
+Admin can add doctors to `doctor_allowlist` via `/admin/users` UI (`POST /api/admin/users/add`). Rules:
+- Only `@gmail.com` addresses are accepted (Google OAuth is the only sign-in path).
+- New entries are always created as `is_admin: false`. Promote to admin via CLI only.
+- **No deletion from UI or API** — deactivate (`is_active: false`) to revoke access. Records are permanent.
+- `POST /api/admin/users/active` — toggles `is_active`. Admin cannot toggle their own row (server + client enforced).
+- Deactivated users: dimmed row in list, eye icon hidden, status pill shows 已停用.
+- Deactivation takes effect on the very next page navigation or API request (no grace period).
 
 ### 6. Field limits are defined in src/lib/forms/limits.ts
 
@@ -321,7 +347,7 @@ Never define a token only in `workbench.css` — admin pages won't see it. Add i
 Doctor fills 9 visible fields. All validated by `structuredCaseSchema` in `src/lib/forms/caseSchema.ts`.
 
 Required fields (hard-block if missing/invalid):
-- `prescriptionType`: `PrescriptionType[]` — array of "方药" | "针灸" | "综合调理", min 1 item
+- `prescriptionType`: `"方药" | "针灸" | "推拿" | "综合调理"` — single-select treatment type
 - `patientAge`: numeric 1-120
 - `patientSex`: "男" | "女"
 - `chiefComplaint`: 2-200 chars
@@ -349,13 +375,17 @@ Admin entry point: `⚙` icon (Settings2) in workbench header, visible only when
 Admin guard: `src/app/admin/layout.tsx` — server-side, redirects to `/?reason=not_admin` if not admin.
 
 Admin nav (3 tabs, `src/app/admin/AdminNav.tsx`):
-- **用户** — `/admin/users` — doctor list with 30-day activity sparkline, last-analysis timestamp (SGT), and role badge; row click opens profile overlay
+- **用户** — `/admin/users` — doctor list with 30-day activity sparkline, 状态 column, last-analysis timestamp (SGT), and role badge; row click opens profile overlay
 - **AI 输出审查** — `/admin/output-audits` — fleet-wide AI output audits (v3)
 - **提示词** — `/admin/prompts` — GitOps prompt registry browser (see Invariant #14)
 
 `/admin` redirects to `/admin/users`.
 
-**Doctor profile overlay**: clicking a doctor row opens a fixed modal (`ProfileOverlay.tsx`). Inactive rows (no `doctorId`) are not clickable. Eye icon keeps its confirm popup (stopPropagation prevents row click).
+**Doctor profile overlay**: clicking an active doctor row opens a fixed modal (`ProfileOverlay.tsx`). Deactivated rows are not clickable (no eye icon). Eye icon keeps its confirm popup (stopPropagation prevents row click).
+
+**状态 column**: green 已启用 / grey 已停用 pill, clickable (except admin's own row). Click opens an inline confirm popup with consequences spelled out. Uses `POST /api/admin/users/active`. Admin cannot toggle own row (client + server enforced).
+
+**添加医生 form**: inline in the toolbar above the list. Accepts `@gmail.com` only; always creates as 医生. Duplicate email returns 409 with inline error. On success, `router.refresh()` reloads the server component.
 
 **Self-aware admin row**: impersonation eye icon is hidden on the admin's own row. When admin opens their own profile overlay and clicks a flagged case, the new tab opens `/` (not `/?viewAs=<self>`).
 
@@ -394,20 +424,71 @@ Prompts: `src/lib/prompts/registry/output-audit/v3.0.ts` — `buildPrompt()`. Li
 
 ## Doctor Onboarding
 
-No signup page. All onboarding is admin-driven via CLI:
+Admins can add doctors via the `/admin/users` UI (添加医生 button, `@gmail.com` only, always created as 医生) or via CLI:
 
 ```bash
 npm run allowlist:add -- --email doctor@example.com [--admin]
 npm run allowlist:add -- --email doctor@example.com --remove
 ```
 
-The doctor can then sign in via Google OAuth — Supabase matches the existing `auth.users` row by email.
+To revoke access without deleting history: deactivate via the 状态 pill in `/admin/users`.
+
+The doctor can then sign in via Google OAuth — Supabase matches the existing `auth.users` row by email. Sessions expire after 3 days (see Invariant §15).
 
 ---
 
-## Historical Data Ingestion (scratch scripts)
+## Historical Data Ingestion
 
-For bulk-migrating clinical exports: `scratch/clean_historical_data.py` (parse/clean CSV), `scratch/ingest_ardy_data.mjs` (delete+insert with local JSON backup), `scratch/analyze_batch_historical.mjs` (batch analyze via `/api/analyze` with `maxTokens: 2500`), `scratch/check_ardy_rows.mjs` (verify counts). Always snapshot DB before deletion. Set `analyzed_at = record.created_at` to preserve timeline positioning.
+Historical ingestion is a gated pipeline. Do not do a one-shot delete/insert/analyze flow.
+
+**Run order**
+
+1. `npm run hist:prepare -- --file "<excel_path>" --out-dir "output\historical_ingestion\<batch_name>"`
+2. `npm run hist:validate -- --input "output\historical_ingestion\<batch_name>\pre_llm_payload.json"`
+3. `npm run hist:extract -- --input "output\historical_ingestion\<batch_name>\pre_llm_payload.json" --output "output\historical_ingestion\<batch_name>\llm_sample.json" --sample 20`
+4. `npm run hist:validate -- --input "output\historical_ingestion\<batch_name>\llm_sample.json"`
+5. `npm run hist:upsert -- --input "output\historical_ingestion\<batch_name>\llm_sample.json" --doctor-map "scratch\historical_doctor_map.json" --dry-run`
+6. After approval and migration 033, rerun `hist:upsert` with `--apply`
+7. `npm run hist:verify -- --batch <batch_name> --expected "output\historical_ingestion\<batch_name>\llm_sample.json"`
+
+Only after the sample path is approved should you run a full LLM extraction and full upsert for the month.
+
+**Source requirements**
+
+Required source columns: `Order Ref` or `External ID`, `Created on`, `Diagnosed By 诊断医师`, `Patient 患者`, `Age`, `Presenting Complaint 主诉`, `History of Presenting Complaint 现病史`, `Diagnosis 诊断`, `Treatment 治疗描述`, `Past Medical History 既往史`, `Medical Examination 体格检查`.
+
+`External ID` may replace `Order Ref` only when it is a stable Odoo row id shaped like `__export__.pos_order_<number>`; use the numeric suffix as `case_id`.
+
+Follow-up linkage must be grouped by `doctor_external_id + patient`, not patient alone.
+
+**Date and row filtering**
+
+- Default range is the latest 31 days by whole day, anchored on `MAX(Created on)`.
+- Use `--start` / `--end` only for explicit review runs.
+- Drop rows only when `Age` is unavailable or unparseable.
+- If invalid-age rows are `>=10%` of the selected window, stop and fix the export instead of dropping them.
+
+**Pre-LLM responsibilities**
+
+`scratch/clean_historical_data.py` is deterministic only. It may validate columns, filter the day-based window, derive identifiers, emit placeholder doctor email hints like `users_129@gmail.com`, strip obvious billing/admin noise, and normalize limited non-clinical fallbacks such as `无` and `未见异常`.
+
+It must not pretend keyword parsing is final clinical extraction.
+
+**LLM responsibilities**
+
+DeepSeek Flash does the intelligent restructuring for `chiefComplaint`, `currentIllness`, `diagnosis`, `pattern`, `prescriptionType`, `prescription`, `pastHistory`, `physicalExam`, and `patientSex`.
+
+`hist:extract` should prefer batched calls, with bounded parallelism, retries, resumable output, and single-row fallback for failed batches. Do not log full clinical text.
+
+**Doctor identity for import**
+
+Placeholder emails such as `users_129@gmail.com` are acceptable for historical review, but inserts still require real Supabase Auth rows because `consultations.doctor_id` references `auth.users(id)`.
+
+Use `scratch/historical_doctor_map.json` to map source doctor ids to placeholder or real emails. The upsert script is responsible for creating placeholder Auth users when needed and then resolving `doctor_id`.
+
+**Post-push verification**
+
+Every apply run must be followed by `hist:verify`. Verify expected rows vs inserted/upserted rows, duplicate `(doctor_id, case_id)` count = 0, broken `related_case_id` links = 0, required `form_data` fields present, and counts by doctor/date range aligned with the validated payload.
 
 ---
 
@@ -434,6 +515,8 @@ Migrations: `supabase/migrations/` (numbered SQL). **Committing a migration file
 > - `029_doctor_risk_nudges.sql` — **must run before first `npm run dr_nudge`**
 > - `031_drop_doctor_discussion_agenda.sql` — drops retired table
 > - `032_doctor_profile_snapshots.sql` — enables profile overlay cache
+> - `033_consultations_doctor_case_unique.sql` — required before historical `hist:upsert --apply`
+> - `034_doctor_allowlist_last_signin.sql` — **required for 3-day session expiry to work**; adds `last_signin_at` column and backfills existing rows with `now()`
 
 `consultations`: doctor reads use user-scoped Supabase client (anon key + session JWT); RLS enforces isolation. Admin routes use service_role (bypasses RLS). Never expose service_role key to browser.
 

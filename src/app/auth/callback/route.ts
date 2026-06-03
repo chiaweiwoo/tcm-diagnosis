@@ -1,7 +1,7 @@
 import { after } from "next/server";
 import { NextRequest, NextResponse } from "next/server";
 import { isAllowedDoctorEmail } from "@/lib/auth";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createServerSupabaseClient, getServiceRoleClient } from "@/lib/supabase/server";
 import { logActivity } from "@/lib/activityLog";
 
 export async function GET(request: NextRequest) {
@@ -28,6 +28,15 @@ export async function GET(request: NextRequest) {
   if (!(await isAllowedDoctorEmail(user?.email))) {
     await supabase.auth.signOut();
     return NextResponse.redirect(new URL("/login?reason=unauthorized", origin));
+  }
+
+  // Stamp last_signin_at to reset the 3-day session expiry window
+  if (user?.email) {
+    const admin = getServiceRoleClient();
+    await admin
+      .from("doctor_allowlist")
+      .update({ last_signin_at: new Date().toISOString() })
+      .eq("email", user.email.toLowerCase());
   }
 
   // Log login event — non-blocking, never fails the auth flow

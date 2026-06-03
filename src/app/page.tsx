@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
-import { getDevBypassDoctorEmail, isAllowedDoctorEmail, isAdminDoctorEmail } from "@/lib/auth";
+import { getAuthStatus, getDevBypassDoctorEmail, isAllowedDoctorEmail, isAdminDoctorEmail } from "@/lib/auth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getPreviewDoctorById } from "@/lib/viewAs";
 import Workbench from "./workbench";
@@ -30,7 +30,11 @@ export default async function Home({ searchParams }: HomeProps) {
       redirect("/login");
     }
 
-    if (!(await isAllowedDoctorEmail(user.email))) {
+    const authStatus = await getAuthStatus(user.email);
+    if (authStatus === "expired") {
+      redirect("/auth/signout?reason=session_expired");
+    }
+    if (authStatus !== "ok") {
       redirect("/auth/signout?reason=unauthorized");
     }
 

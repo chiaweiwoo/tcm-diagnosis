@@ -13,6 +13,8 @@ export type ApiErrorCode =
   | "VIEW_AS_FORBIDDEN"
   | "VIEW_AS_TARGET_NOT_FOUND"
   | "VIEW_AS_READ_ONLY"
+  | "CONFLICT"
+  | "CANNOT_TOGGLE_SELF"
   | "INTERNAL_ERROR";
 
 export type ApiErrorBody = {

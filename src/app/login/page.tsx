@@ -8,6 +8,7 @@ import "../workbench.css";
 
 const reasonMessages: Record<string, string> = {
   unauthorized: "此账号未获授权，请改用允许名单内的 Google 账号登录。",
+  session_expired: "会话已过期，请重新登录。",
   oauth_error: "Google 登录未完成，请稍后再试。",
   dev_bypass_invalid: "本地开发旁路邮箱未通过允许名单校验，请检查 DEV_AUTH_EMAIL 配置。",
 };
@@ -23,7 +24,7 @@ export default function LoginPage() {
       setReasonMessage(reason ? reasonMessages[reason] ?? "" : "");
     }, 0);
 
-    if (reason === "unauthorized") {
+    if (reason === "unauthorized" || reason === "session_expired") {
       void createBrowserSupabaseClient().auth.signOut();
     }
   }, []);
