@@ -1481,7 +1481,7 @@ export default function Workbench({
               }}
             >
               <LogOut size={15} />
-              <span className="sr-only">退出</span>
+              <span>退出</span>
             </button>
           </div>
         </div>
