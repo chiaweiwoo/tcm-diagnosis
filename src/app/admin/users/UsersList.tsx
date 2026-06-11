@@ -258,7 +258,7 @@ export function UsersList({
                   <span className="users-row__spark">
                     {doc.isActive ? <Sparkline counts={doc.dailyCounts} /> : null}
                   </span>
-                  <span>
+                  <span className="users-row__role">
                     {doc.isAdmin ? (
                       <span className="status-pill user-role-admin">管理员</span>
                     ) : (

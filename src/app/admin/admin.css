@@ -2935,8 +2935,12 @@ details[open] .sample-details__toggle::before {
   font-style: italic;
 }
 
-/* Deactivated row dim */
-.users-row--deactivated {
+/* Deactivated row dim — applied per column so the status popup is unaffected by opacity compositing */
+.users-row--deactivated .users-row__email,
+.users-row--deactivated .users-row__spark,
+.users-row--deactivated .users-row__role,
+.users-row--deactivated .users-row__date,
+.users-row--deactivated .users-row__actions {
   opacity: 0.55;
 }
 
