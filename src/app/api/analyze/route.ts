@@ -72,6 +72,10 @@ export async function POST(request: NextRequest) {
       model: getDeepSeekFastModel(),
       timeoutMs: 45_000,
       repairJson: true,
+      retryOnEmpty: true,
+      // The current Flash model defaults to thinking mode; reserve the response
+      // budget for the structured clinical JSON instead of hidden reasoning.
+      thinking: { type: "disabled" },
     });
 
     const output = buildAnalysisResult(result.data, form.prescriptionType);

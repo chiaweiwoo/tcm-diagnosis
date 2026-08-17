@@ -37,6 +37,7 @@ const response = await fetch("https://api.deepseek.com/chat/completions", {
       { role: "user", content: '请返回 {"状态":"成功"}' },
     ],
     response_format: { type: "json_object" },
+    thinking: { type: "disabled" },
     temperature: 0,
     max_tokens: 400,
   }),

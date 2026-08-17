@@ -102,6 +102,26 @@ describe("DeepSeek JSON repair fallback", () => {
     expect(body.response_format).toBeUndefined();
   });
 
+  it("passes an explicit thinking mode to DeepSeek", async () => {
+    process.env.DEEPSEEK_API_KEY = "test-key";
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: '{"ok":true}' }, finish_reason: "stop" }],
+      }),
+    } as Response);
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await callDeepSeekJson<{ ok: boolean }>({
+      messages: [{ role: "user", content: "test" }],
+      thinking: { type: "disabled" },
+    });
+
+    const body = JSON.parse(fetchMock.mock.calls[0]?.[1]?.body as string);
+    expect(body.thinking).toEqual({ type: "disabled" });
+  });
+
   it("includes finish reason and token diagnostics when content is empty", async () => {
     process.env.DEEPSEEK_API_KEY = "test-key";
     const fetchMock = vi.fn().mockResolvedValue({

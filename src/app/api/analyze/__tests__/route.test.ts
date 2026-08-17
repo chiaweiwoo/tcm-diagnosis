@@ -119,6 +119,14 @@ describe("POST /api/analyze", () => {
     const response = await POST(makeRequest({ form: MINIMAL_VALID }));
     expect(response.status).toBe(200);
 
+    expect(callDeepSeekJson).toHaveBeenCalledWith(
+      expect.objectContaining({
+        maxTokens: 1200,
+        retryOnEmpty: true,
+        thinking: { type: "disabled" },
+      }),
+    );
+
     const body = await parseResponse(response);
     expect(body).toHaveProperty("result");
     expect(body).toHaveProperty("raw");

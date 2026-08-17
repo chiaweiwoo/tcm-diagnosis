@@ -3,6 +3,10 @@ type DeepSeekMessage = {
   content: string;
 };
 
+export type DeepSeekThinking = {
+  type: "enabled" | "disabled";
+};
+
 type DeepSeekUsage = {
   prompt_tokens?: number;
   completion_tokens?: number;
@@ -138,6 +142,7 @@ async function requestDeepSeek({
   timeoutMs,
   temperature,
   jsonMode = true,
+  thinking,
 }: {
   messages: DeepSeekMessage[];
   maxTokens: number;
@@ -146,6 +151,7 @@ async function requestDeepSeek({
   temperature: number;
   /** Set false to omit response_format:json_object — allows partial output on truncation. */
   jsonMode?: boolean;
+  thinking?: DeepSeekThinking;
 }): Promise<DeepSeekCall> {
   const apiKey = process.env.DEEPSEEK_API_KEY;
 
@@ -168,6 +174,7 @@ async function requestDeepSeek({
         model,
         messages,
         ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
+        ...(thinking ? { thinking } : {}),
         temperature,
         max_tokens: maxTokens,
       }),
@@ -270,6 +277,7 @@ export async function callDeepSeekJson<T>({
   repairJson = false,
   retryOnEmpty = false,
   jsonMode = true,
+  thinking,
 }: {
   messages: DeepSeekMessage[];
   maxTokens?: number;
@@ -280,15 +288,16 @@ export async function callDeepSeekJson<T>({
   retryOnEmpty?: boolean;
   /** Set false to omit response_format:json_object — allows partial output on truncation. */
   jsonMode?: boolean;
+  thinking?: DeepSeekThinking;
 }): Promise<DeepSeekJsonResult<T>> {
   let first: DeepSeekCall;
   try {
-    first = await requestDeepSeek({ messages, maxTokens, model, timeoutMs, temperature: 0.1, jsonMode });
+    first = await requestDeepSeek({ messages, maxTokens, model, timeoutMs, temperature: 0.1, jsonMode, thinking });
   } catch (err) {
     if (retryOnEmpty && err instanceof DeepSeekError && err.status === 502) {
       // Empty or connection-failed response — retry once after a short pause
       await new Promise((r) => setTimeout(r, 3000));
-      first = await requestDeepSeek({ messages, maxTokens, model, timeoutMs, temperature: 0.1, jsonMode });
+      first = await requestDeepSeek({ messages, maxTokens, model, timeoutMs, temperature: 0.1, jsonMode, thinking });
     } else {
       throw err;
     }
